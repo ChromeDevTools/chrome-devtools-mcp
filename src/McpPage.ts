@@ -374,7 +374,10 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
-      this.#networkOverrideManager = new NetworkOverrideManager(page);
+      this.#networkOverrideManager = new NetworkOverrideManager(
+        page,
+        this.#config,
+      );
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,

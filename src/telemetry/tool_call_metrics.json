@@ -1455,8 +1455,7 @@
       },
       {
         "name": "upstream_length",
-        "argType": "number",
-        "isDeprecated": true
+        "argType": "number"
       }
     ]
   },

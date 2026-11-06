@@ -295,10 +295,9 @@ describe('McpPage', () => {
         locatorClass: Locator,
       });
       await page.mockNetwork({
-        kind: 'file',
+        kind: 'redirect',
         urlPattern: '*.js',
-        responseFilePath: '/tmp/app.js',
-        loadResponseFile: async () => new Uint8Array(),
+        redirectUrl: 'https://example.com/app.js',
       });
       page.setIsRunningPerformanceTrace(true);
       await assert.rejects(
@@ -323,10 +322,9 @@ describe('McpPage', () => {
         locatorClass: Locator,
       });
       const overrides = await page.mockNetwork({
-        kind: 'file',
+        kind: 'redirect',
         urlPattern: '*.js',
-        responseFilePath: '/tmp/replacement.js',
-        loadResponseFile: async () => new Uint8Array(),
+        redirectUrl: 'https://example.com/replacement.js',
       });
       assert.deepStrictEqual(page.listNetworkOverrides(), [overrides]);
       sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
@@ -350,10 +348,9 @@ describe('McpPage', () => {
       page.dispose();
       await assert.rejects(
         page.mockNetwork({
-          kind: 'file',
+          kind: 'redirect',
           urlPattern: '*.js',
-          responseFilePath: '/tmp/replacement.js',
-          loadResponseFile: async () => new Uint8Array(),
+          redirectUrl: 'https://example.com/replacement.js',
         }),
         /already been disposed/,
       );

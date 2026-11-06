@@ -30,7 +30,9 @@ export class NetworkOverridesFormatter {
     const lines = [warning];
     for (const override of overrides) {
       const source =
-        override.responseFilePath + ' (' + override.contentType + ')';
+        override.kind === 'file'
+          ? override.responseFilePath + ' (' + override.contentType + ')'
+          : override.redirectUrl;
       const resourceType = override.resourceType
         ? ' [' + override.resourceType + ']'
         : '';

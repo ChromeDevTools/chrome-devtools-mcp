@@ -21,10 +21,9 @@ describe('network override measurements', () => {
     {
       id: 1,
       diagnostics: {hits: 0, errors: 0, navigations: 0},
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: 'https://example.com/app.js',
-      responseFilePath: '/tmp/candidate.js',
-      contentType: 'text/javascript',
+      redirectUrl: 'https://example.com/candidate.js',
     },
   ];
   const {warning} = new NetworkOverridesFormatter(overrides).toJSON();

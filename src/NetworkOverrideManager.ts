@@ -6,6 +6,13 @@
 
 import path from 'node:path';
 
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {
+  fetchWithValidatedRedirects,
+  getRedirectHeaders,
+  validateNetworkUrl,
+} from './utils/network.js';
+
 import {
   type Frame,
   type HTTPRequest,
@@ -25,6 +32,11 @@ export interface NetworkMockFilter {
   resourceType?: ResourceType;
 }
 
+export interface RedirectNetworkOverrideInput extends NetworkMockFilter {
+  kind: 'redirect';
+  redirectUrl: string;
+}
+
 export interface FileNetworkOverrideInput extends NetworkMockFilter {
   kind: 'file';
   responseFilePath: string;
@@ -32,7 +44,8 @@ export interface FileNetworkOverrideInput extends NetworkMockFilter {
   loadResponseFile: () => Promise<Uint8Array<ArrayBufferLike>>;
 }
 
-export type NetworkMockInput = FileNetworkOverrideInput;
+export type NetworkMockInput =
+  RedirectNetworkOverrideInput | FileNetworkOverrideInput;
 
 interface NetworkOverrideBase extends BaseNetworkOverride {
   id: number;
@@ -44,16 +57,26 @@ interface NetworkOverrideBase extends BaseNetworkOverride {
   };
 }
 
+export interface RedirectNetworkOverride extends NetworkOverrideBase {
+  kind: 'redirect';
+  redirectUrl: string;
+}
+
 export interface FileNetworkOverride extends NetworkOverrideBase {
   kind: 'file';
   responseFilePath: string;
   contentType: string;
 }
 
-export type NetworkOverride = FileNetworkOverride;
+export type NetworkOverride = RedirectNetworkOverride | FileNetworkOverride;
 
 interface StoredNetworkOverrideBase extends NetworkOverrideBase {
   matcher: RegExp;
+}
+
+interface StoredRedirectNetworkOverride extends StoredNetworkOverrideBase {
+  kind: 'redirect';
+  redirectUrl: string;
 }
 
 interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
@@ -63,7 +86,8 @@ interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
   loadResponseFile: () => Promise<Uint8Array<ArrayBufferLike>>;
 }
 
-type StoredNetworkOverride = StoredFileNetworkOverride;
+type StoredNetworkOverride =
+  StoredRedirectNetworkOverride | StoredFileNetworkOverride;
 
 const DEFAULT_URL_PATTERN = '*';
 
@@ -140,6 +164,13 @@ function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
     resourceType: override.resourceType,
     diagnostics: {...override.diagnostics},
   };
+  if (override.kind === 'redirect') {
+    return {
+      ...base,
+      kind: override.kind,
+      redirectUrl: override.redirectUrl,
+    };
+  }
   return {
     ...base,
     kind: override.kind,
@@ -181,7 +212,10 @@ export class NetworkOverrideManager {
     }
   };
 
-  constructor(page: Page) {
+  constructor(
+    page: Page,
+    private readonly config: ReadonlyServerConfig,
+  ) {
     this.#page = page;
   }
 
@@ -232,6 +266,14 @@ export class NetworkOverrideManager {
       matcher: compileUrlPattern(urlPattern),
       diagnostics: {hits: 0, errors: 0, navigations: 0},
     };
+    if (input.kind === 'redirect') {
+      validateNetworkUrl(new URL(input.redirectUrl), this.config.resolved);
+      return {
+        ...base,
+        kind: input.kind,
+        redirectUrl: input.redirectUrl,
+      };
+    }
 
     await input.loadResponseFile();
     return {
@@ -429,6 +471,11 @@ export class NetworkOverrideManager {
 
     override.diagnostics.hits++;
     try {
+      if (override.kind === 'redirect') {
+        await this.#fulfillUpstream(request, override.redirectUrl);
+        return;
+      }
+
       const body = await override.loadResponseFile();
       await request.respond({
         status: 200,
@@ -446,7 +493,10 @@ export class NetworkOverrideManager {
         typeof error.message === 'string'
           ? error.message
           : String(error);
-      const source = override.responseFilePath;
+      const source =
+        override.kind === 'file'
+          ? override.responseFilePath
+          : redactUrlForLogging(override.redirectUrl);
       override.diagnostics.errors++;
       override.diagnostics.lastError = (
         'Failed to load ' +
@@ -457,6 +507,37 @@ export class NetworkOverrideManager {
       logger?.('Failed to apply network override ' + override.id);
       await this.#abortRequest(request);
     }
+  }
+
+  async #fulfillUpstream(
+    request: HTTPRequest,
+    redirectUrl: string,
+  ): Promise<void> {
+    const method = request.method();
+    if (method !== 'GET' && method !== 'HEAD') {
+      throw new Error('Upstream mocks only support GET and HEAD requests.');
+    }
+    const headers = getRedirectHeaders(
+      new URL(request.url()),
+      new URL(redirectUrl),
+      request.headers(),
+    );
+    const response = await fetchWithValidatedRedirects(new URL(redirectUrl), {
+      validateUrl: url => validateNetworkUrl(url, this.config.resolved),
+      method,
+      headers,
+    });
+    const responseHeaders: Record<string, string> = {};
+    for (const [name, value] of response.headers) {
+      if (name !== 'content-encoding' && name !== 'content-length') {
+        responseHeaders[name] = value;
+      }
+    }
+    await request.respond({
+      status: response.status,
+      headers: responseHeaders,
+      body: new Uint8Array(await response.arrayBuffer()),
+    });
   }
 
   async #continueRequest(request: HTTPRequest): Promise<void> {

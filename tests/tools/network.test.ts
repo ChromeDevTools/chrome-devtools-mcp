@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {NetworkOverride} from '../../src/NetworkOverrideManager.js';
 import {NetworkOverridesFormatter} from '../../src/formatters/NetworkOverridesFormatter.js';
 import {
   mockNetwork,
@@ -35,17 +36,24 @@ describe('network', () => {
       assert.strictEqual(tool.schema.route.parse('*/app.js*'), '*/app.js*');
       assert.strictEqual(tool.schema.resourceType.parse('script'), 'script');
       assert.strictEqual(tool.schema.body.parse('./app.js'), './app.js');
+      assert.strictEqual(
+        tool.schema.upstream.parse('https://example.com/app.js'),
+        'https://example.com/app.js',
+      );
       for (const field of [
         tool.schema.route,
         tool.schema.resourceType,
         tool.schema.body,
+        tool.schema.upstream,
       ]) {
         assert.strictEqual(field.safeParse(undefined).success, true);
       }
     });
 
     for (const params of [
+      {body: './script.js', upstream: 'https://example.com/script.js'},
       {body: ' '},
+      {upstream: 'file:///tmp/script.js'},
       {route: '/app.js*', body: './app.js'},
       {resourceType: 'websocket', body: './app.js'},
     ]) {
@@ -64,6 +72,67 @@ describe('network', () => {
         },
       );
     }
+
+    it('updates an upstream mock with the exact supplied actions', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const override = {
+        id: 7,
+        kind: 'redirect',
+        urlPattern: 'https://example.com/script.js*',
+        resourceType: 'script',
+        redirectUrl: 'https://example.com/replacement.js',
+        diagnostics: {hits: 0, errors: 0, navigations: 0},
+      } satisfies NetworkOverride;
+      page.mockNetwork.resolves(override);
+      await mockNetwork(args).handler(
+        {
+          params: {
+            route: override.urlPattern,
+            resourceType: 'script',
+            upstream: override.redirectUrl,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'redirect',
+        urlPattern: override.urlPattern,
+        resourceType: 'script',
+        redirectUrl: override.redirectUrl,
+      });
+      sinon.assert.notCalled(page.listNetworkOverrides);
+      sinon.assert.notCalled(context.validatePath);
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.firstCall,
+        'Network mock configured. Reload or navigate the page to apply it.',
+      );
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.secondCall,
+        new NetworkOverridesFormatter([override]).toString(),
+      );
+    });
+
+    it('propagates upstream policy failures without reporting success', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.mockNetwork.rejects(new Error('Blocked by blocklist'));
+      await assert.rejects(
+        mockNetwork(args).handler(
+          {params: {upstream: 'https://blocked.example/script.js'}, page},
+          response,
+          context,
+        ),
+        /Blocked by blocklist/,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'redirect',
+        urlPattern: undefined,
+        resourceType: undefined,
+        redirectUrl: 'https://blocked.example/script.js',
+      });
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
 
     it('rejects body files outside negotiated roots before changing mocks', async () => {
       const {page, context, response, args} = createHandlerMocks();
@@ -195,10 +264,9 @@ describe('network', () => {
         {
           id: 2,
           diagnostics: {hits: 0, errors: 0, navigations: 1},
-          kind: 'file',
+          kind: 'redirect',
           urlPattern: 'https://example.com/missing.js',
-          responseFilePath: '/tmp/replacement.js',
-          contentType: 'text/javascript',
+          redirectUrl: 'https://example.com/replacement.js',
         },
       ]);
       await mockNetwork(args).handler({params: {}, page}, response, context);

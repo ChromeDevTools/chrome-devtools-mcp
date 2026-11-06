@@ -10,21 +10,152 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkOverrideManager} from '../src/NetworkOverrideManager.js';
-import {createMockHTTPRequest, createMockPuppeteerPage} from './mocks.js';
+import {
+  createMockHTTPRequest,
+  createMockPuppeteerPage,
+  createMockServerConfig,
+} from './mocks.js';
 import {NetworkOverridesFormatter} from '../src/formatters/NetworkOverridesFormatter.js';
 
 describe('NetworkOverrideManager', () => {
+  it('retains existing rules when a replacement URL is blocked', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig({
+        blockedUrlPattern: ['https://blocked.example/*'],
+      }),
+    );
+    const previous = await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://example.com/replacement.js',
+    });
+    await assert.rejects(
+      manager.mock({
+        kind: 'redirect',
+        urlPattern: '*app.js',
+        redirectUrl: 'https://blocked.example/replacement.js',
+      }),
+      /Blocked by blocklist/,
+    );
+    assert.deepEqual(manager.list(), [previous]);
+    sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+    await manager.dispose();
+  });
+  it('blocks cross-origin redirects to a host on blocked-url-pattern before contacting it', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig({
+        blockedUrlPattern: ['https://blocked.example/*'],
+      }),
+    );
+    await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://allowed.example/replacement.js',
+    });
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(
+      new Response('redirect', {
+        status: 302,
+        headers: {location: 'https://blocked.example/secret'},
+      }),
+    );
+    const request = createMockHTTPRequest();
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledOnceWithExactly(
+      fetch,
+      new URL('https://allowed.example/replacement.js'),
+      {redirect: 'manual', method: 'GET', headers: {}},
+    );
+    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+    sinon.assert.notCalled(request.respond);
+    assert.match(
+      manager.list()[0]?.diagnostics.lastError ?? '',
+      /Blocked by blocklist: https:\/\/blocked.example\/secret/,
+    );
+    await manager.dispose();
+  });
+
+  it('uses updated access policies for already configured overrides', async () => {
+    const config = createMockServerConfig();
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(pptrPage, config);
+    await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://example.com/replacement.js',
+    });
+    config.commit(
+      createMockServerConfig({
+        blockedUrlPattern: ['https://example.com/replacement.js'],
+      }),
+    );
+    const request = createMockHTTPRequest();
+    const fetch = sinon.stub(globalThis, 'fetch');
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+    sinon.assert.notCalled(request.continue);
+    sinon.assert.notCalled(fetch);
+    await manager.dispose();
+  });
+
+  it('fulfills an allowed redirect chain with the final response', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://cdn.example/start',
+    });
+    const fetch = sinon.stub(globalThis, 'fetch');
+    fetch
+      .onFirstCall()
+      .resolves(
+        new Response(null, {status: 302, headers: {location: '/final'}}),
+      );
+    fetch.onSecondCall().resolves(
+      new Response('replacement', {
+        status: 200,
+        headers: {'content-type': 'text/javascript'},
+      }),
+    );
+    const request = createMockHTTPRequest();
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledWithExactly(
+      fetch.secondCall,
+      new URL('https://cdn.example/final'),
+      {redirect: 'manual', method: 'GET', headers: {}},
+    );
+    sinon.assert.calledOnceWithExactly(request.respond, {
+      status: 200,
+      headers: {'content-type': 'text/javascript'},
+      body: new TextEncoder().encode('replacement'),
+    });
+    sinon.assert.notCalled(request.abort);
+    await manager.dispose();
+  });
+
   it('counts only matching requests and returns independent diagnostic snapshots', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const initial = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*app.js',
       resourceType: 'script',
-      responseFilePath: '/tmp/replacement.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/replacement.js',
     });
     const handle = pptrPage.on.firstCall.args[1];
+    const fetch = sinon
+      .stub(globalThis, 'fetch')
+      .resolves(new Response('script'));
     const request = createMockHTTPRequest();
     await handle(request);
     const unmatched = createMockHTTPRequest({resourceType: 'fetch'});
@@ -35,12 +166,11 @@ describe('NetworkOverrideManager', () => {
       navigations: 0,
     });
     assert.equal(initial.diagnostics.hits, 0);
-    sinon.assert.calledOnceWithExactly(request.respond, {
-      status: 200,
-      contentType: 'application/javascript; charset=utf-8',
-      headers: {'Cache-Control': 'no-store'},
-      body: new Uint8Array(),
-    });
+    sinon.assert.calledOnceWithExactly(
+      fetch,
+      new URL('https://example.com/replacement.js'),
+      {redirect: 'manual', method: 'GET', headers: {}},
+    );
     sinon.assert.calledOnceWithExactly(unmatched.continue);
     sinon.assert.notCalled(request.continue);
     await manager.dispose();
@@ -48,12 +178,14 @@ describe('NetworkOverrideManager', () => {
 
   it('warns when nothing matched after navigation and removes navigation listeners', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*missing.js',
-      responseFilePath: '/tmp/replacement.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/replacement.js',
     });
     assert.match(
       new NetworkOverridesFormatter(manager.list()).toString(),
@@ -74,7 +206,10 @@ describe('NetworkOverrideManager', () => {
 
   it('reports the local file and error when a previously readable file fails', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const loadResponseFile = sinon
       .stub()
       .onFirstCall()
@@ -105,40 +240,42 @@ describe('NetworkOverrideManager', () => {
   });
   it('updates one rule without replacing unrelated rules or restarting interception', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const unrelated = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*old.js',
-      responseFilePath: '/tmp/old.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/old.js',
     });
     const previous = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*new.js',
-      responseFilePath: '/tmp/new.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/new.js',
     });
     const updated = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*new.js',
-      responseFilePath: '/tmp/updated.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/updated.js',
     });
     assert.deepEqual(manager.list(), [unrelated, updated]);
     assert.equal(updated.id, previous.id);
-    assert.equal(updated.kind, 'file');
+    assert.equal(updated.kind, 'redirect');
     sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
     await manager.dispose();
   });
 
   it('validates a local file before updating an existing rule', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const previous = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*app.js',
-      responseFilePath: '/tmp/app.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/app.js',
     });
     const loadResponseFile = sinon.stub().rejects(new Error('File unreadable'));
     await assert.rejects(
@@ -158,7 +295,10 @@ describe('NetworkOverrideManager', () => {
 
   it('infers local file content types after validating the file', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const loadResponseFile = sinon.stub().resolves(new Uint8Array());
     assert.deepEqual(
       await manager.mock({
@@ -183,16 +323,18 @@ describe('NetworkOverrideManager', () => {
 
   it('rolls back the rule set when activation fails', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     pptrPage.setRequestInterception
       .withArgs(true)
       .rejects(new Error('Target closed'));
     await assert.rejects(
       manager.mock({
-        kind: 'file',
+        kind: 'redirect',
         urlPattern: '*app.js',
-        responseFilePath: '/tmp/app.js',
-        loadResponseFile: async () => new Uint8Array(),
+        redirectUrl: 'https://example.com/app.js',
       }),
       /Target closed/,
     );
@@ -207,12 +349,14 @@ describe('NetworkOverrideManager', () => {
 
   it('retains the rules when clearing interception fails', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const previous = await manager.mock({
-      kind: 'file',
+      kind: 'redirect',
       urlPattern: '*app.js',
-      responseFilePath: '/tmp/app.js',
-      loadResponseFile: async () => new Uint8Array(),
+      redirectUrl: 'https://example.com/app.js',
     });
     pptrPage.setRequestInterception
       .withArgs(false)
@@ -226,7 +370,10 @@ describe('NetworkOverrideManager', () => {
 
   it('filters and removes exact routes and resource types while preserving other mocks', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const script = await manager.mock({
       urlPattern: '*app.js',
       resourceType: 'script',
@@ -268,7 +415,10 @@ describe('NetworkOverrideManager', () => {
 
   it('restores interception and retains mocks when restoring the cache fails during removal', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const previous = await manager.mock({
       urlPattern: '*app.js',
       kind: 'file',
@@ -304,7 +454,10 @@ describe('NetworkOverrideManager', () => {
 
   it('uses all URLs when route is omitted and updates only the exact filter pair', async () => {
     const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(pptrPage);
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
     const scripts = await manager.mock({
       resourceType: 'script',
       kind: 'file',
@@ -341,4 +494,97 @@ describe('NetworkOverrideManager', () => {
     assert.equal(manager.list()[0]?.diagnostics.hits, 0);
     await manager.dispose();
   });
+
+  it('checks same-origin upstream redirects against blocked-url-pattern before contacting the target', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig({
+        blockedUrlPattern: ['https://blocked.example/*'],
+      }),
+    );
+    await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://example.com/start',
+    });
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(
+      new Response(null, {
+        status: 302,
+        headers: {location: 'https://blocked.example/private'},
+      }),
+    );
+    const request = createMockHTTPRequest();
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledOnceWithExactly(
+      fetch,
+      new URL('https://example.com/start'),
+      {redirect: 'manual', method: 'GET', headers: {}},
+    );
+    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+    sinon.assert.notCalled(request.continue);
+    sinon.assert.notCalled(request.respond);
+    await manager.dispose();
+  });
+
+  it('fulfills decoded upstream bodies without stale compression headers', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({
+      kind: 'redirect',
+      urlPattern: '*app.js',
+      redirectUrl: 'https://example.com/replacement.js',
+    });
+    sinon.stub(globalThis, 'fetch').resolves(
+      new Response('decoded', {
+        headers: {
+          'content-encoding': 'gzip',
+          'content-length': '123',
+          'content-type': 'text/javascript',
+        },
+      }),
+    );
+    const request = createMockHTTPRequest();
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledOnceWithExactly(request.respond, {
+      status: 200,
+      headers: {
+        'content-type': 'text/javascript',
+      },
+      body: new TextEncoder().encode('decoded'),
+    });
+    sinon.assert.notCalled(request.continue);
+    await manager.dispose();
+  });
+
+  for (const source of ['upstream']) {
+    it(
+      'rejects unsupported methods for ' + source + ' before fetching',
+      async () => {
+        const pptrPage = createMockPuppeteerPage();
+        const manager = new NetworkOverrideManager(
+          pptrPage,
+          createMockServerConfig(),
+        );
+        await manager.mock({
+          kind: 'redirect',
+          urlPattern: '*app.js',
+          redirectUrl: 'https://example.com/replacement.js',
+        });
+        const fetch = sinon.stub(globalThis, 'fetch');
+        const request = createMockHTTPRequest({method: 'POST'});
+        await pptrPage.on.firstCall.args[1](request);
+        sinon.assert.notCalled(fetch);
+        sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+        assert.match(
+          manager.list()[0]?.diagnostics.lastError ?? '',
+          /only support GET and HEAD/,
+        );
+        await manager.dispose();
+      },
+    );
+  }
 });

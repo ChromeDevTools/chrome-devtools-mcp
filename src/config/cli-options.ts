@@ -1479,7 +1479,7 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
+      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body or upstream updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
     category: 'Network',
     args: {
       pageId: {
@@ -1529,7 +1529,15 @@ export const commands: Commands = {
         name: 'body',
         type: 'string',
         description:
-          'Local response body file, revalidated and reread for every request. Content-Type follows its extension.',
+          'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
+        required: false,
+        positional: false,
+      },
+      upstream: {
+        name: 'upstream',
+        type: 'string',
+        description:
+          'Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.',
         required: false,
         positional: false,
       },
