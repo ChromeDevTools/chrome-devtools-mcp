@@ -63,12 +63,12 @@ jobs:
         shell: bash
         run: npm run verify-npm-package
 
-      - name: Remove node_modules
+      - name: Remove unbundled dependencies
         shell: bash
-        run: rm -rf node_modules
+        run: rm -rf node_modules out/Default/gen/third_party
 
       - name: Smoke test bundled binaries
         shell: bash
         run: |
-          node ./build/src/bin/chrome-devtools-mcp.js --version
-          node ./build/src/bin/chrome-devtools.js --version
+          node ./out/Default/gen/src/bin/chrome-devtools-mcp.js --version
+          node ./out/Default/gen/src/bin/chrome-devtools.js --version

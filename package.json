@@ -44,9 +44,11 @@
     "out/Default/gen/src",
     "LICENSE",
     "skills",
-    "!*.tsbuildinfo",
+    "!**/*.tsbuildinfo",
     "!**/*.js.map",
-    "!**/*.d.ts"
+    "!**/*.d.ts",
+    "!**/*-tsconfig*.json",
+    "!**/*.stamp"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",

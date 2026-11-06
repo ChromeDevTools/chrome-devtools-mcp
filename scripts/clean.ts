@@ -4,16 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {rmSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 
-import {runGnGen} from './gn-gen.ts';
+import {getGnBinaryPath, runGnGen} from './gn-gen.ts';
 
 const projectRoot = process.cwd();
-const pathsToRemove = ['out/Default/gen/src', 'out/Default/gen/tests'];
+const outDir = resolve(projectRoot, 'out', 'Default');
 
-for (const relPath of pathsToRemove) {
-  rmSync(resolve(projectRoot, relPath), {recursive: true, force: true});
+if (existsSync(resolve(outDir, 'build.ninja'))) {
+  execFileSync(getGnBinaryPath(), ['clean', 'out/Default'], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
 }
 
 runGnGen();
