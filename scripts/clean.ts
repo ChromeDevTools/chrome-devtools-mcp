@@ -10,11 +10,7 @@ import {resolve} from 'node:path';
 import {runGnGen} from './gn-gen.ts';
 
 const projectRoot = process.cwd();
-const pathsToRemove = [
-  'out/Default/gen/src',
-  'out/Default/gen/tests',
-  'out/Default/gen/tsconfig.tsbuildinfo',
-];
+const pathsToRemove = ['out/Default/gen/src', 'out/Default/gen/tests'];
 
 for (const relPath of pathsToRemove) {
   rmSync(resolve(projectRoot, relPath), {recursive: true, force: true});

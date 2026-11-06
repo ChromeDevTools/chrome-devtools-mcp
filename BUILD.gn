@@ -5,12 +5,12 @@ group("default") {
   deps = [
     ":devtools_deps",
     "//src:all",
+    "//tests",
   ]
 }
 
 group("devtools_deps") {
   public_deps = [
-    "//src:all",
     "//third_party/devtools-frontend/front_end/entrypoints/formatter_worker:worker_entrypoint",
     "//third_party/devtools-frontend/front_end/entrypoints/heap_snapshot_worker:worker_entrypoint",
     "//third_party/devtools-frontend/front_end/models/issues_manager:descriptions",
