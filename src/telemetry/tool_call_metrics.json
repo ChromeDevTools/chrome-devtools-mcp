@@ -1409,5 +1409,72 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "set_network_overrides",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "overrides_count",
+        "argType": "number"
+      }
+    ],
+    "isDeprecated": true
+  },
+  {
+    "name": "mock_network",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      },
+      {
+        "name": "abort",
+        "argType": "boolean",
+        "isDeprecated": true
+      },
+      {
+        "name": "allow_origin_length",
+        "argType": "number",
+        "isDeprecated": true
+      },
+      {
+        "name": "body_length",
+        "argType": "number"
+      },
+      {
+        "name": "upstream_length",
+        "argType": "number",
+        "isDeprecated": true
+      }
+    ]
+  },
+  {
+    "name": "remove_network_mock",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      }
+    ]
   }
 ]

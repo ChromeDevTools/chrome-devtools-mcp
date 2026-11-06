@@ -27,9 +27,11 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (4 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
+  - [`mock_network`](#mock_network)
+  - [`remove_network_mock`](#remove_network_mock)
 - **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -334,7 +336,7 @@
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.
+- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.
 - **reload** (boolean) _(optional)_: Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
@@ -376,6 +378,31 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `mock_network`
+
+**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Full-URL pattern: '_' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '_'.
+
+---
+
+### `remove_network_mock`
+
+**Description:** Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Full-URL pattern: '_' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '_'.
 
 ---
 
