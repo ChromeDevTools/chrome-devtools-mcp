@@ -235,31 +235,42 @@ export function validateUrlPatterns(
 }
 
 /**
- * Reports whether a URL ultimately targets the `file:` scheme.
+ * Unwraps nested `view-source:` prefixes so every scheme check below runs
+ * against the URL Chrome will actually resolve and load — not the
+ * wrapper. `view-source:` wraps another URL and Chrome resolves the inner
+ * target (potentially through multiple levels of wrapping), so
+ * `view-source:file:///etc/passwd` reads the file just as
+ * `file:///etc/passwd` does, and `view-source:devtools://devtools/...`
+ * loads under the `devtools://devtools` origin just as the bare
+ * `devtools:` URL would. The inner URL is re-parsed rather than
+ * string-matched so that an uppercase inner scheme
+ * (`view-source:FILE:///etc/passwd`) is normalised.
  *
- * `view-source:` wraps another URL and Chrome resolves the inner target, so
- * `view-source:file:///etc/passwd` reads the file just as `file:///etc/passwd`
- * does. The inner URL is re-parsed rather than string-matched so that an
- * uppercase inner scheme (`view-source:FILE:///etc/passwd`) is normalised.
- *
- * @param url The already-parsed URL to inspect.
- * @returns true if the URL, after unwrapping any `view-source:` prefixes, uses `file:`.
+ * @param url The already-parsed URL to unwrap.
+ * @returns The fully unwrapped URL, or the original URL unchanged if it
+ * is not `view-source:`. Returns null if any wrapped layer is not itself
+ * a valid URL.
  */
-function targetsFileScheme(url: URL): boolean {
+function unwrapViewSource(url: URL): URL | null {
   let current = url;
   // Bounded in case of a pathologically nested `view-source:` chain.
   for (let i = 0; i < 5 && current.protocol === 'view-source:'; i++) {
     try {
       current = new URL(current.pathname);
     } catch {
-      return false;
+      return null;
     }
   }
-  return current.protocol === 'file:';
+  return current;
 }
 
 /**
  * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
+ *
+ * Any `view-source:` wrapping is unwrapped first (see {@link unwrapViewSource}),
+ * since Chrome resolves the wrapper at navigation time and loads the page
+ * under the wrapped URL's own origin, so every scheme check below must run
+ * against the unwrapped target rather than the outer `view-source:` URL.
  *
  * @param url The URL string to validate.
  * @param options Options object containing javascriptEvaluation, categoryExtensions and fileNavigations.
@@ -279,32 +290,39 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
     );
   }
 
-  if (
-    javascriptEvaluation === false &&
-    DISALLOWED_PROTOCOLS.has(parsed.protocol)
-  ) {
+  const target = unwrapViewSource(parsed);
+  if (!target) {
     throw new Error(
-      `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
+      `Invalid URL: "${url}". The view-source: wrapped content is not a valid URL.`,
     );
   }
 
-  if (fileNavigations === false && targetsFileScheme(parsed)) {
+  if (
+    javascriptEvaluation === false &&
+    DISALLOWED_PROTOCOLS.has(target.protocol)
+  ) {
+    throw new Error(
+      `Navigating to ${target.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
+    );
+  }
+
+  if (fileNavigations === false && target.protocol === 'file:') {
     throw new Error(
       `Navigating to file: URLs is not allowed when --file-navigations is disabled.`,
     );
   }
 
-  if (parsed.protocol === 'devtools:') {
+  if (target.protocol === 'devtools:') {
     throw new Error(`Navigating to devtools: URLs is not allowed.`);
   }
 
-  if (!isAllowedUrl(url, {categoryExtensions})) {
-    if (parsed.protocol === 'chrome-extension:') {
+  if (!isAllowedUrl(target.href, {categoryExtensions})) {
+    if (target.protocol === 'chrome-extension:') {
       throw new Error(
         `Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.`,
       );
     }
-    throw new Error(`Navigating to ${parsed.protocol} URLs is not allowed.`);
+    throw new Error(`Navigating to ${target.protocol} URLs is not allowed.`);
   }
 
   return parsed;
