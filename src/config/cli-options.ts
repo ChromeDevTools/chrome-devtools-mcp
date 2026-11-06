@@ -1477,6 +1477,88 @@ export const commands: Commands = {
       },
     },
   },
+  mock_network: {
+    description:
+      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route configures '*'. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Upstream and allowOrigin-only responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      route: {
+        name: 'route',
+        type: 'string',
+        description:
+          "Full-URL pattern: '*' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '*'.",
+        required: false,
+        positional: false,
+      },
+      resourceType: {
+        name: 'resourceType',
+        type: 'string',
+        description:
+          'Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.',
+        required: false,
+        positional: false,
+        enum: [
+          'document',
+          'stylesheet',
+          'image',
+          'media',
+          'font',
+          'script',
+          'texttrack',
+          'xhr',
+          'fetch',
+          'prefetch',
+          'eventsource',
+          'manifest',
+          'signedexchange',
+          'ping',
+          'cspviolationreport',
+          'preflight',
+          'fedcm',
+          'other',
+        ],
+      },
+      abort: {
+        name: 'abort',
+        type: 'boolean',
+        description:
+          'Abort matching requests when true; false disables abortion while preserving the replacement source. Abortion takes precedence over body, upstream, and allowOrigin.',
+        required: false,
+        positional: false,
+      },
+      allowOrigin: {
+        name: 'allowOrigin',
+        type: 'string',
+        description:
+          'Set the Access-Control-Allow-Origin response header, for example * or https://example.com. This does not configure preflight or credential headers.',
+        required: false,
+        positional: false,
+      },
+      body: {
+        name: 'body',
+        type: 'string',
+        description:
+          'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
+        required: false,
+        positional: false,
+      },
+      upstream: {
+        name: 'upstream',
+        type: 'string',
+        description:
+          'Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.',
+        required: false,
+        positional: false,
+      },
+    },
+  },
   navigate_page: {
     description:
       'Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.',
@@ -1641,7 +1723,7 @@ export const commands: Commands = {
         name: 'ignoreCache',
         type: 'boolean',
         description:
-          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.',
         required: false,
         positional: false,
       },
@@ -1812,6 +1894,56 @@ export const commands: Commands = {
         description: 'ID of the extension to reload.',
         required: true,
         positional: true,
+      },
+    },
+  },
+  remove_network_mock: {
+    description:
+      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace.',
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      route: {
+        name: 'route',
+        type: 'string',
+        description:
+          "Full-URL pattern: '*' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '*'.",
+        required: false,
+        positional: false,
+      },
+      resourceType: {
+        name: 'resourceType',
+        type: 'string',
+        description:
+          'Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.',
+        required: false,
+        positional: false,
+        enum: [
+          'document',
+          'stylesheet',
+          'image',
+          'media',
+          'font',
+          'script',
+          'texttrack',
+          'xhr',
+          'fetch',
+          'prefetch',
+          'eventsource',
+          'manifest',
+          'signedexchange',
+          'ping',
+          'cspviolationreport',
+          'preflight',
+          'fedcm',
+          'other',
+        ],
       },
     },
   },

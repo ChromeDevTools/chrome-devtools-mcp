@@ -50,6 +50,7 @@ import {
   CdpBrowser,
   CdpExtension,
   CdpFrame,
+  CdpHTTPRequest,
   CdpMouse,
   CdpPage,
   CDPSession,
@@ -66,6 +67,7 @@ import {
   WebMCP,
   WebMCPTool,
   type Browser,
+  type ResourceType,
   type BrowserContext,
   type ConsoleMessageLocation,
   type ConsoleMessageType,
@@ -278,6 +280,25 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
   return session;
 }
 
+export function createMockHTTPRequest(
+  options: {
+    url?: string;
+    method?: string;
+    resourceType?: ResourceType;
+    headers?: Record<string, string>;
+  } = {},
+): sinon.SinonStubbedInstance<CdpHTTPRequest> {
+  const request = sinon.createStubInstance(CdpHTTPRequest);
+  request.url.returns(options.url ?? 'https://example.com/app.js');
+  request.method.returns(options.method ?? 'GET');
+  request.resourceType.returns(options.resourceType ?? 'script');
+  request.headers.returns(options.headers ?? {});
+  request.continue.resolves();
+  request.respond.resolves();
+  request.abort.resolves();
+  return request;
+}
+
 export function createMockPuppeteerPage(): MockPuppeteerPage {
   const pptrPage = sinon.createStubInstance(CdpPage);
   const page = pptrPage as unknown as sinon.SinonStubbedInstance<Page>;
@@ -461,6 +482,7 @@ export function createMockMcpPage(
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
+  page.listNetworkOverrides.returns([]);
   page.close.callsFake(async () => {
     await pptrPage.close({runBeforeUnload: false});
   });
