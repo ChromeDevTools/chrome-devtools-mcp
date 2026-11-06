@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Target,
-  Page,
-  Protocol,
-  CdpPage,
-  Dialog,
-  PredefinedNetworkConditions,
+import {
+  FrameEvent,
+  type Frame,
+  type Target,
+  type Page,
+  type Protocol,
+  type CdpPage,
+  type Dialog,
+  type PredefinedNetworkConditions,
 } from '../third_party/index.js';
 import {logger} from './logger.js';
 
@@ -29,6 +31,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #loadedNewDocument = false;
   #openedPages = new Set<Target>();
 
   constructor(
@@ -177,6 +180,38 @@ export class WaitForHelper {
       this.#publicPage.off('popup', popupHandler);
     });
 
+    // Puppeteer emits `FrameNavigatedWithinDocument` right before
+    // `framenavigated` for same-document navigations, so any other main frame
+    // `framenavigated` means a new document, including a reload or a
+    // back/forward cache restore.
+    let pendingSameDocumentNavigation = false;
+    const mainFrame = this.#publicPage.mainFrame();
+    const withinDocumentHandler = (): void => {
+      pendingSameDocumentNavigation = true;
+    };
+    const frameNavigatedHandler = (frame: Frame): void => {
+      if (frame !== this.#publicPage.mainFrame()) {
+        return;
+      }
+      if (pendingSameDocumentNavigation) {
+        pendingSameDocumentNavigation = false;
+      } else {
+        this.#loadedNewDocument = true;
+      }
+    };
+    mainFrame.on(
+      FrameEvent.FrameNavigatedWithinDocument,
+      withinDocumentHandler,
+    );
+    this.#publicPage.on('framenavigated', frameNavigatedHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      mainFrame.off(
+        FrameEvent.FrameNavigatedWithinDocument,
+        withinDocumentHandler,
+      );
+      this.#publicPage.off('framenavigated', frameNavigatedHandler);
+    });
+
     // A scoped AbortController used to clean up navigation probe listeners.
     // When aborted (either after navigation detection finishes or if this.#abortController
     // aborts), it removes CDP navigation probe listeners and automatically
@@ -302,7 +337,7 @@ export class WaitForHelper {
   #getResult(): WaitForEventsResult {
     const urlAfterAction = this.#page.url();
     return {
-      ...(urlAfterAction !== this.#initialUrl
+      ...(urlAfterAction !== this.#initialUrl || this.#loadedNewDocument
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
