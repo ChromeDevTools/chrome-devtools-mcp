@@ -19,11 +19,16 @@ import {
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
+  UncaughtError,
   type ListenerMap,
 } from '../../src/collectors/PageCollector.js';
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
-import {createMockPuppeteerPage} from '../mocks.js';
+import {
+  createMockCDPSession,
+  createMockPuppeteerPage,
+  createMockWebWorker,
+} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
 function createMockConsoleMessage(text: string): ConsoleMessage {
@@ -710,6 +715,85 @@ describe('ConsoleCollector', () => {
         );
       }),
     );
+  });
+
+  it('emits UncaughtErrors for Runtime.exceptionThrown events on a dedicated worker session', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const onUncaughtErrorListener = sinon.spy();
+    const client = createMockCDPSession();
+    client.target.returns({_targetId: '<worker-target-id>'});
+    const worker = createMockWebWorker();
+    Object.defineProperty(worker, 'client', {
+      value: client,
+      configurable: true,
+    });
+    // The dedicated worker was attached before the collector subscribed.
+    pptrPage.workers.returns([worker]);
+    new ConsoleCollector(pptrPage, () => {
+      return {
+        uncaughtError: onUncaughtErrorListener,
+      } as ListenerMap;
+    });
+
+    client.emit('Runtime.exceptionThrown', {
+      exceptionDetails: {
+        exception: {description: 'Uncaught Error: worker-uncaught'},
+        text: 'Uncaught',
+        stackTrace: {callFrames: []},
+      },
+    });
+
+    sinon.assert.calledOnceWithMatch(
+      onUncaughtErrorListener,
+      sinon.match(error => {
+        return (
+          error instanceof UncaughtError &&
+          error.details.text === 'Uncaught' &&
+          error.details.exception?.description ===
+            'Uncaught Error: worker-uncaught' &&
+          error.targetId === '<worker-target-id>' &&
+          error.session === client
+        );
+      }),
+    );
+  });
+
+  it('stops collecting uncaught errors of a worker after it is destroyed', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const onUncaughtErrorListener = sinon.spy();
+    const client = createMockCDPSession();
+    const worker = createMockWebWorker();
+    Object.defineProperty(worker, 'client', {
+      value: client,
+      configurable: true,
+    });
+    new ConsoleCollector(pptrPage, () => {
+      return {
+        uncaughtError: onUncaughtErrorListener,
+      } as ListenerMap;
+    });
+
+    pptrPage.emit('workercreated', worker);
+    client.emit('Runtime.exceptionThrown', {
+      exceptionDetails: {
+        exception: {description: 'Uncaught Error: worker-uncaught'},
+        text: 'Uncaught',
+        stackTrace: {callFrames: []},
+      },
+    });
+    sinon.assert.calledOnce(onUncaughtErrorListener);
+    onUncaughtErrorListener.resetHistory();
+
+    pptrPage.emit('workerdestroyed', worker);
+    client.emit('Runtime.exceptionThrown', {
+      exceptionDetails: {
+        exception: {description: 'Uncaught Error: worker-uncaught-again'},
+        text: 'Uncaught',
+        stackTrace: {callFrames: []},
+      },
+    });
+
+    sinon.assert.notCalled(onUncaughtErrorListener);
   });
 
   it('retains only the newest messages per navigation', async () => {

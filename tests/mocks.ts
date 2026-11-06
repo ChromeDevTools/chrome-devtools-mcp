@@ -256,6 +256,12 @@ export class MockCDPSession extends CDPSession {
   override id(): string {
     return '';
   }
+  // Mirrors the Puppeteer-internal CdpCDPSession.target() that the collectors
+  // read for target IDs. The real method returns a CdpTarget; the mock only
+  // exposes the _targetId field they consume.
+  target(): {_targetId: string} {
+    throw new Error('Not implemented');
+  }
 }
 
 export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSession> {
@@ -275,6 +281,11 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
     listener.off(eventName, handler);
     return session;
   });
+  session.emit.callsFake((eventName, data) => {
+    listener.emit(eventName, data);
+    return true;
+  });
+  session.target.returns({_targetId: '<mock-target-id>'});
   return session;
 }
 
@@ -369,6 +380,9 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
 
   page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
+  // The subscriber in PageCollector scans existing dedicated workers with
+  // workers(). The real method returns an array; the stub returns undefined.
+  page.workers.returns([]);
 
   return Object.assign(page, {
     webmcp,
