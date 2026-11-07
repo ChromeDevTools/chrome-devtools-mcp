@@ -17,6 +17,7 @@ import {
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
+  type WebWorker,
 } from '../third_party/index.js';
 import {
   createIdGenerator,
@@ -255,6 +256,13 @@ class PageEventSubscriber {
   #page: Page;
   #session: CDPSession;
   #targetId: string;
+  // Dedicated workers report uncaught errors on their own sessions; the page
+  // session never sees them. Each worker session listener is keyed by its
+  // worker, so it can be detached when the worker goes away.
+  #workerExceptionListeners = new Map<
+    WebWorker,
+    (event: Protocol.Runtime.ExceptionThrownEvent) => void
+  >();
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
 
@@ -285,7 +293,11 @@ class PageEventSubscriber {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
+    this.#page.on('workercreated', this.#onWorkerCreated);
+    this.#page.on('workerdestroyed', this.#onWorkerDestroyed);
     this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
+    // A worker can predate the subscription, e.g. on a reused tab.
+    this.#subscribeWorkerExceptionListeners(this.#page.workers());
     this.#attachFrameNavigatedWithinDocumentListener();
   }
 
@@ -295,7 +307,13 @@ class PageEventSubscriber {
     this.#detachFrameNavigatedWithinDocumentListener();
     this.#page.off('framenavigated', this.#onFrameNavigated);
     this.#page.off('issue', this.#onIssueAdded);
+    this.#page.off('workercreated', this.#onWorkerCreated);
+    this.#page.off('workerdestroyed', this.#onWorkerDestroyed);
     this.#session.off('Runtime.exceptionThrown', this.#onExceptionThrown);
+    for (const [worker, listener] of this.#workerExceptionListeners) {
+      worker.client.off('Runtime.exceptionThrown', listener);
+    }
+    this.#workerExceptionListeners.clear();
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
@@ -318,6 +336,53 @@ class PageEventSubscriber {
     this.#page.emit(
       'uncaughtError',
       new UncaughtError(event.exceptionDetails, this.#targetId, this.#session),
+    );
+  };
+
+  #onWorkerCreated = (worker: WebWorker): void => {
+    this.#subscribeWorkerExceptionListeners([worker]);
+  };
+
+  #onWorkerDestroyed = (worker: WebWorker): void => {
+    this.#unsubscribeWorkerExceptionListeners([worker]);
+  };
+
+  #subscribeWorkerExceptionListeners(workers: Iterable<WebWorker>): void {
+    for (const worker of workers) {
+      if (this.#workerExceptionListeners.has(worker)) {
+        continue;
+      }
+      const listener = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
+        this.#onWorkerExceptionThrown(worker, event);
+      };
+      worker.client.on('Runtime.exceptionThrown', listener);
+      this.#workerExceptionListeners.set(worker, listener);
+    }
+  }
+
+  #unsubscribeWorkerExceptionListeners(workers: Iterable<WebWorker>): void {
+    for (const worker of workers) {
+      const listener = this.#workerExceptionListeners.get(worker);
+      if (!listener) {
+        continue;
+      }
+      worker.client.off('Runtime.exceptionThrown', listener);
+      this.#workerExceptionListeners.delete(worker);
+    }
+  }
+
+  #onWorkerExceptionThrown = (
+    worker: WebWorker,
+    event: Protocol.Runtime.ExceptionThrownEvent,
+  ): void => {
+    this.#page.emit(
+      'uncaughtError',
+      new UncaughtError(
+        event.exceptionDetails,
+        // @ts-expect-error use internal Puppeteer API to get the target ID
+        worker.client.target()._targetId,
+        worker.client,
+      ),
     );
   };
 
