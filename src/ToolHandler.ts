@@ -555,7 +555,7 @@ export class ToolHandler {
     } finally {
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: tool.name,
-        params,
+        params: rawArgs,
         schema: tool.schema,
         success,
         latencyMs: Date.now() - startTime,

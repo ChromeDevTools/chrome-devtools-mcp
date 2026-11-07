@@ -866,7 +866,9 @@ describe('McpServer', () => {
 async function getToolsWithFilteredCategories(
   filterOutCategories: ToolCategory[] = [],
 ): Promise<string[]> {
-  const files = fs.readdirSync('build/src/tools');
+  const files = fs.readdirSync(
+    path.resolve(import.meta.dirname, '../src/tools'),
+  );
   const definedNames = [];
   for (const file of files) {
     if (
