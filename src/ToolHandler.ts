@@ -406,6 +406,10 @@ export class ToolHandler {
             : context.getSelectedMcpPage();
         await page?.init({emulateFocus: true});
         response.setPage(page);
+        // A call that runs beside others can't tell its own errors apart.
+        if (tool.concurrency !== 'none') {
+          response.includeConsoleErrorsFrom(page);
+        }
         if (tool.blockedByDialog) {
           page.throwIfDialogOpen();
         }

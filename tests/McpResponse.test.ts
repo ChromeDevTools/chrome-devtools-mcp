@@ -71,6 +71,7 @@ import {
   html,
   stabilizeResponseOutput,
   stabilizeStructuredContent,
+  waitExecutionFor,
   withMcpContext,
 } from './utils.js';
 
@@ -673,6 +674,148 @@ describe('McpResponse', () => {
       assert.ok(getTextContent(content[0]));
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    });
+  });
+
+  describe('console errors of a handed over page', () => {
+    const heading = '## Console errors during this call';
+
+    async function logOnPage(
+      context: McpContext,
+      log: () => void,
+      expected = 1,
+    ): Promise<void> {
+      const mcpPage = context.getSelectedMcpPage();
+      const count = mcpPage.getConsoleData().length;
+      await mcpPage.pptrPage.evaluate(log);
+      await waitExecutionFor(async () => {
+        assert.ok(mcpPage.getConsoleData().length >= count + expected);
+      }, 5000);
+    }
+
+    it('lists the errors raised after the hand-over', async () => {
+      await withMcpContext(async (response, context) => {
+        await logOnPage(context, () => {
+          console.error('logged before');
+        });
+        response.includeConsoleErrorsFrom(context.getSelectedMcpPage());
+        await logOnPage(context, () => {
+          console.warn('warned after');
+          console.error('logged after');
+        });
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.ok(text.includes(heading));
+        assert.ok(text.includes('logged after'));
+        assert.ok(!text.includes('logged before'));
+        assert.ok(!text.includes('warned after'));
+      });
+    });
+
+    it('lists the first errors and points to the rest', async () => {
+      await withMcpContext(async (response, context) => {
+        response.includeConsoleErrorsFrom(context.getSelectedMcpPage());
+        await logOnPage(
+          context,
+          () => {
+            for (let i = 0; i < 12; i++) {
+              console.error(`error ${String(i).padStart(2, '0')}`);
+            }
+          },
+          12,
+        );
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.ok(text.includes('error 09'));
+        assert.ok(!text.includes('error 10'));
+        assert.ok(text.includes('2 more not shown.'));
+      });
+    });
+
+    it('leaves the section out when there are none', async () => {
+      await withMcpContext(async (response, context) => {
+        await logOnPage(context, () => {
+          console.error('logged before');
+        });
+        response.includeConsoleErrorsFrom(context.getSelectedMcpPage());
+        const {content} = await response.handle(context);
+        assert.ok(!getTextContent(content[0]).includes(heading));
+      });
+    });
+
+    it('keeps the listing of a tool that lists console messages', async () => {
+      await withMcpContext(async (response, context) => {
+        response.setIncludeConsoleData(true);
+        response.includeConsoleErrorsFrom(context.getSelectedMcpPage());
+        await logOnPage(context, () => {
+          console.error('logged after');
+        });
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.strictEqual(text.split('logged after').length, 2);
+        assert.ok(text.includes('## Console messages'));
+        assert.ok(!text.includes(heading));
+      });
+    });
+
+    it('leaves the errors out next to a single attached message', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await logOnPage(context, () => {
+          console.error('logged before');
+        });
+        response.attachConsoleMessage(mcpPage.getLatestConsoleMessageId());
+        response.includeConsoleErrorsFrom(mcpPage);
+        await logOnPage(context, () => {
+          console.error('logged after');
+        });
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.ok(text.includes('logged before'));
+        assert.ok(!text.includes('logged after'));
+      });
+    });
+
+    it('keeps the pagination of the list the tool asked for', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.getNetworkRequests = () => {
+          return [getMockRequest({stableId: 1}), getMockRequest({stableId: 2})];
+        };
+        response.setIncludeNetworkRequests(true, {pageSize: 1});
+        response.includeConsoleErrorsFrom(mcpPage);
+        await logOnPage(context, () => {
+          console.error('logged after');
+        });
+        const {content, structuredContent} = await response.handle(context);
+        assert.ok(getTextContent(content[0]).includes('logged after'));
+        assert.ok('consoleErrors' in structuredContent);
+        assert.ok(Array.isArray(structuredContent.consoleErrors));
+        assert.strictEqual(structuredContent.consoleErrors.length, 1);
+        assert.ok('pagination' in structuredContent);
+        assert.deepStrictEqual(structuredContent.pagination, {
+          currentPage: 0,
+          totalPages: 2,
+          hasNextPage: true,
+          hasPreviousPage: false,
+          startIndex: 0,
+          endIndex: 1,
+          invalidPage: false,
+        });
+      });
+    });
+
+    it('leaves out the errors of a page closed meanwhile', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        response.includeConsoleErrorsFrom(page);
+        await logOnPage(context, () => {
+          console.error('logged before closing');
+        });
+        await context.closePage(page.id);
+        const {content} = await response.handle(context);
+        assert.ok(!getTextContent(content[0]).includes(heading));
+      });
     });
   });
 

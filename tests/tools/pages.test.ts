@@ -28,7 +28,12 @@ import {
   createMockMcpPage,
   createMockParsedArguments,
 } from '../mocks.js';
-import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
+import {
+  assertNoServiceWorkerReported,
+  getTextContent,
+  html,
+  withMcpContext,
+} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
@@ -254,6 +259,14 @@ describe('pages', () => {
       sinon.assert.calledOnceWithExactly(
         response.setListThirdPartyDeveloperTools,
       );
+      sinon.assert.calledOnceWithExactly(
+        response.includeConsoleErrorsFrom,
+        page,
+      );
+      sinon.assert.callOrder(
+        response.includeConsoleErrorsFrom,
+        page.pptrPage.goto,
+      );
     });
     it('closes the new tab and restores the selection when navigation fails', async () => {
       const {
@@ -344,6 +357,22 @@ describe('pages', () => {
           context.getSelectedMcpPage(),
         );
         assert.ok(response.includePages);
+      });
+    });
+    it('lists the errors the page raises while it loads', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await newPage(args).handler(
+          {
+            params: {
+              url: 'data:text/html,<script>console.error("on load")</script>',
+            },
+          },
+          response,
+          context,
+        );
+        const {content} = await response.handle(context);
+        // The page list shows the URL, so match the message line.
+        assert.ok(getTextContent(content[0]).includes('[error] on load'));
       });
     });
     it('throws when navigating to a javascript URL and javascriptEvaluation is false', async () => {

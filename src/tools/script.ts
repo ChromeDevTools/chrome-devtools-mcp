@@ -197,6 +197,8 @@ Example with arguments: \`(el) => el.innerText\`
 
         const evaluatable = await getPageOrFrame(page, frames);
 
+        // ToolHandler hands over the page of page-scoped tools only.
+        response.includeConsoleErrorsFrom(mcpPage);
         const result = await mcpPage.waitForEventsAfterAction(
           async () => {
             await performEvaluation(

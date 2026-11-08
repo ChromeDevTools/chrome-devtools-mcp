@@ -300,6 +300,11 @@ export interface Response {
       serviceWorkerId?: string;
     },
   ): void;
+  /**
+   * Lists the console errors and uncaught exceptions that the page raises from
+   * now until the response is handled.
+   */
+  includeConsoleErrorsFrom(page: ContextPage): void;
   setIncludeCssStyles(
     matchedStyles: MatchedStyles,
     options: CssFormatterOptions & PaginationOptions,
@@ -532,6 +537,8 @@ export type ContextPage = Readonly<{
   setScreenRecorder(data: ScreenRecorderData | null): void;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
+  getLatestConsoleMessageId(): number;
+  getConsoleDataAfter(id: number): ReturnType<McpPage['getConsoleDataAfter']>;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
