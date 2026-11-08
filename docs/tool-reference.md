@@ -733,7 +733,7 @@ in the DevTools Elements panel (if any).
 
 ### `list_extensions`
 
-**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)
+**Description:** Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included. (requires flag: --categoryExtensions=true)
 
 **Parameters:** None
 
