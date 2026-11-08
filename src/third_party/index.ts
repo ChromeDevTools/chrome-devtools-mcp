@@ -12,6 +12,9 @@ import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 import {z as zod} from 'zod';
 
+// eslint-disable-next-line no-restricted-imports
+import * as DevToolsRoot from '../../third_party/devtools-frontend/front_end/core/root/root.js';
+
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
 
 export type {Flags, Result, RunnerResult, OutputMode};
@@ -138,5 +141,13 @@ export async function generateReport(
   const lighthouse = await loadLighthouse();
   return lighthouse.generateReport(lhr, format);
 }
+
+DevToolsRoot.Runtime.experiments.register({
+  name: DevToolsRoot.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS,
+  title: 'Instrumentation breakpoints',
+  aboutFlag: 'devtools-instrumentation-breakpoints',
+  isEnabled: false,
+  requiresChromeRestart: false,
+});
 
 export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';

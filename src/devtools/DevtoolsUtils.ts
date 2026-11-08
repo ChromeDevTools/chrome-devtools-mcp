@@ -532,8 +532,7 @@ export async function createStackTrace(
   }
 
   const signal = AbortSignal.timeout(1_000);
-  const knownScriptIds = new Set<string>();
-  await Promise.all(
+  const scripts = await Promise.all(
     [...scriptUrls].map(async ([scriptId, url]) => {
       try {
         const script = await waitForScript(model, scriptId, signal);
@@ -543,15 +542,17 @@ export async function createStackTrace(
           : script.sourceURL;
         // Script ids restart in a new renderer process, so after a
         // cross-process navigation the id can belong to another script.
-        if (scriptUrl !== url) {
-          return;
-        }
-        knownScriptIds.add(scriptId);
-        await model.sourceMapManager().sourceMapForClientPromise(script);
+        return scriptUrl === url ? script : undefined;
       } catch {
         // The script is gone, e.g. after a navigation.
+        return undefined;
       }
     }),
+  );
+  const knownScripts = scripts.filter(script => script !== undefined);
+  await waitForSourceMaps(model, knownScripts, signal);
+  const knownScriptIds = new Set<string>(
+    knownScripts.map(script => script.scriptId),
   );
 
   const binding = devTools.universe.context.get(
@@ -587,12 +588,49 @@ function withUnknownScriptsRaw(
   return copy;
 }
 
+/**
+ * Waits for the source maps of `scripts` to load, so that their original
+ * sources are in the workspace. Scripts without a source map are skipped.
+ * Non-trivial pages have hundreds of source maps, so the wait ends when
+ * `signal` aborts; loads still pending then continue in the background and
+ * resolve later.
+ */
+export async function waitForSourceMaps(
+  model: DevTools.DebuggerModel,
+  scripts: Iterable<DevToolsScript>,
+  signal: AbortSignal,
+): Promise<void> {
+  const manager = model.sourceMapManager();
+  const aborted = new Promise<void>(resolve => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener('abort', () => resolve(), {once: true});
+  });
+  await Promise.all(
+    [...scripts].map(script => {
+      if (!script.sourceMapURL) {
+        return undefined;
+      }
+      return Promise.race([
+        manager.sourceMapForClientPromise(script).then(() => undefined),
+        aborted,
+      ]);
+    }),
+  );
+}
+
+type DevToolsScript = NonNullable<
+  ReturnType<DevTools.DebuggerModel['scriptForId']>
+>;
+
 // Waits indefinitely for the script so pair it with Promise.race.
 async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: string,
   signal: AbortSignal,
-): Promise<NonNullable<ReturnType<DevTools.DebuggerModel['scriptForId']>>> {
+): Promise<DevToolsScript> {
   while (true) {
     if (signal.aborted) {
       throw signal.reason;

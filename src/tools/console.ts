@@ -9,6 +9,10 @@ import {zod, type ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
+import {
+  GET_CONSOLE_MESSAGE_TOOL_NAME,
+  LIST_CONSOLE_MESSAGES_TOOL_NAME,
+} from './toolNames.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: [
@@ -36,8 +40,6 @@ const FILTERABLE_MESSAGE_TYPES: [
   'verbose',
   'issue',
 ];
-
-const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 
 export const listConsoleMessages: PageToolFactory = definePageTool(
   (cliArgs: ParsedArguments) => {
@@ -110,7 +112,7 @@ export const listConsoleMessages: PageToolFactory = definePageTool(
 );
 
 export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
-  name: 'get_console_message',
+  name: GET_CONSOLE_MESSAGE_TOOL_NAME,
   description: `Gets a console message by its ID. You can get all messages by calling ${LIST_CONSOLE_MESSAGES_TOOL_NAME}.`,
   annotations: {
     category: ToolCategory.DEBUGGING,

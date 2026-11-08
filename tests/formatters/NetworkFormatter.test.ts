@@ -288,6 +288,38 @@ describe('NetworkFormatter', () => {
       assert.strictEqual(json.responseBody, undefined);
     });
 
+    it('should save binary request bodies byte for byte', async () => {
+      const bytes = new Uint8Array([0, 159, 146, 150, 255, 10, 13]);
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => new TextDecoder().decode(bytes),
+        content: async () => bytes,
+        response: () => null,
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'binary_req');
+      let saved: Uint8Array | undefined;
+      await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        saveFile: async (data, filename) => {
+          saved = data;
+          return {filename};
+        },
+        redactNetworkHeaders: false,
+      });
+
+      assert.ok(saved);
+      assert.deepStrictEqual([...saved], [...bytes]);
+    });
+
     it('should not truncate large bodies when saving to file', async () => {
       const largeBody = 'a'.repeat(10005);
       const request = {

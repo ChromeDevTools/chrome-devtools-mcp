@@ -247,7 +247,7 @@ export function sanitizeParams(
 ): ShapeOutput<zod.ZodRawShape> {
   const transformed: ShapeOutput<zod.ZodRawShape> = {};
   for (const [name, value] of Object.entries(params)) {
-    if (PARAM_BLOCKLIST.has(name)) {
+    if (value === undefined || PARAM_BLOCKLIST.has(name)) {
       continue;
     }
     const zodType = getZodType(schema[name]);
