@@ -40,6 +40,7 @@ import {
   type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
+import {mockNetwork} from '../src/tools/network.js';
 import {createTools} from '../src/tools/tools.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import {createMockMcpContext, createMockMcpPage} from './mocks.js';
@@ -1326,6 +1327,31 @@ describe('ToolHandler', () => {
     );
     assert.strictEqual(handlerCalled, false);
   });
+
+  for (const body of ['/outside/script.js', 'https://example.com/script.js']) {
+    it(
+      'validates mock_network body files before resolving the page: ' + body,
+      async () => {
+        const config = parseConfig();
+        const context = createMockMcpContext();
+        context.ensureBrowser.resolves(getMockBrowser());
+        context.validatePath.rejects(new Error('Access denied'));
+        const handler = new ToolHandler(
+          mockNetwork(config.resolved),
+          config,
+          async () => context,
+          sinon.spy(),
+        );
+        const result = await handler.handle({pageId: 1, body});
+        assert.strictEqual(result.isError, true);
+        assert.match(
+          result.content[0].type === 'text' ? result.content[0].text : '',
+          /Access denied|expects a file path, not a URL/,
+        );
+        sinon.assert.notCalled(context.getPageById);
+      },
+    );
+  }
 
   for (const thrown of ['str-thrown', 0]) {
     it(`reports non-Error values thrown by a handler: ${thrown}`, async () => {

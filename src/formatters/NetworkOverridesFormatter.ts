@@ -7,10 +7,10 @@
 import type {NetworkOverride} from '../NetworkOverrideManager.js';
 
 const MEASUREMENT_WARNING =
-  'Network overrides disable the page HTTP cache and intercept every request. ' +
+  'Network mocks disable the page HTTP cache and intercept every request. ' +
   'Replacement resources use altered delivery paths; these timings do not ' +
   'represent normal production loading. Compare baseline and candidate using ' +
-  'the same override mechanism, cache policy, and throttling.';
+  'the same mock mechanism, cache policy, and throttling.';
 
 export class NetworkOverridesFormatter {
   constructor(private readonly overrides: NetworkOverride[]) {}

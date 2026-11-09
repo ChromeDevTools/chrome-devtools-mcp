@@ -26,27 +26,30 @@ describe('network', () => {
       for (const route of ['/app.js*', '   ']) {
         assert.strictEqual(schema.safeParse(route).success, false);
       }
-      assert.throws(() => schema.parse('/app.js*'), /full URL/);
-      assert.strictEqual(schema.parse('  */app.js*  '), '*/app.js*');
+      assert.throws(() => schema.parse('/app.js*'), /absolute URLPattern/);
+      assert.strictEqual(schema.parse('  *://*:*/app.js  '), '*://*:*/app.js');
     });
 
-    it('exposes optional scalar CLI parameters without a string representation', () => {
-      const tool = mockNetwork(createMockParsedArguments({viaCli: true}));
-      assert.strictEqual(tool.schema.route.parse('*/app.js*'), '*/app.js*');
-      assert.strictEqual(tool.schema.resourceType.parse('script'), 'script');
-      assert.strictEqual(tool.schema.body.parse('./app.js'), './app.js');
-      for (const field of [
-        tool.schema.route,
-        tool.schema.resourceType,
-        tool.schema.body,
-      ]) {
-        assert.strictEqual(field.safeParse(undefined).success, true);
+    it('rejects regex and named groups in routes for inspection, updates and removal', () => {
+      const args = createMockParsedArguments();
+      for (const tool of [mockNetwork(args), removeNetworkMock(args)]) {
+        for (const route of [
+          'https://example.com/(app|other).js',
+          'https://example.com/:name.js',
+          'https://:host/app.js',
+          'https://example.com/app.js?version=:version',
+        ]) {
+          assert.throws(() => tool.schema.route.parse(route), /group/);
+        }
       }
     });
 
     for (const params of [
       {body: ' '},
       {route: '/app.js*', body: './app.js'},
+      {route: '*app.js*', body: './app.js'},
+      {route: 'https://example.com/:file', body: './app.js'},
+      {route: 'https://example.com/(app|other).js', body: './app.js'},
       {resourceType: 'websocket', body: './app.js'},
     ]) {
       it(
@@ -65,31 +68,13 @@ describe('network', () => {
       );
     }
 
-    it('rejects body files outside negotiated roots before changing mocks', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      context.validatePath.rejects(new Error('Access denied'));
-      await assert.rejects(
-        mockNetwork(args).handler(
-          {params: {body: '/outside/script.js'}, page},
-          response,
-          context,
-        ),
-        /Access denied/,
-      );
-      sinon.assert.calledOnceWithExactly(
-        context.validatePath,
-        '/outside/script.js',
-      );
-      sinon.assert.notCalled(page.mockNetwork);
-    });
-
     it('revalidates the canonical body file before each read', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.validatePath.resolves('/tmp/script.js');
       page.mockNetwork.resolves({
         id: 1,
         kind: 'file',
-        urlPattern: '*',
+        urlPattern: '*://*:*/*',
         responseFilePath: '/tmp/script.js',
         contentType: 'application/javascript; charset=utf-8',
         diagnostics: {hits: 0, errors: 0, navigations: 0},
@@ -98,7 +83,7 @@ describe('network', () => {
         .stub(fs, 'readFile')
         .resolves(Buffer.from('updated'));
       await mockNetwork(args).handler(
-        {params: {body: './script.js'}, page},
+        {params: {body: '/tmp/script.js'}, page},
         response,
         context,
       );
@@ -111,14 +96,14 @@ describe('network', () => {
         responseFilePath: '/tmp/script.js',
         loadResponseFile: input.loadResponseFile,
       });
-      sinon.assert.calledOnceWithExactly(context.validatePath, './script.js');
+      sinon.assert.notCalled(context.validatePath);
       sinon.assert.notCalled(readFile);
       assert.deepStrictEqual(
         await input.loadResponseFile(),
         Buffer.from('updated'),
       );
-      sinon.assert.calledWithExactly(
-        context.validatePath.secondCall,
+      sinon.assert.calledOnceWithExactly(
+        context.validatePath,
         '/tmp/script.js',
       );
       sinon.assert.calledOnceWithMatch(
@@ -131,29 +116,11 @@ describe('network', () => {
       sinon.assert.notCalled(readFile);
     });
 
-    it('validates body as a filesystem path even when it resembles a URL', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      context.validatePath.rejects(new Error('Access denied'));
-      await assert.rejects(
-        mockNetwork(args).handler(
-          {params: {body: 'https://example.com/script.js'}, page},
-          response,
-          context,
-        ),
-        /Access denied/,
-      );
-      sinon.assert.calledOnceWithExactly(
-        context.validatePath,
-        'https://example.com/script.js',
-      );
-      sinon.assert.notCalled(page.mockNetwork);
-    });
-
     for (const params of [
       {},
-      {route: '*/app.js*'},
+      {route: '*://*:*/app.js'},
       {resourceType: 'script'},
-      {route: '*/app.js*', resourceType: 'script'},
+      {route: '*://*:*/app.js', resourceType: 'script'},
     ] satisfies Array<{route?: string; resourceType?: 'script'}>) {
       it(
         'inspects supplied filters without changing mocks: ' +
@@ -187,7 +154,7 @@ describe('network', () => {
             lastError: 'File missing',
           },
           kind: 'file',
-          urlPattern: '*.js',
+          urlPattern: '*://*:*/*.js',
           resourceType: 'script',
           responseFilePath: '/tmp/script.js',
           contentType: 'text/javascript',
@@ -219,9 +186,9 @@ describe('network', () => {
   describe('remove_network_mock', () => {
     for (const params of [
       {},
-      {route: '*/app.js*'},
+      {route: '*://*:*/app.js'},
       {resourceType: 'script'},
-      {route: '*/app.js*', resourceType: 'script'},
+      {route: '*://*:*/app.js', resourceType: 'script'},
     ] satisfies Array<{route?: string; resourceType?: 'script'}>) {
       it('removes supplied filters: ' + JSON.stringify(params), async () => {
         const {page, context, response, args} = createHandlerMocks();
@@ -247,12 +214,12 @@ describe('network', () => {
       const {page, context, response, args} = createHandlerMocks();
       page.removeNetworkMocks.resolves(0);
       await removeNetworkMock(args).handler(
-        {params: {route: '*'}, page},
+        {params: {route: '*://*:*/*'}, page},
         response,
         context,
       );
       sinon.assert.calledOnceWithExactly(page.removeNetworkMocks, {
-        urlPattern: '*',
+        urlPattern: '*://*:*/*',
         resourceType: undefined,
       });
       sinon.assert.calledOnceWithExactly(

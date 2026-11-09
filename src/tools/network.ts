@@ -10,6 +10,7 @@ import type {ParsedArguments} from '../config/mcp-options.js';
 import type {NetworkMockInput} from '../NetworkOverrideManager.js';
 import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
 import {zod, type ResourceType} from '../third_party/index.js';
+import {validateUrlPatterns} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
@@ -165,11 +166,26 @@ const mockFilterSchema = {
     .min(1)
     .refine(
       value => !value.startsWith('/'),
-      'route matches the full URL. Use */app.js* or an absolute URL pattern instead of /app.js*.',
+      'route must be an absolute URLPattern, such as https://example.com/app.js or *://*:*/app.js.',
     )
+    .superRefine((value, context) => {
+      try {
+        validateUrlPatterns([value], 'route');
+      } catch (error) {
+        context.addIssue({
+          code: 'custom',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })
     .optional()
     .describe(
-      "Full-URL pattern: '*' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '*'.",
+      'Absolute URLPattern using the same syntax and restrictions as ' +
+        'allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js ' +
+        'or `*://*:*/app.js`. Use `*` for wildcards; ' +
+        'omitted query strings match any query. Regex and `:name` groups ' +
+        'are rejected. Inspection and removal compare the stored pattern ' +
+        'exactly. Omit to inspect/remove all routes or match any URL.',
     ),
   resourceType: zod
     .enum(FILTERABLE_RESOURCE_TYPES)
@@ -199,7 +215,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
     'Inspect or update network mocks for a page. With no actions, list mocks ' +
     'matching the supplied filters, or all mocks when no filters are given. ' +
     'Providing body updates the exact route/resourceType pair. ' +
-    "An omitted route configures '*'. Other mocks are preserved. " +
+    'An omitted route matches any URL. Other mocks are preserved. ' +
     'The most recently updated matching mock wins and persists across ' +
     'navigations. Configure before navigating or reloading; inspection shows ' +
     'hit counts and replacement errors. Changes are rejected during ' +
@@ -212,7 +228,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
   },
   schema: mockNetworkSchema.shape,
   blockedByDialog: false,
-  verifyFilesSchema: {},
+  verifyFilesSchema: {body: true},
   concurrency: 'page',
   handler: async (request, response, context) => {
     const params = mockNetworkSchema.parse(request.params);
@@ -222,7 +238,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
     };
     let input: NetworkMockInput | undefined;
     if (params.body !== undefined) {
-      const responseFilePath = await context.validatePath(params.body);
+      const responseFilePath = params.body;
       input = {
         ...filter,
         kind: 'file',

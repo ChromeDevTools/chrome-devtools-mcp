@@ -296,14 +296,14 @@ describe('McpPage', () => {
       });
       await page.mockNetwork({
         kind: 'file',
-        urlPattern: '*.js',
+        urlPattern: '*://*:*/*.js',
         responseFilePath: '/tmp/app.js',
         loadResponseFile: async () => new Uint8Array(),
       });
       page.setIsRunningPerformanceTrace(true);
       await assert.rejects(
         page.mockNetwork({
-          urlPattern: '*.js',
+          urlPattern: '*://*:*/*.js',
           kind: 'file',
           responseFilePath: '/tmp/app.js',
           loadResponseFile: async () => new Uint8Array(),
@@ -324,7 +324,7 @@ describe('McpPage', () => {
       });
       const overrides = await page.mockNetwork({
         kind: 'file',
-        urlPattern: '*.js',
+        urlPattern: '*://*:*/*.js',
         responseFilePath: '/tmp/replacement.js',
         loadResponseFile: async () => new Uint8Array(),
       });
@@ -351,7 +351,7 @@ describe('McpPage', () => {
       await assert.rejects(
         page.mockNetwork({
           kind: 'file',
-          urlPattern: '*.js',
+          urlPattern: '*://*:*/*.js',
           responseFilePath: '/tmp/replacement.js',
           loadResponseFile: async () => new Uint8Array(),
         }),
@@ -367,7 +367,7 @@ describe('McpPage', () => {
         locatorClass: Locator,
       });
       const script = await page.mockNetwork({
-        urlPattern: '*app.js',
+        urlPattern: '*://*:*/*app.js',
         resourceType: 'script',
         kind: 'file',
         responseFilePath: '/tmp/app.js',

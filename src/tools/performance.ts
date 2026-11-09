@@ -57,7 +57,7 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       .boolean()
       .optional()
       .describe(
-        'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.',
+        'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network mocks always disable the page HTTP cache.',
       ),
     filePath: filePathSchema,
   },

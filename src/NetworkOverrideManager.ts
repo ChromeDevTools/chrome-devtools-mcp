@@ -6,14 +6,14 @@
 
 import path from 'node:path';
 
+import {URLPattern} from './third_party/cli.js';
 import {
-  type Frame,
   type HTTPRequest,
   Mutex,
   type Page,
   type ResourceType,
 } from './third_party/index.js';
-import {logger, redactUrlForLogging} from './utils/logger.js';
+import {logger} from './utils/logger.js';
 
 interface BaseNetworkOverride {
   urlPattern: string;
@@ -53,7 +53,7 @@ export interface FileNetworkOverride extends NetworkOverrideBase {
 export type NetworkOverride = FileNetworkOverride;
 
 interface StoredNetworkOverrideBase extends NetworkOverrideBase {
-  matcher: RegExp;
+  matcher: URLPattern;
 }
 
 interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
@@ -65,7 +65,7 @@ interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
 
 type StoredNetworkOverride = StoredFileNetworkOverride;
 
-const DEFAULT_URL_PATTERN = '*';
+const DEFAULT_URL_PATTERN = '*://*:*/*';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -91,46 +91,6 @@ function inferContentType(filePath: string): string {
     CONTENT_TYPES[path.extname(filePath).toLowerCase()] ??
     'application/octet-stream'
   );
-}
-
-function escapeRegExpCharacter(character: string): string {
-  return /[\\^$.*+?()[\]{}|]/.test(character) ? '\\' + character : character;
-}
-
-/**
- * CDP Fetch URL patterns use '*' for any sequence, '?' for one character,
- * and a backslash to escape the next character.
- */
-function compileUrlPattern(pattern: string): RegExp {
-  let source = '^';
-  let escaping = false;
-
-  for (const character of pattern) {
-    if (escaping) {
-      source += escapeRegExpCharacter(character);
-      escaping = false;
-      continue;
-    }
-    if (character === '\\') {
-      escaping = true;
-      continue;
-    }
-    if (character === '*') {
-      source += '.*';
-      continue;
-    }
-    if (character === '?') {
-      source += '.';
-      continue;
-    }
-    source += escapeRegExpCharacter(character);
-  }
-
-  if (escaping) {
-    source += '\\\\';
-  }
-  source += '$';
-  return new RegExp(source);
 }
 
 function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
@@ -171,14 +131,6 @@ export class NetworkOverrideManager {
 
   #requestHandler = (request: HTTPRequest): Promise<void> => {
     return this.#handleRequest(request);
-  };
-
-  #navigationHandler = (frame: Frame): void => {
-    if (frame === this.#page.mainFrame()) {
-      for (const override of this.#overrides.values()) {
-        override.diagnostics.navigations++;
-      }
-    }
   };
 
   constructor(page: Page) {
@@ -229,7 +181,7 @@ export class NetworkOverrideManager {
       id: existing?.id ?? this.#nextId,
       urlPattern,
       resourceType: input.resourceType,
-      matcher: compileUrlPattern(urlPattern),
+      matcher: new URLPattern(urlPattern),
       diagnostics: {hits: 0, errors: 0, navigations: 0},
     };
 
@@ -299,7 +251,7 @@ export class NetworkOverrideManager {
       try {
         await this.#deactivate();
       } catch (error) {
-        logger?.('Failed to dispose network overrides', error);
+        logger?.('Failed to dispose network mocks', error);
       }
     });
   }
@@ -307,12 +259,8 @@ export class NetworkOverrideManager {
   async #runLifecycleOperation<Result>(
     operation: () => Promise<Result>,
   ): Promise<Result> {
-    const guard = await this.#lifecycleMutex.acquire();
-    try {
-      return await operation();
-    } finally {
-      guard[Symbol.dispose]();
-    }
+    using guard = await this.#lifecycleMutex.acquire();
+    return await operation();
   }
 
   async #activate(): Promise<void> {
@@ -320,52 +268,20 @@ export class NetworkOverrideManager {
       return;
     }
     if (this.#page.isClosed()) {
-      throw new Error('Cannot add an override to a closed page.');
+      throw new Error('Cannot add a network mock to a closed page.');
     }
 
     this.#page.on('request', this.#requestHandler);
-    this.#page.on('framenavigated', this.#navigationHandler);
     try {
       this.#cacheDisabled = true;
       await this.#page.setCacheEnabled(false);
-      if (this.#page.isClosed()) {
-        throw new Error('Cannot add an override to a closed page.');
-      }
-      await this.#page.setRequestInterception(true);
       this.#active = true;
-      if (this.#page.isClosed()) {
-        throw new Error('Cannot add an override to a closed page.');
-      }
+      await this.#page.setRequestInterception(true);
     } catch (error) {
-      let interceptionDisabled = this.#page.isClosed();
-      if (!interceptionDisabled) {
-        try {
-          await this.#page.setRequestInterception(false);
-          interceptionDisabled = true;
-        } catch (cleanupError) {
-          this.#active = true;
-          logger?.(
-            'Failed to disable request interception after activation failed',
-            cleanupError,
-          );
-        }
-      }
-      if (interceptionDisabled) {
-        this.#active = false;
-        this.#removeListeners();
-        if (this.#page.isClosed()) {
-          this.#cacheDisabled = false;
-        } else if (this.#cacheDisabled) {
-          try {
-            await this.#page.setCacheEnabled(true);
-            this.#cacheDisabled = false;
-          } catch (cleanupError) {
-            logger?.(
-              'Failed to restore the cache after activation failed',
-              cleanupError,
-            );
-          }
-        }
+      try {
+        await this.#deactivate();
+      } catch (cleanupError) {
+        logger?.('Failed to clean up network mock activation', cleanupError);
       }
       throw error;
     }
@@ -413,10 +329,17 @@ export class NetworkOverrideManager {
 
   #removeListeners(): void {
     this.#page.off('request', this.#requestHandler);
-    this.#page.off('framenavigated', this.#navigationHandler);
   }
 
   async #handleRequest(request: HTTPRequest): Promise<void> {
+    if (
+      request.resourceType() === 'document' &&
+      request.frame() === this.#page.mainFrame()
+    ) {
+      for (const override of this.#overrides.values()) {
+        override.diagnostics.navigations++;
+      }
+    }
     if (request.isInterceptResolutionHandled()) {
       return;
     }
@@ -448,13 +371,9 @@ export class NetworkOverrideManager {
           : String(error);
       const source = override.responseFilePath;
       override.diagnostics.errors++;
-      override.diagnostics.lastError = (
-        'Failed to load ' +
-        source +
-        ': ' +
-        message
-      ).replace(/https?:\/\/[^\s"'<>]+/gi, url => redactUrlForLogging(url));
-      logger?.('Failed to apply network override ' + override.id);
+      override.diagnostics.lastError =
+        'Failed to load ' + source + ': ' + message;
+      logger?.('Failed to apply network mock ' + override.id);
       await this.#abortRequest(request);
     }
   }
@@ -477,7 +396,7 @@ export class NetworkOverrideManager {
     try {
       await request.abort('failed');
     } catch (error) {
-      logger?.('Failed to abort a request after an override error', error);
+      logger?.('Failed to abort a request after a network mock error', error);
     }
   }
 }

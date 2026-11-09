@@ -951,7 +951,7 @@ export class McpPage implements ContextPage {
   async #getNetworkOverrideManagerForChanges(): Promise<NetworkOverrideManager> {
     if (this.#isRunningPerformanceTrace) {
       throw new Error(
-        'Cannot change network overrides while a performance trace is running.',
+        'Cannot change network mocks while a performance trace is running.',
       );
     }
     await this.init();

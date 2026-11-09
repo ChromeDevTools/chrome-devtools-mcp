@@ -29,7 +29,7 @@ describe('network overrides integration', () => {
     });
   }
 
-  it('serves the latest contents of a local file', async () => {
+  it('serves the latest contents of a local file when the URL has a query string', async () => {
     using directory = createTempDir('network-override-');
     const filePath = join(directory.path, 'local-override.js');
     await writeFile(
@@ -42,7 +42,7 @@ describe('network overrides integration', () => {
     );
     server.addHtmlRoute(
       '/local-page',
-      html`<script src="${server.getRoute('/local-original.js')}"></script>`,
+      html`<script src="${server.getRoute('/local-original.js')}?v=1"></script>`,
     );
 
     await withMcpContext(async (response, context, args) => {

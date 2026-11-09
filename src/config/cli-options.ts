@@ -1479,7 +1479,7 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
+      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.',
     category: 'Network',
     args: {
       pageId: {
@@ -1493,7 +1493,7 @@ export const commands: Commands = {
         name: 'route',
         type: 'string',
         description:
-          "Full-URL pattern: '*' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '*'.",
+          'Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
         required: false,
         positional: false,
       },
@@ -1699,7 +1699,7 @@ export const commands: Commands = {
         name: 'ignoreCache',
         type: 'boolean',
         description:
-          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.',
+          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network mocks always disable the page HTTP cache.',
         required: false,
         positional: false,
       },
@@ -1889,7 +1889,7 @@ export const commands: Commands = {
         name: 'route',
         type: 'string',
         description:
-          "Full-URL pattern: '*' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '*'.",
+          'Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
         required: false,
         positional: false,
       },

@@ -336,7 +336,7 @@
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.
+- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network mocks always disable the page HTTP cache.
 - **reload** (boolean) _(optional)_: Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
@@ -383,14 +383,14 @@
 
 ### `mock_network`
 
-**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks.
+**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks.
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension.
 - **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
-- **route** (string) _(optional)_: Full-URL pattern: '_' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '_'.
+- **route** (string) _(optional)_: Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
 
 ---
 
@@ -402,7 +402,7 @@
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
-- **route** (string) _(optional)_: Full-URL pattern: '_' matches any sequence, '?' one character, and a backslash escapes a wildcard. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or configure '_'.
+- **route** (string) _(optional)_: Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
 
 ---
 

@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkOverrideManager} from '../src/NetworkOverrideManager.js';
+import {CdpFrame} from '../src/third_party/index.js';
 import {createMockHTTPRequest, createMockPuppeteerPage} from './mocks.js';
 import {NetworkOverridesFormatter} from '../src/formatters/NetworkOverridesFormatter.js';
 
@@ -19,7 +20,7 @@ describe('NetworkOverrideManager', () => {
     const manager = new NetworkOverrideManager(pptrPage);
     const initial = await manager.mock({
       kind: 'file',
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       resourceType: 'script',
       responseFilePath: '/tmp/replacement.js',
       loadResponseFile: async () => new Uint8Array(),
@@ -46,12 +47,12 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
-  it('warns when nothing matched after navigation and removes navigation listeners', async () => {
+  it('warns after a main-frame document request but not a hash change or subframe navigation', async () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(pptrPage);
     await manager.mock({
       kind: 'file',
-      urlPattern: '*missing.js',
+      urlPattern: '*://*:*/*missing.js',
       responseFilePath: '/tmp/replacement.js',
       loadResponseFile: async () => new Uint8Array(),
     });
@@ -60,17 +61,72 @@ describe('NetworkOverrideManager', () => {
       /Navigate or reload/,
     );
     pptrPage.emit('framenavigated', pptrPage.mainFrame());
+    const handle = pptrPage.on.firstCall.args[1];
+    const mainFrame = pptrPage.mainFrame();
+    const childFrame = createMockPuppeteerPage().mainFrame();
+    assert.ok(mainFrame instanceof CdpFrame);
+    assert.ok(childFrame instanceof CdpFrame);
+    const subframe = createMockHTTPRequest({resourceType: 'document'});
+    subframe.frame.returns(childFrame);
+    await handle(subframe);
+    const script = createMockHTTPRequest();
+    script.frame.returns(mainFrame);
+    await handle(script);
+    assert.equal(manager.list()[0]?.diagnostics.navigations, 0);
+    assert.doesNotMatch(
+      new NetworkOverridesFormatter(manager.list()).toString(),
+      /Warning: no requests matched after navigation/,
+    );
+    const document = createMockHTTPRequest({resourceType: 'document'});
+    document.frame.returns(mainFrame);
+    await handle(document);
+    assert.equal(manager.list()[0]?.diagnostics.navigations, 1);
     assert.match(
       new NetworkOverridesFormatter(manager.list()).toString(),
       /Warning: no requests matched after navigation/,
     );
-    const unmatched = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](unmatched);
     assert.equal(manager.list()[0]?.diagnostics.hits, 0);
-    sinon.assert.calledOnceWithExactly(unmatched.continue);
+    sinon.assert.calledOnceWithExactly(document.continue);
+    sinon.assert.notCalled(document.respond);
     await manager.dispose();
-    assert.equal(pptrPage.listenerCount('framenavigated'), 0);
+    assert.equal(pptrPage.listenerCount('request'), 0);
   });
+
+  for (const route of [
+    'https://example.com/app.js',
+    '*://*:*/app.js',
+    'https://example.com/app.js?v=*',
+  ]) {
+    it('matches query strings using URLPattern: ' + route, async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const manager = new NetworkOverrideManager(pptrPage);
+      await manager.mock({
+        kind: 'file',
+        urlPattern: route,
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      const handle = pptrPage.on.firstCall.args[1];
+      const request = createMockHTTPRequest({
+        url: 'https://example.com/app.js?v=1',
+      });
+      await handle(request);
+      sinon.assert.calledOnceWithExactly(request.respond, {
+        status: 200,
+        contentType: 'application/javascript; charset=utf-8',
+        headers: {'Cache-Control': 'no-store'},
+        body: new Uint8Array(),
+      });
+      sinon.assert.notCalled(request.continue);
+      const unmatched = createMockHTTPRequest({
+        url: 'https://example.com/app.jsxv=1',
+      });
+      await handle(unmatched);
+      sinon.assert.calledOnceWithExactly(unmatched.continue);
+      sinon.assert.notCalled(unmatched.respond);
+      await manager.dispose();
+    });
+  }
 
   it('reports the local file and error when a previously readable file fails', async () => {
     const pptrPage = createMockPuppeteerPage();
@@ -83,7 +139,7 @@ describe('NetworkOverrideManager', () => {
       .rejects({message: 'ENOENT: file was removed'});
     await manager.mock({
       kind: 'file',
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       responseFilePath: '/tmp/app.js',
       loadResponseFile,
     });
@@ -108,19 +164,19 @@ describe('NetworkOverrideManager', () => {
     const manager = new NetworkOverrideManager(pptrPage);
     const unrelated = await manager.mock({
       kind: 'file',
-      urlPattern: '*old.js',
+      urlPattern: '*://*:*/*old.js',
       responseFilePath: '/tmp/old.js',
       loadResponseFile: async () => new Uint8Array(),
     });
     const previous = await manager.mock({
       kind: 'file',
-      urlPattern: '*new.js',
+      urlPattern: '*://*:*/*new.js',
       responseFilePath: '/tmp/new.js',
       loadResponseFile: async () => new Uint8Array(),
     });
     const updated = await manager.mock({
       kind: 'file',
-      urlPattern: '*new.js',
+      urlPattern: '*://*:*/*new.js',
       responseFilePath: '/tmp/updated.js',
       loadResponseFile: async () => new Uint8Array(),
     });
@@ -136,7 +192,7 @@ describe('NetworkOverrideManager', () => {
     const manager = new NetworkOverrideManager(pptrPage);
     const previous = await manager.mock({
       kind: 'file',
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
     });
@@ -144,7 +200,7 @@ describe('NetworkOverrideManager', () => {
     await assert.rejects(
       manager.mock({
         kind: 'file',
-        urlPattern: '*app.js',
+        urlPattern: '*://*:*/*app.js',
         responseFilePath: '/tmp/app.js',
         loadResponseFile,
       }),
@@ -163,7 +219,7 @@ describe('NetworkOverrideManager', () => {
     assert.deepEqual(
       await manager.mock({
         kind: 'file',
-        urlPattern: '*app.js',
+        urlPattern: '*://*:*/*app.js',
         responseFilePath: '/tmp/app.js',
         loadResponseFile,
       }),
@@ -171,7 +227,7 @@ describe('NetworkOverrideManager', () => {
         id: 1,
         diagnostics: {hits: 0, errors: 0, navigations: 0},
         kind: 'file',
-        urlPattern: '*app.js',
+        urlPattern: '*://*:*/*app.js',
         resourceType: undefined,
         responseFilePath: '/tmp/app.js',
         contentType: 'application/javascript; charset=utf-8',
@@ -190,7 +246,7 @@ describe('NetworkOverrideManager', () => {
     await assert.rejects(
       manager.mock({
         kind: 'file',
-        urlPattern: '*app.js',
+        urlPattern: '*://*:*/*app.js',
         responseFilePath: '/tmp/app.js',
         loadResponseFile: async () => new Uint8Array(),
       }),
@@ -210,7 +266,7 @@ describe('NetworkOverrideManager', () => {
     const manager = new NetworkOverrideManager(pptrPage);
     const previous = await manager.mock({
       kind: 'file',
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
     });
@@ -228,33 +284,39 @@ describe('NetworkOverrideManager', () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(pptrPage);
     const script = await manager.mock({
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       resourceType: 'script',
       kind: 'file',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
     });
     const fetch = await manager.mock({
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       resourceType: 'fetch',
       kind: 'file',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
     });
     const other = await manager.mock({
-      urlPattern: '*other.js',
+      urlPattern: '*://*:*/*other.js',
       kind: 'file',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
     });
-    assert.deepEqual(manager.list({urlPattern: '*app.js'}), [script, fetch]);
+    assert.deepEqual(manager.list({urlPattern: '*://*:*/*app.js'}), [
+      script,
+      fetch,
+    ]);
     assert.deepEqual(manager.list({resourceType: 'script'}), [script]);
     assert.equal(
-      await manager.remove({urlPattern: '*app.js', resourceType: 'script'}),
+      await manager.remove({
+        urlPattern: '*://*:*/*app.js',
+        resourceType: 'script',
+      }),
       1,
     );
     assert.deepEqual(manager.list(), [fetch, other]);
-    assert.equal(await manager.remove({urlPattern: '*app*'}), 0);
+    assert.equal(await manager.remove({urlPattern: '*://*:*/*app*'}), 0);
     sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
     assert.equal(await manager.remove({}), 2);
     assert.deepEqual(manager.list(), []);
@@ -270,7 +332,7 @@ describe('NetworkOverrideManager', () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(pptrPage);
     const previous = await manager.mock({
-      urlPattern: '*app.js',
+      urlPattern: '*://*:*/*app.js',
       kind: 'file',
       responseFilePath: '/tmp/app.js',
       loadResponseFile: async () => new Uint8Array(),
@@ -291,7 +353,7 @@ describe('NetworkOverrideManager', () => {
     );
     assert.equal(pptrPage.listenerCount('request'), 1);
     const request = createMockHTTPRequest();
-    await pptrPage.on.thirdCall.args[1](request);
+    await pptrPage.on.secondCall.args[1](request);
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
       contentType: 'application/javascript; charset=utf-8',
@@ -322,10 +384,12 @@ describe('NetworkOverrideManager', () => {
       responseFilePath: '/tmp/updated.js',
       loadResponseFile: async () => new Uint8Array(),
     });
-    assert.equal(scripts.urlPattern, '*');
+    assert.equal(scripts.urlPattern, '*://*:*/*');
     assert.equal(updated.id, scripts.id);
     assert.deepEqual(manager.list(), [all, updated]);
-    const request = createMockHTTPRequest();
+    const request = createMockHTTPRequest({
+      url: 'http://localhost:8080/app.js?v=1',
+    });
     await pptrPage.on.firstCall.args[1](request);
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
