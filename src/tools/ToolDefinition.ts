@@ -6,6 +6,7 @@
 
 import {categoryToFlagName} from '../config/category-options.js';
 import type {ParsedArguments} from '../config/mcp-options.js';
+import type {McpServer} from '../index.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotDiff,
@@ -352,6 +353,7 @@ export interface ScreenRecorderData {
 }
 
 export type Context = Readonly<{
+  mcpServer?: McpServer;
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;
@@ -399,6 +401,7 @@ export type Context = Readonly<{
  * connection.
  */
 export type BrowserlessContext = Readonly<{
+  mcpServer?: McpServer;
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,

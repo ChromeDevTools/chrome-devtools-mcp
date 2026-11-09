@@ -625,23 +625,33 @@ export class McpResponse implements Response {
     return undefined;
   }
 
-  async #handleThirdPartyDeveloperTools(): Promise<ToolGroups | undefined> {
-    if (
-      this.#config.resolved.categoryExperimentalThirdParty &&
-      this.#listThirdPartyDeveloperTools &&
-      this.#page
-    ) {
+  async #handleThirdPartyDeveloperTools(
+    context?: McpContext,
+  ): Promise<ToolGroups | undefined> {
+    const capManager = context?.mcpServer?.capabilityManager;
+    const isEnabled =
+      this.#config.resolved.categoryExperimentalThirdParty ||
+      (this.#config.resolved.categoryExperimentalThirdParty !== false &&
+        Boolean(
+          capManager?.isMetaFeatureSystemEnabled &&
+          capManager?.isToolActive('list_3p_developer_tools'),
+        ));
+    if (isEnabled && this.#listThirdPartyDeveloperTools && this.#page) {
       return await this.#page.discoverThirdPartyDeveloperTools();
     }
     return undefined;
   }
 
-  async #handleWebMCP(): Promise<WebMCPTool[] | undefined> {
-    if (
-      this.#config.resolved.categoryExperimentalWebmcp &&
-      this.#listWebMcpTools &&
-      this.#page
-    ) {
+  async #handleWebMCP(context?: McpContext): Promise<WebMCPTool[] | undefined> {
+    const capManager = context?.mcpServer?.capabilityManager;
+    const isEnabled =
+      this.#config.resolved.categoryExperimentalWebmcp ||
+      (this.#config.resolved.categoryExperimentalWebmcp !== false &&
+        Boolean(
+          capManager?.isMetaFeatureSystemEnabled &&
+          capManager?.isToolActive('list_webmcp_tools'),
+        ));
+    if (isEnabled && this.#listWebMcpTools && this.#page) {
       return this.#page.getWebMcpTools();
     }
     return undefined;
@@ -814,8 +824,8 @@ export class McpResponse implements Response {
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
       this.#handleAttachedConsoleMessage(),
-      this.#handleThirdPartyDeveloperTools(),
-      this.#handleWebMCP(),
+      this.#handleThirdPartyDeveloperTools(context),
+      this.#handleWebMCP(context),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
       this.#handleComments(),
