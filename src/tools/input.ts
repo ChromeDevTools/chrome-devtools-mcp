@@ -605,9 +605,16 @@ export const uploadFile: PageToolFactory = definePageTool(() => ({
     try {
       await handle.uploadFile(...filePaths);
     } catch (err) {
+      // Puppeteer rejects multiple files for any element without the
+      // `multiple` property, including chooser-opening proxy elements. Only
+      // rethrow for real file inputs; proxies fall through to the file
+      // chooser, which enforces the limit on the input it opens.
       if (
         err instanceof Error &&
-        err.message.includes('Multiple file uploads')
+        err.message.includes('Multiple file uploads') &&
+        (await handle.evaluate(
+          el => el instanceof HTMLInputElement && el.type === 'file',
+        ))
       ) {
         throw err;
       }
