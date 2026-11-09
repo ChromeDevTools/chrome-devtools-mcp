@@ -9,6 +9,8 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {zod} from '../src/third_party/index.js';
+
 const BUILD_SRC = path.resolve(import.meta.dirname, '..', 'src');
 const CLI_ENTRY = path.join(BUILD_SRC, 'bin', 'chrome-devtools.js');
 const FULL_BUNDLE = path.join(BUILD_SRC, 'third_party', 'index.js');
@@ -57,5 +59,9 @@ describe('chrome-devtools CLI imports', () => {
       undefined,
       `The CLI must import from third_party/cli.js only. Import chain:\n  ${chain?.join('\n  -> ')}`,
     );
+  });
+
+  it('does not re-export unused zod locales from the third-party barrel', () => {
+    assert.strictEqual('locales' in zod, false);
   });
 });

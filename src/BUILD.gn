@@ -37,6 +37,7 @@ ts_library("third_party") {
     "third_party/devtools-heap-snapshot-worker.ts",
     "third_party/index.ts",
     "third_party/lighthouse-devtools-mcp-bundle.d.ts",
+    "third_party/zod.ts",
   ]
 
   ts_deps = [
