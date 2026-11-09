@@ -824,6 +824,17 @@ export function geolocationTransform(
   });
 }
 
+const jsonObjectSchema = zod.record(zod.string(), zod.unknown());
+
+export function jsonObjectTransform(
+  arg: string | undefined,
+): Record<string, unknown> | undefined {
+  if (!arg) {
+    return undefined;
+  }
+  return jsonObjectSchema.parse(JSON.parse(arg));
+}
+
 export function isSlimTool(
   tool: Pick<BaseToolDefinition, 'annotations'>,
 ): boolean {
