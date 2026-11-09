@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
@@ -30,13 +30,11 @@ import {
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-sw',
+  '../../../../../tests/tools/fixtures/extension-sw',
 );
 
 describe('script', () => {
   const server = serverHooks();
-
-  afterEach(() => sinon.restore());
 
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {
@@ -118,6 +116,40 @@ describe('script', () => {
           await context.getSelectedMcpPage().pptrPage.title(),
           '',
         );
+      });
+    });
+    it('surfaces non-Error values when script throws or rejects', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const cases = [
+          {fn: "() => { throw 'str-thrown'; }", expected: 'str-thrown'},
+          {fn: "async () => { throw 'async-str'; }", expected: 'async-str'},
+          {fn: '() => Promise.reject(42)', expected: '42'},
+          {fn: '() => { throw {code: 42}; }', expected: '{"code":42}'},
+          {
+            fn: "() => { throw new Error('err-thrown'); }",
+            expected: 'err-thrown',
+          },
+        ];
+        for (const testCase of cases) {
+          let caught: unknown;
+          try {
+            await evaluateScript(args).handler(
+              {params: {function: testCase.fn}},
+              response,
+              context,
+            );
+          } catch (err) {
+            caught = err;
+          }
+          assert.ok(
+            caught instanceof Error,
+            `Expected Error for ${testCase.fn}`,
+          );
+          assert.ok(
+            caught.message.includes(testCase.expected),
+            `Expected "${caught.message}" to include "${testCase.expected}"`,
+          );
+        }
       });
     });
     it('serializes script results inside the browser', async () => {
@@ -241,6 +273,7 @@ describe('script', () => {
         ),
         {message: 'A dialog is open (alert: hello).'},
       );
+      sinon.assert.calledOnceWithExactly(page.init, {emulateFocus: true});
       sinon.assert.calledOnceWithExactly(page.throwIfDialogOpen);
       sinon.assert.callOrder(page.init, page.throwIfDialogOpen);
       sinon.assert.notCalled(page.waitForEventsAfterAction);

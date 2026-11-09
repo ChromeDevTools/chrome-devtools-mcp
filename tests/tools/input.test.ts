@@ -5,12 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {TimeoutError, zod} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -26,6 +27,7 @@ import {
   createHandlerMocks,
   createMockDialog,
   createMockElementHandle,
+  createMockServerConfig,
 } from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
@@ -37,10 +39,6 @@ import {
 
 describe('input', () => {
   const server = serverHooks();
-
-  afterEach(() => {
-    sinon.restore();
-  });
 
   describe('click', () => {
     it('clicks', async () => {
@@ -246,58 +244,66 @@ describe('input', () => {
     });
 
     it('does not include snapshot by default', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onclick="this.innerText = 'clicked';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await click(args).handler(
-          {
-            params: {
-              uid: '1_1',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked on the element',
-        );
-        assert.strictEqual(response.snapshotParams, undefined);
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithMatch(
+        locator.click,
+        sinon.match({
+          count: 1,
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully clicked on the element',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
     });
 
     it('includes snapshot if includeSnapshot is true', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onclick="this.innerText = 'clicked';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await click(args).handler(
-          {
-            params: {
-              uid: '1_1',
-              includeSnapshot: true,
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked on the element',
-        );
-        assert.notStrictEqual(response.snapshotParams, undefined);
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithMatch(
+        locator.click,
+        sinon.match({
+          count: 1,
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully clicked on the element',
+      );
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
 
     it('selects a collapsed native select option by option uid', async () => {
@@ -495,31 +501,64 @@ describe('input', () => {
 
   describe('hover', () => {
     it('hovers', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onmouseover="this.innerText = 'hovered';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await hover(args).handler(
-          {
-            params: {
-              uid: '1_1',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully hovered over the element',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/hovered'));
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithMatch(
+        locator.hover,
+        sinon.match({
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully hovered over the element',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('includes snapshot if includeSnapshot is true', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithMatch(
+        locator.hover,
+        sinon.match({
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully hovered over the element',
+      );
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
 
     it('does not fail when the hover opens a dialog', async () => {
@@ -905,7 +944,7 @@ describe('input', () => {
         );
 
         // Fill email
-        const response1 = new McpResponse(args);
+        const response1 = new McpResponse(createMockServerConfig(args));
         await fill(args).handler(
           {
             params: {
@@ -923,7 +962,7 @@ describe('input', () => {
         );
 
         // Fill password
-        const response2 = new McpResponse(args);
+        const response2 = new McpResponse(createMockServerConfig(args));
         await fill(args).handler(
           {
             params: {
@@ -1008,7 +1047,7 @@ describe('input', () => {
             },
             page: context.getSelectedMcpPage(),
           },
-          new McpResponse(args),
+          new McpResponse(createMockServerConfig(args)),
           context,
         );
 
@@ -1066,7 +1105,7 @@ describe('input', () => {
             },
             page: context.getSelectedMcpPage(),
           },
-          new McpResponse(args),
+          new McpResponse(createMockServerConfig(args)),
           context,
         );
 
@@ -1134,6 +1173,40 @@ describe('input', () => {
         assert.strictEqual(r1Checked, false);
         assert.strictEqual(r2Checked, true);
       });
+    });
+
+    it('reports failure when the locator rejects a fill', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fill(args).handler(
+          {
+            params: {uid: '1_1', value: 'changed', includeSnapshot: true},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5070);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'changed',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
     });
 
     it('does not fail when filling opens a dialog', async () => {
@@ -1220,9 +1293,85 @@ describe('input', () => {
         assert.ok(await page.$('text/dropped'));
       });
     });
+
+    it('calls drag and drop on the element handles and includes snapshot', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const fromHandle = createMockElementHandle().handle;
+      const toHandle = createMockElementHandle().handle;
+      page.getElementByUid.withArgs('1_1').resolves(fromHandle);
+      page.getElementByUid.withArgs('1_2').resolves(toHandle);
+
+      await drag(args).handler(
+        {
+          params: {
+            from_uid: '1_1',
+            to_uid: '1_2',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledTwice(page.getElementByUid);
+      sinon.assert.calledWithExactly(page.getElementByUid.firstCall, '1_1');
+      sinon.assert.calledWithExactly(page.getElementByUid.secondCall, '1_2');
+      sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
+      sinon.assert.calledOnceWithMatch(
+        toHandle.drop,
+        sinon.match.same(fromHandle),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully dragged an element',
+      );
+      sinon.assert.calledOnce(response.includeSnapshot);
+    });
   });
 
   describe('fill form', () => {
+    it('stops when the locator rejects a form value', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fillForm(args).handler(
+          {
+            params: {
+              elements: [
+                {uid: '1_1', value: 'abc'},
+                {uid: '1_2', value: 'next'},
+              ],
+              includeSnapshot: true,
+            },
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5030);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'abc',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
     it('successfully fills out the form', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1672,7 +1821,7 @@ describe('input', () => {
         await pressKey(args).handler(
           {
             params: {
-              key: 'Control+Shift+C',
+              key: ['C', 'Control', 'Shift'],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1680,6 +1829,10 @@ describe('input', () => {
           context,
         );
 
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+Shift+C',
+        );
         assert.deepStrictEqual(await page.evaluate('logs'), [
           'dControl',
           'dShift',
@@ -1689,6 +1842,68 @@ describe('input', () => {
           'uControl',
         ]);
       });
+    });
+
+    it('parses valid keys and rejects invalid keys in press_key and type_text schemas', () => {
+      const {args} = createHandlerMocks();
+      const pressKeySchema = zod.object(pressKey(args).schema);
+      assert.deepStrictEqual(
+        pressKeySchema.safeParse({pageId: 1, key: 'Control+Shift+C'}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            key: ['C', 'Control', 'Shift'],
+          },
+        },
+      );
+      const invalidPressKey = pressKeySchema.safeParse({
+        pageId: 1,
+        key: 'NotAKey',
+      });
+      assert.strictEqual(invalidPressKey.success, false);
+      assert.match(
+        invalidPressKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
+
+      const typeTextSchema = zod.object(typeText(args).schema);
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({
+          pageId: 1,
+          text: 'hello',
+          submitKey: 'Enter',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: 'Enter',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({pageId: 1, text: 'hello', submitKey: ''}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: undefined,
+          },
+        },
+      );
+      const invalidSubmitKey = typeTextSchema.safeParse({
+        pageId: 1,
+        text: 'hello',
+        submitKey: 'NotAKey',
+      });
+      assert.strictEqual(invalidSubmitKey.success, false);
+      assert.match(
+        invalidSubmitKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
     });
 
     it('releases held modifiers when the main key press fails', async () => {
@@ -1707,7 +1922,7 @@ describe('input', () => {
 
         // Simulate the main key press failing mid-sequence (e.g. a CDP
         // hiccup) after the modifiers have already been pressed down.
-        sinon
+        const pressStub = sinon
           .stub(page.keyboard, 'press')
           .throws(new Error('injected press failure'));
 
@@ -1716,7 +1931,7 @@ describe('input', () => {
             pressKey(args).handler(
               {
                 params: {
-                  key: 'Control+Shift+C',
+                  key: ['C', 'Control', 'Shift'],
                 },
                 page: context.getSelectedMcpPage(),
               },
@@ -1725,7 +1940,7 @@ describe('input', () => {
             ),
           );
         } finally {
-          sinon.restore();
+          pressStub.restore();
         }
 
         // The modifiers were pressed down; both must be released even though

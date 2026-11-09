@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -15,10 +15,6 @@ import {
 import type {CD4ACommentThread} from '../../src/types.js';
 
 describe('CommentFormatter', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   function formatterTest(
     label: string,
     setup: (t: it.TestContext) => CommentFormatter | Promise<CommentFormatter>,

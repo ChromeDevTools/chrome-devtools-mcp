@@ -4,16 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {TimeoutError, zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import {
+  TimeoutError,
+  zod,
+  type ElementHandle,
+  type KeyInput,
+} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
+import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
-import {definePageTool} from './ToolDefinition.js';
+import {
+  definePageTool,
+  zodTransform,
+  type ContextPage,
+  type PageToolFactory,
+} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -28,9 +36,11 @@ const includeSnapshotSchema = zod
 const submitKeySchema = zod
   .string()
   // An empty string means no submit key, as before.
-  .refine((key): boolean => key === '' || isValidKey(key), {
-    error: issue => invalidKeyMessage(String(issue.input)),
-  })
+  .transform(
+    zodTransform((key): KeyInput | undefined =>
+      key === '' ? undefined : throwIfInvalidKey(key),
+    ),
+  )
   .optional()
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
@@ -108,7 +118,7 @@ async function selectNativeSelectOption(
   return true;
 }
 
-export const click = definePageTool(() => ({
+export const click: PageToolFactory = definePageTool(() => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -125,6 +135,7 @@ export const click = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
@@ -168,7 +179,7 @@ export const click = definePageTool(() => ({
   },
 }));
 
-export const clickAt = definePageTool(() => ({
+export const clickAt: PageToolFactory = definePageTool(() => ({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
@@ -183,6 +194,7 @@ export const clickAt = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -203,7 +215,7 @@ export const clickAt = definePageTool(() => ({
   },
 }));
 
-export const hover = definePageTool(() => ({
+export const hover: PageToolFactory = definePageTool(() => ({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
@@ -219,6 +231,7 @@ export const hover = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
@@ -390,7 +403,7 @@ async function fillFormElements(
   }
 }
 
-export const fill = definePageTool(() => ({
+export const fill: PageToolFactory = definePageTool(() => ({
   name: 'fill',
   description: `Type text into an input, text area or select an option from a <select> element.`,
   annotations: {
@@ -411,6 +424,7 @@ export const fill = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const {result} = await fillFormElements(
@@ -431,7 +445,7 @@ export const fill = definePageTool(() => ({
   },
 }));
 
-export const typeText = definePageTool(() => ({
+export const typeText: PageToolFactory = definePageTool(() => ({
   name: 'type_text',
   description: `Type text using keyboard into a previously focused input`,
   annotations: {
@@ -443,14 +457,14 @@ export const typeText = definePageTool(() => ({
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     const submitKey = request.params.submitKey;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      // submitKeySchema has already validated the key; isValidKey narrows the type.
-      if (submitKey && isValidKey(submitKey)) {
+      if (submitKey) {
         await page.pptrPage.keyboard.press(submitKey);
       }
     });
@@ -461,7 +475,7 @@ export const typeText = definePageTool(() => ({
   },
 }));
 
-export const drag = definePageTool(() => ({
+export const drag: PageToolFactory = definePageTool(() => ({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -474,6 +488,7 @@ export const drag = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     using fromHandle = await request.page.getElementByUid(
@@ -494,7 +509,7 @@ export const drag = definePageTool(() => ({
   },
 }));
 
-export const fillForm = definePageTool(() => ({
+export const fillForm: PageToolFactory = definePageTool(() => ({
   name: 'fill_form',
   description: `Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual 'fill' or 'click' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: Fill username, password, and check "Remember Me" in one call.`,
   annotations: {
@@ -521,6 +536,7 @@ export const fillForm = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const {result, interruptedUid} = await fillFormElements(
@@ -549,7 +565,7 @@ export const fillForm = definePageTool(() => ({
   },
 }));
 
-export const uploadFile = definePageTool(() => ({
+export const uploadFile: PageToolFactory = definePageTool(() => ({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
@@ -571,6 +587,7 @@ export const uploadFile = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   // We do not validate file paths for remote browser instances
   // because they are on the remote host and not accessed by the MCP server.
   verifyFilesSchema: {
@@ -617,9 +634,9 @@ export const uploadFile = definePageTool(() => ({
   },
 }));
 
-export const pressKey = definePageTool(() => ({
+export const pressKey: PageToolFactory = definePageTool(() => ({
   name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations). Note: On macOS, native <select> elements cannot be operated with ArrowDown/Enter via press_key; use fill() on the combobox or click() on the option instead.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -627,17 +644,18 @@ export const pressKey = definePageTool(() => ({
   schema: {
     key: zod
       .string()
+      .transform(zodTransform(parseKey))
       .describe(
         'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
       ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    const tokens = parseKey(request.params.key);
-    const [key, ...modifiers] = tokens;
+    const [key, ...modifiers] = request.params.key;
 
     const result = await page.waitForEventsAfterAction(async () => {
       const heldModifiers: KeyInput[] = [];
@@ -658,7 +676,7 @@ export const pressKey = definePageTool(() => ({
     });
 
     response.appendResponseLine(
-      `Successfully pressed key: ${request.params.key}`,
+      `Successfully pressed key: ${[...modifiers, key].join('+')}`,
     );
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {

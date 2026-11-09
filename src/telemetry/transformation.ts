@@ -42,7 +42,7 @@ export function sanitizeClientName(clientName: string): string {
   return REDACTED_CLIENT_NAME;
 }
 
-export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
+export const PARAM_BLOCKLIST: Set<string> = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [
   'ZodString',
@@ -247,7 +247,7 @@ export function sanitizeParams(
 ): ShapeOutput<zod.ZodRawShape> {
   const transformed: ShapeOutput<zod.ZodRawShape> = {};
   for (const [name, value] of Object.entries(params)) {
-    if (PARAM_BLOCKLIST.has(name)) {
+    if (value === undefined || PARAM_BLOCKLIST.has(name)) {
       continue;
     }
     const zodType = getZodType(schema[name]);

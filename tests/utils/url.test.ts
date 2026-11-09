@@ -9,10 +9,50 @@ import {describe, it} from 'node:test';
 
 import {
   isAllowedUrl,
+  isLocalBrowserEndpoint,
   isLocalhost,
   validateUrl,
   validateUrlPatterns,
 } from '../../src/utils/url.js';
+
+describe('isLocalBrowserEndpoint', () => {
+  it('returns true for loopback endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://127.0.0.1:9222/devtools/browser/id'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://localhost:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::1]:9222'), true);
+  });
+
+  it('returns true for unspecified address endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://0.0.0.0:9222/devtools/browser/id'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('http://0:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0x0:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0.0.0.0.:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::]:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::0]:9222'), true);
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://[::ffff:0.0.0.0]:9222'),
+      true,
+    );
+  });
+
+  it('returns false for remote and invalid endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://remote-host.com:9222'),
+      false,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0.0.0.1:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::2]:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('file://0.0.0.0/x'), false);
+    assert.strictEqual(isLocalBrowserEndpoint(''), false);
+    assert.strictEqual(isLocalBrowserEndpoint('not a url'), false);
+  });
+});
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -53,6 +93,14 @@ describe('isLocalhost', () => {
 
   it('should return true for uncompressed IPv6 loopback', () => {
     assert.strictEqual(isLocalhost('http://[0:0:0:0:0:0:0:1]:8080'), true);
+  });
+
+  it('should return true for IPv4-mapped IPv6 loopback', () => {
+    assert.strictEqual(isLocalhost('ws://[::ffff:127.0.0.1]:9222'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:127.1.2.3]'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:7f00:1]:8080'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:128.0.0.1]'), false);
+    assert.strictEqual(isLocalhost('http://[::ffff:192.168.1.1]'), false);
   });
 
   it('should return true for URLs with user credentials', () => {
@@ -307,6 +355,17 @@ describe('validateUrl', () => {
         fileNavigations: undefined,
       }).href,
       'chrome-extension://abcdef/popup.html',
+    );
+  });
+
+  it('should reject devtools: URLs', () => {
+    assert.throws(
+      () =>
+        validateUrl(
+          'devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed\./,
     );
   });
 

@@ -13,10 +13,13 @@ import {GoogleGenAI, mcpToTool} from '@google/genai';
 
 import {Client} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-import {TestServer} from '../build/tests/server.js';
+import {TestServer} from '../out/Default/gen/tests/server.js';
 
-import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
-import {Result} from './eval_result.js';
+import {
+  Result,
+  type CapturedFunctionCall,
+  type TestScenario,
+} from './eval_result.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
@@ -90,7 +93,7 @@ async function runSingleScenario(
     // Path to the compiled MCP server
     const serverPath = path.join(
       ROOT_DIR,
-      'build/src/bin/chrome-devtools-mcp.js',
+      'out/Default/gen/src/bin/chrome-devtools-mcp.js',
     );
     if (!fs.existsSync(serverPath)) {
       throw new Error(
@@ -264,7 +267,7 @@ async function main() {
           console.error(e);
           failureCount++;
         } finally {
-          server.restore();
+          server.reset();
         }
       }
     }

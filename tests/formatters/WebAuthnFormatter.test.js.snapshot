@@ -1,0 +1,56 @@
+exports[`WebAuthnFormatter > formats an authenticator with credentials toJSON 1`] = `
+{
+  "protocol": "ctap2",
+  "transport": "usb",
+  "hasResidentKey": true,
+  "hasUserVerification": true,
+  "isUserVerified": true,
+  "credentials": [
+    {
+      "credentialId": "Bq4IsoJ-lZuj_w",
+      "rpId": "example.com",
+      "isResidentCredential": true,
+      "userName": "alice",
+      "signCount": 0
+    },
+    {
+      "credentialId": "b3RoZXI",
+      "isResidentCredential": false,
+      "signCount": 3
+    }
+  ]
+}
+`;
+
+exports[`WebAuthnFormatter > formats an authenticator with credentials toString 1`] = `
+## Virtual authenticator
+protocol=ctap2, transport=usb, hasResidentKey=true, hasUserVerification=true, isUserVerified=true
+### Credentials
+- credentialId=Bq4IsoJ-lZuj_w, rpId=example.com, discoverable=true, signCount=0, userName=alice
+- credentialId=b3RoZXI, rpId=unknown, discoverable=false, signCount=3
+`;
+
+exports[`WebAuthnFormatter > formats an authenticator without credentials toJSON 1`] = `
+{
+  "protocol": "u2f",
+  "transport": "nfc",
+  "hasResidentKey": false,
+  "hasUserVerification": false,
+  "isUserVerified": false,
+  "credentials": []
+}
+`;
+
+exports[`WebAuthnFormatter > formats an authenticator without credentials toString 1`] = `
+## Virtual authenticator
+protocol=u2f, transport=nfc, hasResidentKey=false, hasUserVerification=false, isUserVerified=false
+No credentials.
+`;
+
+exports[`WebAuthnFormatter > formats no authenticator toJSON 1`] = `
+null
+`;
+
+exports[`WebAuthnFormatter > formats no authenticator toString 1`] = `
+No virtual authenticator on this page.
+`;

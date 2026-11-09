@@ -218,6 +218,24 @@ describe('daemon client', () => {
       );
     });
 
+    it('handles JSON response for performance_analyze_insight with traceInsight', async () => {
+      const insightResponse = {
+        structuredContent: {
+          traceInsight: '## Insight Title: LCP breakdown',
+        },
+        content: [
+          {
+            type: 'text' as const,
+            text: '## Insight Title: LCP breakdown',
+          },
+        ],
+      };
+      assert.strictEqual(
+        await handleResponse(insightResponse, 'json'),
+        JSON.stringify(insightResponse.structuredContent),
+      );
+    });
+
     it('handles error response when isError is true with json format', async () => {
       const errorResponse = {
         isError: true,

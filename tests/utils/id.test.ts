@@ -7,8 +7,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {WithSymbolId} from '../../src/utils/id.js';
-import {createIdGenerator, stableIdSymbol} from '../../src/utils/id.js';
+import {
+  createIdGenerator,
+  stableIdSymbol,
+  type WithSymbolId,
+} from '../../src/utils/id.js';
 
 describe('createIdGenerator', () => {
   it('should return 1 as the first id', () => {

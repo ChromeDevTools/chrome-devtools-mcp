@@ -7,20 +7,20 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {mcpOptions} from '../build/src/config/mcp-options.js';
-import {ConfigParser} from '../build/src/config/ConfigParser.js';
-import {ErrorCode} from '../build/src/telemetry/errors.js';
+import {mcpOptions} from '../out/Default/gen/src/config/mcp-options.js';
+import {ServerConfig} from '../out/Default/gen/src/config/ServerConfig.js';
+import {ErrorCode} from '../out/Default/gen/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,
   type FlagMetric,
-} from '../build/src/telemetry/flagUtils.js';
+} from '../out/Default/gen/src/telemetry/flagUtils.js';
 import {
   applyToExisting,
   applyToExistingMetrics,
   generateToolMetrics,
   type ToolMetric,
-} from '../build/src/telemetry/metricsRegistry.js';
-import {createTools} from '../build/src/tools/tools.js';
+} from '../out/Default/gen/src/telemetry/metricsRegistry.js';
+import {createTools} from '../out/Default/gen/src/tools/tools.js';
 
 export function haveUniqueNames(tools: Array<{name: string}>): boolean {
   const toolNames = tools.map(tool => tool.name);
@@ -36,8 +36,9 @@ function writeToolCallMetricsConfig() {
     throw new Error(`Error: Directory ${dir} does not exist.`);
   }
 
-  // Avoid 'as ParsedArguments' by using parseArguments
-  const allTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
+  const allTools = createTools(
+    ServerConfig.applyDefaults({}, {suppressUsageStatisticsNotice: true}),
+  );
 
   if (!haveUniqueNames(allTools)) {
     throw new Error('Error: Duplicate tool names found.');

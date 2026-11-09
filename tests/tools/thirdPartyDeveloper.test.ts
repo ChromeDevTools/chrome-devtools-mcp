@@ -5,26 +5,24 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {zod} from '../../src/third_party/index.js';
 import {
   executeThirdPartyDeveloperTool,
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
+import {jsonObjectTransform} from '../../src/tools/ToolDefinition.js';
 import {createHandlerMocks} from '../mocks.js';
 import {getTextContent, withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(
@@ -344,7 +342,7 @@ describe('thirdPartyDeveloperTools', () => {
         {
           params: {
             toolName: 'test-tool',
-            params: JSON.stringify({arg: 'value'}),
+            params: {arg: 'value'},
           },
           page,
         },
@@ -383,7 +381,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'missing-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -398,21 +396,48 @@ describe('thirdPartyDeveloperTools', () => {
       sinon.assert.notCalled(page.executeThirdPartyDeveloperTool);
     });
 
-    it('rejects JSON array params', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      await assert.rejects(
-        executeThirdPartyDeveloperTool(args).handler(
-          {
-            params: {
-              toolName: 'test-tool',
-              params: '[]',
-            },
-            page,
+    it('parses valid JSON object params and rejects non-object or invalid JSON in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(executeThirdPartyDeveloperTool(args).schema);
+
+      assert.strictEqual(jsonObjectTransform(undefined), undefined);
+      assert.strictEqual(jsonObjectTransform(''), undefined);
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          toolName: 'test-tool',
+          params: JSON.stringify({arg: 'value'}),
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            toolName: 'test-tool',
+            params: {arg: 'value'},
           },
-          response,
-          context,
-        ),
-        {message: /Parsed params is not an object/},
+        },
+      );
+
+      const arrayResult = schema.safeParse({
+        pageId: 1,
+        toolName: 'test-tool',
+        params: '[]',
+      });
+      assert.strictEqual(arrayResult.success, false);
+      assert.strictEqual(
+        arrayResult.error.issues[0].message,
+        'Invalid input: expected record, received array',
+      );
+
+      const invalidJsonResult = schema.safeParse({
+        pageId: 1,
+        toolName: 'test-tool',
+        params: 'invalid',
+      });
+      assert.strictEqual(invalidJsonResult.success, false);
+      assert.match(
+        invalidJsonResult.error.issues[0].message,
+        /Unexpected token 'i', "invalid" is not valid JSON/,
       );
     });
 
@@ -446,7 +471,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}), // Missing required 'arg'
+                params: {}, // Missing required 'arg'
               },
               page,
             },
@@ -487,7 +512,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page: context.getSelectedMcpPage(),
             },
@@ -571,7 +596,7 @@ describe('thirdPartyDeveloperTools', () => {
           {
             params: {
               toolName: 'test-tool',
-              params: JSON.stringify({element: {uid: 'some-uid'}}),
+              params: {element: {uid: 'some-uid'}},
             },
             page,
           },
@@ -623,7 +648,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page: context.getSelectedMcpPage(),
             },
@@ -670,7 +695,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page: context.getSelectedMcpPage(),
             },
@@ -719,7 +744,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page: context.getSelectedMcpPage(),
             },
@@ -787,7 +812,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -851,7 +876,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -904,7 +929,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -958,7 +983,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -1022,7 +1047,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -1071,7 +1096,7 @@ describe('thirdPartyDeveloperTools', () => {
                 {
                   params: {
                     toolName: 'test-tool',
-                    params: JSON.stringify({}),
+                    params: {},
                   },
                   page,
                 },
@@ -1122,7 +1147,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },
@@ -1139,7 +1164,7 @@ describe('thirdPartyDeveloperTools', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: JSON.stringify({}),
+                params: {},
               },
               page,
             },

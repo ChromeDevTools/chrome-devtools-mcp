@@ -21,12 +21,16 @@ function main() {
   console.log('Running yarn in lighthouse directory...');
   execSync('yarn', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
 
+  console.log('Building lighthouse report...');
+  execSync('yarn build-report', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
+
   console.log('Building lighthouse-devtools-mcp bundle...');
   execSync('yarn build-devtools-mcp', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
 
   const bundlePath = path.join(
     LIGHTHOUSE_DIR,
     'dist',
+    'devtools-mcp',
     'lighthouse-devtools-mcp-bundle.js',
   );
 
@@ -39,6 +43,7 @@ function main() {
   const noticesPath = path.join(
     LIGHTHOUSE_DIR,
     'dist',
+    'devtools-mcp',
     'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES',
   );
 

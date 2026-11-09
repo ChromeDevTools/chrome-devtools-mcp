@@ -7,9 +7,14 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {
+  definePageTool,
+  jsonObjectTransform,
+  zodTransform,
+  type PageToolFactory,
+} from './ToolDefinition.js';
 
-export const listWebMcpTools = definePageTool(() => ({
+export const listWebMcpTools: PageToolFactory = definePageTool(() => ({
   name: 'list_webmcp_tools',
   description: `Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools').`,
   annotations: {
@@ -18,13 +23,14 @@ export const listWebMcpTools = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListWebMcpTools();
   },
 }));
 
-export const executeWebMcpTool = definePageTool(() => ({
+export const executeWebMcpTool: PageToolFactory = definePageTool(() => ({
   name: 'execute_webmcp_tool',
   description: `Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool').`,
   annotations: {
@@ -35,32 +41,16 @@ export const executeWebMcpTool = definePageTool(() => ({
     toolName: zod.string().describe('The name of the WebMCP tool to execute'),
     input: zod
       .string()
+      .transform(zodTransform(jsonObjectTransform))
       .optional()
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;
-
-    let input: Record<string, unknown> = {};
-    if (request.params.input) {
-      try {
-        const parsed = JSON.parse(request.params.input);
-        if (
-          typeof parsed === 'object' &&
-          parsed !== null &&
-          !Array.isArray(parsed)
-        ) {
-          input = parsed;
-        } else {
-          throw new Error('Parsed input is not an object');
-        }
-      } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        throw new Error(`Failed to parse input as JSON: ${errorMessage}`);
-      }
-    }
+    const input = request.params.input ?? {};
 
     const tools = request.page.getWebMcpTools();
     const tool = tools.find(t => t.name === toolName);

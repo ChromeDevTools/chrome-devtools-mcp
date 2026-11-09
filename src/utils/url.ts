@@ -10,6 +10,7 @@ import {URLPattern} from '../third_party/cli.js';
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
 const IPV4_LOOPBACK_REGEX = /^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
+const IPV4_MAPPED_LOOPBACK_REGEX = /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/;
 
 /**
  * Determines whether a given URL string points to a localhost / loopback address.
@@ -50,7 +51,43 @@ export function isLocalhost(url?: string): boolean {
     return true;
   }
 
+  // 4. Check IPv4-mapped IPv6 loopback. URL serializes [::ffff:127.0.0.1]
+  // as [::ffff:7f00:1].
+  if (IPV4_MAPPED_LOOPBACK_REGEX.test(hostname)) {
+    return true;
+  }
+
   return false;
+}
+
+// URL serializes `0`, `0x0` and `0.0` as 0.0.0.0, `[::0]` as [::], and
+// [::ffff:0.0.0.0] as [::ffff:0:0].
+const UNSPECIFIED_HOSTNAMES = new Set(['0.0.0.0', '[::]', '[::ffff:0:0]']);
+
+/**
+ * Determines whether a browser endpoint URL points to the local machine.
+ *
+ * In addition to {@link isLocalhost}, this accepts the unspecified addresses
+ * 0.0.0.0 and [::]. A connection to an unspecified address reaches the local
+ * machine.
+ *
+ * @param url The browser endpoint URL (for example, a WebSocket endpoint).
+ * @returns true if the endpoint is on the local machine.
+ */
+export function isLocalBrowserEndpoint(url: string): boolean {
+  if (isLocalhost(url)) {
+    return true;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+    return false;
+  }
+  return UNSPECIFIED_HOSTNAMES.has(parsed.hostname);
 }
 
 export interface ValidateUrlOptions {
@@ -255,6 +292,10 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
     throw new Error(
       `Navigating to file: URLs is not allowed when --file-navigations is disabled.`,
     );
+  }
+
+  if (parsed.protocol === 'devtools:') {
+    throw new Error(`Navigating to devtools: URLs is not allowed.`);
   }
 
   if (!isAllowedUrl(url, {categoryExtensions})) {

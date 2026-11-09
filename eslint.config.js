@@ -30,7 +30,11 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
-    'third_party/devtools-frontend/**',
+    'build/**',
+    'build_overrides/**',
+    'buildtools/**',
+    'out/**',
+    'third_party/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
@@ -519,6 +523,7 @@ export default defineConfig([
           allowIIFEs: true,
         },
       ],
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@local/no-direct-third-party-imports': 'error',
       'no-restricted-imports': [
         'error',
@@ -557,7 +562,7 @@ export default defineConfig([
   },
   {
     name: 'Scripts files',
-    files: ['scripts/**/*'],
+    files: ['scripts/**/*.{js,mjs,cjs,ts}'],
     rules: {
       'no-console': 'off',
       'no-restricted-syntax': 'off',
@@ -623,6 +628,7 @@ export default defineConfig([
       // promises, but we don't need to await them.
       '@typescript-eslint/no-floating-promises': 'off',
       '@local/enforce-using': 'error',
+      '@local/no-sinon-restore-in-hooks': 'error',
     },
   },
   {

@@ -7,16 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {createTools} from '../../src/tools/tools.js';
+import {createMockParsedArguments} from '../mocks.js';
 
 describe('createTools', () => {
   it('has unique tool names', () => {
-    const serverArgs = new ConfigParser(
-      '0.0.0',
-      ['node', 'script.js'],
-      {},
-    ).parse();
+    const serverArgs = createMockParsedArguments();
 
     const names = createTools(serverArgs).map(tool => tool.name);
 

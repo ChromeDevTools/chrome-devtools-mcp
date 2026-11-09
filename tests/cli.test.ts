@@ -8,11 +8,16 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import {DEFAULT_MAX_NAVIGATION_SAVED} from '../src/collectors/constants.js';
+import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {
   getCliOptions,
   mcpOptions,
   DEFAULT_FILESYSTEM_ROOT,
+  MAX_NAVIGATION_SAVED_LIMIT,
 } from '../src/config/mcp-options.js';
 import {
   buildCommand,
@@ -26,11 +31,14 @@ import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 import {createTempFile} from './utils.js';
 
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
+  const locator = new ConfigLocator();
+  sinon.stub(locator, 'locate').returns(undefined);
   return new ConfigParser(
     '0.0.0',
     ['node', 'main.js', ...argv],
     env,
     false,
+    locator,
   ).parse();
 }
 
@@ -64,11 +72,13 @@ describe('cli args parsing', () => {
     experimentalStructuredContent: false,
     pageIdRouting: true,
     sourceMaps: true,
+    maxNavigationSaved: 3,
     clearcutIncludePidHeader: false,
     screenshotFormat: 'png',
     slim: false,
     viaCli: false,
     devtoolsComments: false,
+    watchConfig: false,
   };
 
   it('parses with default args', async () => {
@@ -694,6 +704,53 @@ describe('cli args parsing', () => {
     assert.strictEqual(explicitTrueArgs.sourceMaps, true);
   });
 
+  it('parses maxNavigationSaved flag', async () => {
+    const defaultParsed = parseConfig(['main.js']);
+    assert.strictEqual(defaultParsed.maxNavigationSaved, 3);
+    assert.strictEqual(
+      defaultParsed.maxNavigationSaved,
+      DEFAULT_MAX_NAVIGATION_SAVED,
+    );
+
+    const camelCaseArgs = parseConfig(['--maxNavigationSaved', '5']);
+    assert.strictEqual(camelCaseArgs.maxNavigationSaved, 5);
+
+    const kebabCaseArgs = parseConfig(['--max-navigation-saved=1']);
+    assert.strictEqual(kebabCaseArgs.maxNavigationSaved, 1);
+
+    assert.throws(
+      () => parseConfig(['--maxNavigationSaved', '26']),
+      /Invalid maxNavigationSaved 26/,
+    );
+  });
+
+  it('rejects invalid maxNavigationSaved values', async () => {
+    const coerce = mcpOptions.maxNavigationSaved.coerce;
+    assert.ok(coerce);
+
+    assert.strictEqual(coerce(undefined), undefined);
+    assert.strictEqual(coerce(1), 1);
+    assert.strictEqual(
+      coerce(MAX_NAVIGATION_SAVED_LIMIT),
+      MAX_NAVIGATION_SAVED_LIMIT,
+    );
+
+    for (const value of [
+      0,
+      -1,
+      2.5,
+      Number.NaN,
+      MAX_NAVIGATION_SAVED_LIMIT + 1,
+      Number.MAX_SAFE_INTEGER,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid maxNavigationSaved .* Expected an integer between 1 and 25\./,
+      );
+    }
+  });
+
   it('parses config option', async () => {
     using testConfig = createTempFile(
       JSON.stringify({
@@ -946,6 +1003,7 @@ describe('cli args parsing', () => {
     const cliOptions = getCliOptions();
 
     assert.strictEqual(cliOptions.viewport, undefined);
+    assert.strictEqual(cliOptions.slim, undefined);
     assert.strictEqual(cliOptions.experimentalStructuredContent, undefined);
     assert.strictEqual(cliOptions.experimentalInteropTools, undefined);
 

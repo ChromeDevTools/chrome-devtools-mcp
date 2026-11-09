@@ -12,13 +12,21 @@ import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 import {z as zod} from 'zod';
 
+// eslint-disable-next-line no-restricted-imports
+import * as DevToolsRoot from '../../third_party/devtools-frontend/front_end/core/root/root.js';
+
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {YargsOptions, InferredOptionTypes} from './cli.js';
 export {yargs, hideBin, semver, PipeTransport} from './cli.js';
-export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
+export {
+  McpServer,
+  ProtocolError,
+  ProtocolErrorCode,
+  type RegisteredTool,
+} from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
   serveStdio,
@@ -45,8 +53,10 @@ export type ShapeOutput<T extends zod.ZodRawShape> = zod.output<
 export {default as ajv} from 'ajv';
 export {
   Accessibility,
+  ConsoleMessage,
   Dialog,
   ElementHandle,
+  Frame,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,
@@ -75,6 +85,7 @@ export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
 export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
 export {
   DisposableStack,
   AsyncDisposableStack,
@@ -106,27 +117,37 @@ function loadLighthouse(): Promise<typeof LighthouseBundle> {
   return lighthouseBundle;
 }
 
-export const lighthouseRunner = {
-  async snapshot(page: Page, options: {flags?: Flags}): Promise<RunnerResult> {
-    const {snapshot} = await loadLighthouse();
-    return await snapshot(page, options);
-  },
-  async navigation(
-    page: Page,
-    url: string,
-    options: {flags?: Flags},
-  ): Promise<RunnerResult> {
-    const {navigation} = await loadLighthouse();
-    return await navigation(page, url, options);
-  },
-};
+export async function lighthouseSnapshot(
+  page: Page,
+  options: {flags?: Flags},
+): Promise<RunnerResult | undefined> {
+  const {snapshot} = await loadLighthouse();
+  return await snapshot(page, options);
+}
+
+export async function lighthouseNavigation(
+  page: Page,
+  url: string,
+  options: {flags?: Flags},
+): Promise<RunnerResult | undefined> {
+  const {navigation} = await loadLighthouse();
+  return await navigation(page, url, options);
+}
 
 export async function generateReport(
   lhr: Result,
-  format: string,
+  format: OutputMode,
 ): Promise<string> {
   const lighthouse = await loadLighthouse();
   return lighthouse.generateReport(lhr, format);
 }
+
+DevToolsRoot.Runtime.experiments.register({
+  name: DevToolsRoot.ExperimentNames.ExperimentName.INSTRUMENTATION_BREAKPOINTS,
+  title: 'Instrumentation breakpoints',
+  aboutFlag: 'devtools-instrumentation-breakpoints',
+  isEnabled: false,
+  requiresChromeRestart: false,
+});
 
 export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';

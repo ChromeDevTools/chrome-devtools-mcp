@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
@@ -15,12 +16,15 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
+import type {Logpoint, LogpointOptions} from './LogpointManager.js';
+import {LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   type Locator,
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
+  type Frame,
   type Viewport,
   type WebMCPTool,
   type Protocol,
@@ -29,7 +33,11 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
+  type Flags,
   type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
 } from './third_party/index.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
@@ -38,6 +46,8 @@ import type {
   MatchedStyles,
   Response,
   ScreenRecorderData,
+  WebAuthnAuthenticatorConfig,
+  WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -47,6 +57,7 @@ import type {
   PrefersReducedMotion,
   TextSnapshotNode,
 } from './types.js';
+import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import {
   getNetworkMultiplierFromString,
@@ -54,6 +65,31 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './utils/WaitForHelper.js';
+
+const WEBAUTHN_PROTOCOLS = {
+  ctap2: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+  u2f: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+};
+
+const WEBAUTHN_TRANSPORTS = {
+  internal: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+  usb: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Usb,
+  nfc: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Nfc,
+  ble: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Ble,
+  hybrid: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Hybrid,
+};
+
+interface WebAuthnAuthenticator {
+  id: DevTools.Protocol.WebAuthn.AuthenticatorId;
+  options: Omit<WebAuthnAuthenticatorState, 'credentials'>;
+}
+
+const WEBAUTHN_CREATION_OPTIONS = [
+  'protocol',
+  'transport',
+  'hasResidentKey',
+  'hasUserVerification',
+] as const;
 
 export function replaceHtmlElementsWithUids(
   schema: JSONSchema7Definition,
@@ -152,12 +188,13 @@ export class McpPage implements ContextPage {
 
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
+  #focusEmulationRequested = false;
   #disposed = false;
   #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
-  uniqueBackendNodeIdToMcpId = new Map<string, string>();
+  uniqueBackendNodeIdToMcpId: Map<string, string> = new Map<string, string>();
   extraHandles: ElementHandle[] = [];
 
   // Emulation
@@ -166,6 +203,11 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+  #webAuthnEnabled = false;
+  #webAuthnAuthenticator?: WebAuthnAuthenticator;
+
+  // Logpoints, created on first use.
+  #logpointManager?: LogpointManager;
 
   // Dialog
   #dialog?: Dialog;
@@ -174,39 +216,43 @@ export class McpPage implements ContextPage {
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
 
+  // Performance trace
+  #isRunningPerformanceTrace = false;
+
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
-  #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
-  #sourceMaps: boolean;
+  #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
     id: number,
     options: {
-      hasNetworkBlockOrAllowlist: boolean;
+      config: ReadonlyServerConfig;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
-      sourceMaps?: boolean;
-      onNotification?: (message: string) => void;
     },
   ) {
-    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#config = options.config;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
-    this.#sourceMaps = options.sourceMaps ?? true;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+  }
+
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return Boolean(
+      this.#config.resolved.allowedUrlPattern ||
+      this.#config.resolved.blockedUrlPattern,
+    );
   }
 
   get pptrPage(): Page {
@@ -286,19 +332,26 @@ export class McpPage implements ContextPage {
     await page?.close({runBeforeUnload: false});
   }
 
-  async init(): Promise<void> {
+  async init(options?: {emulateFocus?: boolean}): Promise<void> {
     if (this.#disposed) {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
-    if (this.#initPromise) {
-      return await this.#initPromise;
+    if (!this.#initPromise) {
+      this.#initPromise = this.#doInit().catch(err => {
+        this.#initPromise = undefined;
+        throw err;
+      });
     }
-    this.#initPromise = this.#doInit();
-    try {
-      await this.#initPromise;
-    } catch (err) {
-      this.#initPromise = undefined;
-      throw err;
+    await this.#initPromise;
+    // Discovery skips focus emulation, but a later page tool still needs it.
+    if (
+      options?.emulateFocus !== false &&
+      !this.#disposed &&
+      !this.#focusEmulationRequested
+    ) {
+      // Prevent duplicate requests while pending and after success.
+      this.#focusEmulationRequested = true;
+      this.#initFocusEmulationNoThrow();
     }
   }
 
@@ -315,34 +368,39 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
+      );
     }
     this.updateTimeouts();
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
     if (this.#disposed) {
       this.dispose();
     }
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
+  #initFocusEmulationNoThrow(): void {
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }
@@ -354,18 +412,183 @@ export class McpPage implements ContextPage {
     try {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
-        sourceMaps: this.#sourceMaps,
+        sourceMaps: this.#config.resolved.sourceMaps,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
   }
 
+  syncSourceMaps(): void {
+    if (!this.#devtoolsUniverse) {
+      return;
+    }
+    const sourceMaps = this.#config.resolved.sourceMaps;
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+  }
+
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
   }
 
+  /**
+   * Makes the given logpoints the complete set of logpoints on the page, see
+   * {@link LogpointManager.setLogpoints}. The manager is created on first
+   * use, so an empty list on a page without logpoints is a no-op.
+   */
+  setLogpoints(logpoints: LogpointOptions[]): Promise<Logpoint[]> {
+    if (!this.#logpointManager) {
+      if (logpoints.length === 0) {
+        return Promise.resolve([]);
+      }
+      const devtoolsUniverse = this.devtoolsUniverse;
+      if (!devtoolsUniverse) {
+        throw new Error(
+          `DevTools universe is not available for page ${this.id ?? '?'}.`,
+        );
+      }
+      this.#logpointManager = new LogpointManager(devtoolsUniverse);
+    }
+    return this.#logpointManager.setLogpoints(logpoints);
+  }
+
+  getWebAuthnAuthenticator():
+    Omit<WebAuthnAuthenticatorState, 'credentials'> | undefined {
+    return (
+      this.#webAuthnAuthenticator && {
+        ...this.#webAuthnAuthenticator.options,
+      }
+    );
+  }
+
+  async configureWebAuthn(
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined> {
+    const model = this.devtoolsUniverse?.target.model(
+      DevTools.WebAuthnModel.WebAuthnModel,
+    );
+    if (!model) {
+      throw new Error(`WebAuthn is not available for page ${this.id}.`);
+    }
+    const options = config.enabled
+      ? this.#resolveWebAuthnOptions(config)
+      : undefined;
+    try {
+      return await this.#applyWebAuthnConfig(model, options);
+    } catch (error) {
+      const orphan = this.#webAuthnAuthenticator;
+      this.#webAuthnEnabled = false;
+      this.#webAuthnAuthenticator = undefined;
+      if (orphan) {
+        try {
+          await model.removeAuthenticator(orphan.id);
+        } catch {
+          // Already gone, e.g. another client disabled the environment.
+        }
+      }
+      throw new Error(
+        `Failed to configure WebAuthn for page ${this.id}: ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
+  }
+
+  #resolveWebAuthnOptions(
+    config: WebAuthnAuthenticatorConfig,
+  ): WebAuthnAuthenticator['options'] {
+    const current = this.#webAuthnAuthenticator?.options;
+    const protocol = config.protocol ?? current?.protocol ?? 'ctap2';
+    const transport = config.transport ?? current?.transport ?? 'internal';
+    const isUserVerified =
+      config.isUserVerified ?? current?.isUserVerified ?? true;
+    if (protocol === 'u2f') {
+      if (config.hasResidentKey || config.hasUserVerification) {
+        throw new Error(
+          `protocol 'u2f' does not support hasResidentKey or hasUserVerification. Set them to false or omit them.`,
+        );
+      }
+      return {
+        protocol,
+        transport,
+        hasResidentKey: false,
+        hasUserVerification: false,
+        isUserVerified,
+      };
+    }
+    return {
+      protocol,
+      transport,
+      hasResidentKey: config.hasResidentKey ?? current?.hasResidentKey ?? true,
+      hasUserVerification:
+        config.hasUserVerification ?? current?.hasUserVerification ?? true,
+      isUserVerified,
+    };
+  }
+
+  async #applyWebAuthnConfig(
+    model: DevTools.WebAuthnModel.WebAuthnModel,
+    options: WebAuthnAuthenticator['options'] | undefined,
+  ): Promise<WebAuthnAuthenticatorState | undefined> {
+    if (!options) {
+      this.#webAuthnAuthenticator = undefined;
+      this.#webAuthnEnabled = false;
+      await model.setVirtualAuthEnvEnabled(false);
+      return undefined;
+    }
+    if (!this.#webAuthnEnabled) {
+      await model.setVirtualAuthEnvEnabled(true, false);
+      this.#webAuthnEnabled = true;
+    }
+
+    const current = this.#webAuthnAuthenticator;
+    let authenticator = current;
+    if (
+      !authenticator ||
+      WEBAUTHN_CREATION_OPTIONS.some(
+        key => options[key] !== authenticator?.options[key],
+      )
+    ) {
+      if (authenticator) {
+        await model.removeAuthenticator(authenticator.id);
+        this.#webAuthnAuthenticator = undefined;
+      }
+      const id = await model.addAuthenticator({
+        ...options,
+        protocol: WEBAUTHN_PROTOCOLS[options.protocol],
+        transport: WEBAUTHN_TRANSPORTS[options.transport],
+        automaticPresenceSimulation: true,
+      });
+      authenticator = {id, options};
+      this.#webAuthnAuthenticator = authenticator;
+    } else if (
+      options.isUserVerified !== authenticator.options.isUserVerified
+    ) {
+      await model.setUserVerified(authenticator.id, options.isUserVerified);
+      authenticator.options.isUserVerified = options.isUserVerified;
+    }
+
+    const credentials = await model.getCredentials(authenticator.id);
+    return {
+      ...authenticator.options,
+      credentials: credentials.map(credential => ({
+        credentialId: credential.credentialId,
+        rpId: credential.rpId,
+        isResidentCredential: credential.isResidentCredential,
+        userName: credential.userName,
+        signCount: credential.signCount,
+      })),
+    };
+  }
+
   getDialog(): Dialog | undefined {
+    if (this.#dialog?.handled) {
+      this.#dialog = undefined;
+    }
     return this.#dialog;
   }
 
@@ -381,10 +604,19 @@ export class McpPage implements ContextPage {
     this.#screenRecorder = data;
   }
 
+  isRunningPerformanceTrace(): boolean {
+    return this.#isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(x: boolean): void {
+    this.#isRunningPerformanceTrace = x;
+  }
+
   throwIfDialogOpen(): void {
-    if (this.#dialog && !this.#dialog.handled) {
+    const dialog = this.getDialog();
+    if (dialog) {
       throw new Error(
-        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+        `A dialog is open (${dialog.type()}: ${dialog.message()}).`,
       );
     }
   }
@@ -547,6 +779,11 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  disposeCommentBridge(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+  }
+
   /**
    * Returns the comment bridge attached to the DevTools page, or undefined if
    * the DevTools page does not support DevTools comments.
@@ -555,9 +792,7 @@ export class McpPage implements ContextPage {
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
     const attached = await this.#commentBridge.attach(devtoolsPage);
     return attached ? this.#commentBridge : undefined;
@@ -579,7 +814,9 @@ export class McpPage implements ContextPage {
 
   async openDevTools(): Promise<Page | undefined> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    if (this.#config.resolved.devtoolsComments) {
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    }
     return devtoolsPage;
   }
 
@@ -662,8 +899,8 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
-    this.#commentBridge?.dispose();
-    this.#commentBridge = undefined;
+    this.#isRunningPerformanceTrace = false;
+    this.disposeCommentBridge();
     if (this.#screenRecorder) {
       const {recorder} = this.#screenRecorder;
       this.#screenRecorder = null;
@@ -674,8 +911,11 @@ export class McpPage implements ContextPage {
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
+    this.#logpointManager?.dispose();
+    this.#logpointManager = undefined;
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
+    this.#webAuthnAuthenticator = undefined;
     devtoolsUniverse?.universe.dispose();
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
@@ -1075,7 +1315,9 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+      if (this.#config.resolved.devtoolsComments) {
+        await this.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
           // @ts-expect-error no types
@@ -1196,7 +1438,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      await page.setGeolocation(null);
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);
@@ -1282,6 +1524,15 @@ export class McpPage implements ContextPage {
     }
   }
 
+  async clearNetworkConditions(): Promise<void> {
+    if (!this.emulationSettings.networkConditions) {
+      return;
+    }
+    await this.#pptrPage?.emulateNetworkConditions(null);
+    delete this.emulationSettings.networkConditions;
+    this.updateTimeouts();
+  }
+
   updateTimeouts(): void {
     if (!this.#pptrPage) {
       return;
@@ -1301,23 +1552,91 @@ export class McpPage implements ContextPage {
     );
   }
 
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const frames = this.pptrPage.frames();
+  waitForTextOnPage(
+    text: string[],
+    options: {timeout?: number; visible?: boolean} = {},
+  ): Promise<Element> {
+    const {timeout, visible} = options;
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
+      this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => {
+            const locators = [
+              frame.locator(`aria/${value}`),
+              frame.locator(`text/${value}`),
+            ];
+            return visible
+              ? locators.map(locator => locator.setVisibility('visible'))
+              : locators;
+          }),
+        ),
+      );
 
+    let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {
-      locator = locator.setTimeout(timeout);
+      initialLocator = initialLocator.setTimeout(timeout);
     }
 
-    return locator.wait();
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) {
+          return false;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        return true;
+      };
+      const finish = (element: Element): void => {
+        if (cleanup()) {
+          resolve(element);
+        }
+      };
+      const fail = (error: unknown): void => {
+        if (cleanup()) {
+          reject(error);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        // A timeout of 0 disables the frame timer; controller.abort() stops it.
+        void locatorForFrames([frame])
+          .setTimeout(0)
+          .wait({signal: controller.signal})
+          .then(finish, error => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            logger?.('Failed to wait for text in an attached frame', error);
+          });
+      };
+
+      page.on('frameattached', onFrameAttached);
+      void initialLocator.wait({signal: controller.signal}).then(finish, fail);
+    });
+  }
+
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseNavigation(this.pptrPage, this.pptrPage.url(), {
+      flags,
+    });
+  }
+
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseSnapshot(this.pptrPage, {
+      flags,
+    });
   }
 
   /**
@@ -1327,7 +1646,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {

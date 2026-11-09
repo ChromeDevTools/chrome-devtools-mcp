@@ -8,10 +8,11 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {
   CdpScreenRecording,
@@ -22,7 +23,15 @@ import {createHandlerMocks} from '../mocks.js';
 import {createTempDir, html, withMcpContext} from '../utils.js';
 
 function parseArgs(...argv: string[]) {
-  return new ConfigParser('test', ['node', 'test', ...argv]).parse();
+  const locator = new ConfigLocator();
+  sinon.stub(locator, 'locate').returns(undefined);
+  return new ConfigParser(
+    'test',
+    ['node', 'test', ...argv],
+    {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    false,
+    locator,
+  ).parse();
 }
 
 function createScreencastMocks() {
@@ -37,10 +46,6 @@ function createScreencastMocks() {
 }
 
 describe('screencast', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('screencast_start', () => {
     it('starts an mp4 recording with filePath', async () => {
       const {page, context, response, mockRecording, args} =

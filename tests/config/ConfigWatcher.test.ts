@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -68,7 +68,7 @@ async function waitForWatchReady(dir: string): Promise<fs.FSWatcher> {
 
 async function startWatcher(
   watchedPath: string,
-  onChange: () => Promise<void> = sinon.stub().resolves(),
+  onChange: (content: string) => Promise<void> = sinon.stub().resolves(),
 ): Promise<{watcher: ConfigWatcher} & Disposable> {
   const watcher = new ConfigWatcher(watchedPath, onChange, {
     debounceMs: DEBOUNCE_MS,
@@ -87,10 +87,6 @@ async function startWatcher(
 }
 
 describe('ConfigWatcher', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('calls onChange once for several quick writes', async () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
@@ -101,7 +97,7 @@ describe('ConfigWatcher', () => {
     fs.writeFileSync(configPath, '{"headless": false}');
     await waitForCall(onChange);
 
-    sinon.assert.calledOnceWithExactly(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"headless": false}');
   });
 
   it('detects atomic replacements', async () => {
@@ -115,7 +111,7 @@ describe('ConfigWatcher', () => {
     fs.renameSync(tempPath, configPath);
     await waitForCall(onChange);
 
-    sinon.assert.calledOnceWithExactly(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
   });
 
   it('ignores other files in the directory', async () => {
@@ -142,7 +138,7 @@ describe('ConfigWatcher', () => {
     fs.writeFileSync(configPath, '{"headless": true}');
     await waitForCall(onChange);
 
-    sinon.assert.calledOnceWithExactly(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
   });
 
   it('does not call onChange if the content did not change', async () => {
@@ -213,7 +209,7 @@ describe('ConfigWatcher', () => {
 
     fs.writeFileSync(configPath, '{"headless": true}');
     await waitForCall(onChange);
-    sinon.assert.calledOnce(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
 
     fs.writeFileSync(configPath, '{"headless": false}');
     await wait(SETTLE_MS);
@@ -222,5 +218,6 @@ describe('ConfigWatcher', () => {
     firstCall.resolve();
     await secondCall.promise;
     sinon.assert.calledTwice(onChange);
+    sinon.assert.calledWithExactly(onChange.secondCall, '{"headless": false}');
   });
 });

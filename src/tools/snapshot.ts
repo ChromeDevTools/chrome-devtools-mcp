@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
+import {TimeoutError, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool, timeoutSchema} from './ToolDefinition.js';
+import {
+  definePageTool,
+  type PageToolFactory,
+  timeoutSchema,
+} from './ToolDefinition.js';
 
-export const takeSnapshot = definePageTool(() => ({
+export const takeSnapshot: PageToolFactory = definePageTool(() => ({
   name: 'take_snapshot',
   description: `Take a text snapshot of the target page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
@@ -34,6 +38,7 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -45,9 +50,9 @@ in the DevTools Elements panel (if any).`,
   },
 }));
 
-export const waitFor = definePageTool(() => ({
+export const waitFor: PageToolFactory = definePageTool(() => ({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description: `Wait for the specified text to appear on the selected page. By default, hidden text is also matched. Set visible to true to wait until the matched text is visible.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -57,15 +62,42 @@ export const waitFor = definePageTool(() => ({
       .array(zod.string())
       .min(1)
       .describe(
-        'Non-empty list of texts. Resolves when any value appears on the page.',
+        'Non-empty list of texts. Resolves when any value matches an ' +
+          'accessible name exactly or is a substring of DOM text. Matching ' +
+          'is case-sensitive. DOM text preserves spaces and newlines, unlike ' +
+          'snapshot text which may normalize whitespace. Use the original ' +
+          'whitespace or a shorter distinctive substring.',
       ),
     ...timeoutSchema,
+    visible: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'If true, wait until the matching text is visible. By default, hidden text also counts.',
+      ),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForTextOnPage(request.params.text, request.params.timeout);
+    try {
+      await page.waitForTextOnPage(request.params.text, {
+        timeout: request.params.timeout,
+        visible: request.params.visible,
+      });
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw new TimeoutError(
+          `${error.message}. Text matching is case-sensitive. DOM text must ` +
+            'preserve spaces and newlines, whereas snapshot text may ' +
+            'normalize whitespace. Try a shorter distinctive substring.',
+          {cause: error},
+        );
+      }
+      throw error;
+    }
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,

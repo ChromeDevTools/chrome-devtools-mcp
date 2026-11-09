@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,10 +18,6 @@ import {
 import {createHandlerMocks} from '../mocks.js';
 
 describe('emulation', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('transforms', () => {
     describe('viewportTransform', () => {
       it('returns undefined for undefined input', () => {
@@ -82,6 +78,25 @@ describe('emulation', () => {
 
       it('throws when height is not positive', () => {
         assert.throws(() => viewportTransform('800x0'));
+      });
+
+      it('throws when width or height is not an integer', () => {
+        assert.throws(
+          () => viewportTransform('1280.5x720'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280x720.5'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280.0x720'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280x720.'),
+          /Expected an integer/,
+        );
       });
 
       it('throws when devicePixelRatio is not positive', () => {
@@ -517,6 +532,146 @@ describe('emulation', () => {
       sinon.assert.calledOnceWithExactly(page.emulate, {
         extraHttpHeaders: {'X-Page': 'one'},
       });
+    });
+
+    it('parses valid extraHttpHeaders JSON and empty string in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '{"X-Custom": "value"}',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {'X-Custom': 'value'},
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {},
+          },
+        },
+      );
+    });
+
+    it('reports validation issues instead of throwing for invalid transform inputs', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+
+      const geoResult = schema.safeParse({pageId: 1, geolocation: '0x0'});
+      assert.strictEqual(geoResult.success, false);
+      assert.strictEqual(
+        geoResult.error.issues[0].message,
+        'Invalid geolocation "0x0". Expected \'<latitude>,<longitude>\'.',
+      );
+
+      const nonNumericGeoResult = schema.safeParse({
+        pageId: 1,
+        geolocation: 'abc,11.5',
+      });
+      assert.strictEqual(nonNumericGeoResult.success, false);
+      assert.deepStrictEqual(nonNumericGeoResult.error.issues[0].path, [
+        'geolocation',
+        'latitude',
+      ]);
+      assert.strictEqual(
+        nonNumericGeoResult.error.issues[0].message,
+        'Expected a number',
+      );
+
+      const viewportResult = schema.safeParse({pageId: 1, viewport: '0x0'});
+      assert.strictEqual(viewportResult.success, false);
+      assert.deepStrictEqual(viewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
+      assert.strictEqual(
+        viewportResult.error.issues[0].message,
+        'Too small: expected number to be >0',
+      );
+
+      const nonNumericViewportResult = schema.safeParse({
+        pageId: 1,
+        viewport: 'abcx720',
+      });
+      assert.strictEqual(nonNumericViewportResult.success, false);
+      assert.deepStrictEqual(nonNumericViewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
+      assert.strictEqual(
+        nonNumericViewportResult.error.issues[0].message,
+        'Expected an integer',
+      );
+
+      const fractionalViewportResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280.5x720',
+      });
+      assert.strictEqual(fractionalViewportResult.success, false);
+      assert.deepStrictEqual(fractionalViewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
+      assert.strictEqual(
+        fractionalViewportResult.error.issues[0].message,
+        'Expected an integer',
+      );
+
+      const invalidTagResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280x720,bogus',
+      });
+      assert.strictEqual(invalidTagResult.success, false);
+      assert.deepStrictEqual(invalidTagResult.error.issues[0].path, [
+        'viewport',
+      ]);
+      assert.strictEqual(
+        invalidTagResult.error.issues[0].message,
+        'Invalid viewport option "bogus". Expected "mobile", "touch", or "landscape" in \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\'.',
+      );
+
+      const emptyTagResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280x720,',
+      });
+      assert.strictEqual(emptyTagResult.success, false);
+      assert.deepStrictEqual(emptyTagResult.error.issues[0].path, ['viewport']);
+      assert.strictEqual(
+        emptyTagResult.error.issues[0].message,
+        'Invalid viewport option "". Expected "mobile", "touch", or "landscape" in \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\'.',
+      );
+
+      const invalidJsonResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: 'notjson',
+      });
+      assert.strictEqual(invalidJsonResult.success, false);
+      assert.match(
+        invalidJsonResult.error.issues[0].message,
+        /^Invalid JSON for headers:/,
+      );
+
+      const nonObjectHeadersResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: '[]',
+      });
+      assert.strictEqual(nonObjectHeadersResult.success, false);
+      assert.strictEqual(
+        nonObjectHeadersResult.error.issues[0].message,
+        'Invalid JSON for headers: Headers must be a JSON object',
+      );
     });
   });
 

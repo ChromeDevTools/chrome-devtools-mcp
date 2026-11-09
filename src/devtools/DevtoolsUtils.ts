@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
-import type {
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
+import {
+  DevTools,
+  type CDPSession,
+  type ConsoleMessage,
+  type Protocol,
 } from '../third_party/index.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
@@ -230,6 +230,13 @@ export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
+ * Maximum number of `cause` links resolved for one error. A page can create a
+ * cyclic chain (`error.cause = error`), and CDP returns a new object id on
+ * every lookup of the same object, so a cycle cannot be detected by id.
+ */
+const MAX_CAUSE_DEPTH = 10;
+
+/**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
  *
  * TODO: Also construct from a RemoteObject of subtype 'error'.
@@ -252,15 +259,25 @@ export class SymbolizedError {
   }
 
   static async fromDetails(opts: {
-    devTools?: TargetUniverse;
     details: ExceptionDetailsLike;
     targetId: string;
+    devTools?: TargetUniverse;
+    // The session that reported `details`. Remote object ids are scoped to
+    // the session that issued them, so the cause has to be resolved there.
+    session?: CDPSession;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromDetails(opts, 0);
+  }
+
+  static async #fromDetails(
+    opts: Parameters<typeof SymbolizedError.fromDetails>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const message = SymbolizedError.#getMessage(opts.details);
-    if (!opts.includeStackAndCause || !opts.devTools) {
+    if (!opts.includeStackAndCause || (!opts.devTools && !opts.session)) {
       return new SymbolizedError(
         message,
         opts.resolvedStackTraceForTesting,
@@ -271,7 +288,7 @@ export class SymbolizedError {
     let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
     if (opts.resolvedStackTraceForTesting) {
       stackTrace = opts.resolvedStackTraceForTesting;
-    } else if (opts.details.stackTrace) {
+    } else if (opts.devTools && opts.details.stackTrace) {
       try {
         stackTrace = await createStackTrace(
           opts.devTools,
@@ -288,19 +305,24 @@ export class SymbolizedError {
     let cause: SymbolizedError | undefined;
     if (opts.resolvedCauseForTesting) {
       cause = opts.resolvedCauseForTesting;
-    } else if (opts.details.exception) {
+    } else if (opts.details.exception && causeDepth < MAX_CAUSE_DEPTH) {
       try {
         const causeRemoteObj = await SymbolizedError.#lookupCause(
           opts.devTools,
           opts.details.exception,
           opts.targetId,
+          opts.session,
         );
         if (causeRemoteObj) {
-          cause = await SymbolizedError.fromError({
-            devTools: opts.devTools,
-            error: causeRemoteObj,
-            targetId: opts.targetId,
-          });
+          cause = await SymbolizedError.#fromError(
+            {
+              devTools: opts.devTools,
+              error: causeRemoteObj,
+              targetId: opts.targetId,
+              session: opts.session,
+            },
+            causeDepth + 1,
+          );
         }
       } catch {
         // Ignore
@@ -310,22 +332,35 @@ export class SymbolizedError {
   }
 
   static async fromError(opts: {
-    devTools?: TargetUniverse;
     error: RemoteObjectLike;
     targetId: string;
+    devTools?: TargetUniverse;
+    session?: CDPSession;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromError(opts, 0);
+  }
+
+  static async #fromError(
+    opts: Parameters<typeof SymbolizedError.fromError>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const details = await SymbolizedError.#getExceptionDetails(
       opts.devTools,
       opts.error,
       opts.targetId,
+      opts.session,
     );
     if (details) {
-      return await SymbolizedError.fromDetails({
-        details,
-        devTools: opts.devTools,
-        targetId: opts.targetId,
-        includeStackAndCause: true,
-      });
+      return await SymbolizedError.#fromDetails(
+        {
+          details,
+          devTools: opts.devTools,
+          targetId: opts.targetId,
+          session: opts.session,
+          includeStackAndCause: true,
+        },
+        causeDepth,
+      );
     }
 
     return new SymbolizedError(
@@ -370,8 +405,24 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-  ): Promise<DevTools.Protocol.Runtime.ExceptionDetails | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    session?: CDPSession,
+  ): Promise<ExceptionDetailsLike | null> {
+    if (error.type !== 'object' && error.subtype !== 'error') {
+      return null;
+    }
+
+    if (session) {
+      if (!error.objectId) {
+        return null;
+      }
+      const {exceptionDetails} = await session.send(
+        'Runtime.getExceptionDetails',
+        {errorObjectId: error.objectId},
+      );
+      return exceptionDetails ?? null;
+    }
+
+    if (!devTools) {
       return null;
     }
 
@@ -391,8 +442,23 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-  ): Promise<DevTools.Protocol.Runtime.RemoteObject | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    session?: CDPSession,
+  ): Promise<RemoteObjectLike | null> {
+    if (error.type !== 'object' && error.subtype !== 'error') {
+      return null;
+    }
+
+    if (session) {
+      if (!error.objectId) {
+        return null;
+      }
+      const {result} = await session.send('Runtime.getProperties', {
+        objectId: error.objectId,
+      });
+      return result.find(prop => prop.name === 'cause')?.value ?? null;
+    }
+
+    if (!devTools) {
       return null;
     }
 
@@ -466,15 +532,10 @@ export async function createStackTrace(
   }
 
   const signal = AbortSignal.timeout(1_000);
-  await Promise.all(
-    [...scriptIds].map(id =>
-      waitForScript(model, id, signal)
-        .then(script =>
-          model.sourceMapManager().sourceMapForClientPromise(script),
-        )
-        .catch(),
-    ),
+  const scripts = await Promise.all(
+    [...scriptIds].map(id => waitForScript(model, id, signal)),
   );
+  await waitForSourceMaps(model, scripts, signal);
 
   const binding = devTools.universe.context.get(
     DevTools.DebuggerWorkspaceBinding,
@@ -488,12 +549,49 @@ export async function createStackTrace(
   );
 }
 
+/**
+ * Waits for the source maps of `scripts` to load, so that their original
+ * sources are in the workspace. Scripts without a source map are skipped.
+ * Non-trivial pages have hundreds of source maps, so the wait ends when
+ * `signal` aborts; loads still pending then continue in the background and
+ * resolve later.
+ */
+export async function waitForSourceMaps(
+  model: DevTools.DebuggerModel,
+  scripts: Iterable<DevToolsScript>,
+  signal: AbortSignal,
+): Promise<void> {
+  const manager = model.sourceMapManager();
+  const aborted = new Promise<void>(resolve => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener('abort', () => resolve(), {once: true});
+  });
+  await Promise.all(
+    [...scripts].map(script => {
+      if (!script.sourceMapURL) {
+        return undefined;
+      }
+      return Promise.race([
+        manager.sourceMapForClientPromise(script).then(() => undefined),
+        aborted,
+      ]);
+    }),
+  );
+}
+
+type DevToolsScript = NonNullable<
+  ReturnType<DevTools.DebuggerModel['scriptForId']>
+>;
+
 // Waits indefinitely for the script so pair it with Promise.race.
 async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: string,
   signal: AbortSignal,
-): Promise<NonNullable<ReturnType<DevTools.DebuggerModel['scriptForId']>>> {
+): Promise<DevToolsScript> {
   while (true) {
     if (signal.aborted) {
       throw signal.reason;

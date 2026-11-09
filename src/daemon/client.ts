@@ -159,7 +159,7 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout = SEND_COMMAND_TIMEOUT,
+  timeout: number = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {

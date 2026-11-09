@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {afterEach, describe, it} from 'node:test';
-import sinon from 'sinon';
-
+import {describe, it} from 'node:test';
 import {
   type ContainerQuery,
   CssFormatter,
@@ -29,10 +27,6 @@ import {
 } from '../mocks.js';
 
 describe('CssFormatter', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   function formatterTest(
     label: string,
     setup: (t: it.TestContext) => CssFormatter | Promise<CssFormatter>,

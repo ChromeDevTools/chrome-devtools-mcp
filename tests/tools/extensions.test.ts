@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -19,10 +19,6 @@ import {
 import {createHandlerMocks, createMockExtension} from '../mocks.js';
 
 describe('extensions', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('install_extension', () => {
     it('installs an extension and appends response line', async () => {
       const {context, response, args} = createHandlerMocks();

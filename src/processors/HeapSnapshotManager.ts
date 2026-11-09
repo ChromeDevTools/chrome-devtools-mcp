@@ -9,6 +9,7 @@ import path from 'node:path';
 
 import {DevTools} from '../third_party/index.js';
 import {createIdGenerator} from '../utils/id.js';
+import type {TaskQueue, TaskRunner} from '../utils/TaskRunner.js';
 
 export interface HeapSnapshotAggregate {
   id: number;
@@ -129,6 +130,38 @@ function hasValidHeapSnapshotExtension(filePath: string): boolean {
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<string, Promise<HeapSnapshot>>();
+  /**
+   * Queue for all heap snapshot work, with one child queue per absolute file
+   * path. A read of one file holds the file queue, so reads of different
+   * files run at the same time. A read of several files holds this queue.
+   * `disposeSnapshot()` holds the file queue, so it waits for in-flight
+   * reads of the file, and a read that starts after it loads the file again.
+   */
+  #taskQueue: TaskQueue;
+  #taskRunner: TaskRunner;
+  #fileTaskQueues = new Map<string, TaskQueue>();
+
+  constructor(taskRunner: TaskRunner) {
+    this.#taskRunner = taskRunner;
+    this.#taskQueue = taskRunner.createQueue();
+  }
+
+  /**
+   * Holds the queue of `filePath`, or the heap queue without a path, until
+   * the guard is disposed.
+   */
+  async #scheduleTask(filePath?: string): Promise<Disposable> {
+    if (filePath === undefined) {
+      return await this.#taskQueue.scheduleTask();
+    }
+    const absolutePath = path.resolve(filePath);
+    let queue = this.#fileTaskQueues.get(absolutePath);
+    if (!queue) {
+      queue = this.#taskRunner.createQueue(this.#taskQueue);
+      this.#fileTaskQueues.set(absolutePath, queue);
+    }
+    return await queue.scheduleTask();
+  }
 
   async getSnapshot(filePath: string): Promise<HeapSnapshot> {
     if (!hasValidHeapSnapshotExtension(filePath)) {
@@ -174,6 +207,7 @@ export class HeapSnapshotManager {
     filterName?: string,
     objectId?: number,
   ): Promise<HeapSnapshotAggregateData> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
@@ -211,6 +245,7 @@ export class HeapSnapshotManager {
   async getStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getStatistics();
   }
@@ -218,6 +253,7 @@ export class HeapSnapshotManager {
   async getStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return snapshot.proxy.staticData;
   }
@@ -225,6 +261,7 @@ export class HeapSnapshotManager {
   async getNativeContextSizes(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getNativeContextSizes();
   }
@@ -232,6 +269,7 @@ export class HeapSnapshotManager {
   async getRetainedByContextSummary(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getRetainedByContextSummary();
   }
@@ -242,6 +280,7 @@ export class HeapSnapshotManager {
     filterName?: string,
     objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
@@ -262,6 +301,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -275,6 +315,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -286,6 +327,7 @@ export class HeapSnapshotManager {
   async analyzeContexts(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.analyzeContexts();
   }
@@ -297,6 +339,7 @@ export class HeapSnapshotManager {
     maxNodes?: number,
     maxSiblings?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -314,6 +357,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -327,6 +371,7 @@ export class HeapSnapshotManager {
     nodeId: number,
     options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -401,6 +446,7 @@ export class HeapSnapshotManager {
     baseFilePath: string,
     currentFilePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff[]> {
+    using guard = await this.#scheduleTask();
     const [baseSnapshot, currentSnapshot] = await Promise.all([
       this.getSnapshot(baseFilePath),
       this.getSnapshot(currentFilePath),
@@ -480,6 +526,7 @@ export class HeapSnapshotManager {
   }
 
   async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getDuplicateStrings();
   }
@@ -488,6 +535,7 @@ export class HeapSnapshotManager {
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const provider = snapshot.proxy.queryObjects(options);
     return await provider.serializeItemsRange(0, Infinity);
@@ -498,6 +546,7 @@ export class HeapSnapshotManager {
   }
 
   async disposeSnapshot(filePath: string): Promise<boolean> {
+    using guard = await this.#scheduleTask(filePath);
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {

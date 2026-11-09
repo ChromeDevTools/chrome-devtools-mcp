@@ -15,7 +15,7 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {
   DAEMON_SCRIPT_PATH,
   serializeArgs,
@@ -301,7 +301,6 @@ describe('daemon pid handling', () => {
   });
 
   afterEach(() => {
-    sinon.restore();
     if (savedXdgRuntimeDir === undefined) {
       delete process.env['XDG_RUNTIME_DIR'];
     } else {

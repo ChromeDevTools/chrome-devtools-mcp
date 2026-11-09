@@ -6,20 +6,31 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 
+import type {McpOptionsFor} from './category-options.js';
+
 interface ToolOption extends YargsOptions {
   reloadable: true;
 }
 
+export interface ToolArguments {
+  screenshotFormat: 'jpeg' | 'png' | 'webp';
+  screenshotQuality?: number;
+  screenshotMaxWidth?: number;
+  screenshotMaxHeight?: number;
+}
+
+export type ToolOptions = McpOptionsFor<ToolArguments, ToolOption>;
+
 /**
  * Options that change the default behavior of tools.
  */
-export const toolOptions = {
+export const toolOptions: ToolOptions = {
   screenshotFormat: {
     type: 'string',
-    default: 'png' as const,
+    default: 'png',
     description:
       'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
-    choices: ['jpeg', 'png', 'webp'] as const,
+    choices: ['jpeg', 'png', 'webp'],
     reloadable: true,
   },
   screenshotQuality: {
@@ -27,7 +38,7 @@ export const toolOptions = {
     description:
       'Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -44,7 +55,7 @@ export const toolOptions = {
     description:
       'Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -61,7 +72,7 @@ export const toolOptions = {
     description:
       'Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -73,4 +84,4 @@ export const toolOptions = {
       return value;
     },
   },
-} satisfies Record<string, ToolOption>;
+};

@@ -26,7 +26,8 @@ function readContent(filePath: string): string | undefined {
 }
 
 /**
- * Watches a config file and calls `onChange` after it was modified.
+ * Watches a config file and calls `onChange` with the new content after it was
+ * modified.
  *
  * - Symlinks are resolved once on start, and the directory of the real file is
  *   watched. Watching the directory instead of the file keeps working when
@@ -39,7 +40,7 @@ function readContent(filePath: string): string | undefined {
  */
 export class ConfigWatcher implements Disposable {
   readonly #configPath: string;
-  readonly #onChange: () => Promise<void>;
+  readonly #onChange: (content: string) => Promise<void>;
   readonly #debounceMs: number;
   #watcher?: fs.FSWatcher;
   #debounced?: ReturnType<typeof DevTools.Common.Debouncer.debounce>;
@@ -48,7 +49,7 @@ export class ConfigWatcher implements Disposable {
 
   constructor(
     configPath: string,
-    onChange: () => Promise<void>,
+    onChange: (content: string) => Promise<void>,
     options: {debounceMs?: number} = {},
   ) {
     this.#configPath = configPath;
@@ -73,7 +74,7 @@ export class ConfigWatcher implements Disposable {
       }
       this.#content = content;
       this.#pending = this.#pending
-        .then(() => this.#onChange())
+        .then(() => this.#onChange(content))
         .catch(err => {
           console.error(`Failed to apply ${this.#configPath}:`, err);
         });

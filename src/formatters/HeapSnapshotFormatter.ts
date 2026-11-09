@@ -13,6 +13,7 @@ import type {
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
+import {truncateText} from '../utils/text.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -43,10 +44,7 @@ export function formatName(
  * Truncates `value` to `maxLength`, appending an ellipsis if it was cut off.
  */
 function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return value.slice(0, maxLength) + '...';
+  return truncateText(value, maxLength);
 }
 
 export interface ContextAnalysisReport {

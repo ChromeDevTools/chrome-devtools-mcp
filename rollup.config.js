@@ -42,7 +42,7 @@ const allowedLicenses = [
   '0BSD',
 ];
 
-const thirdPartyDir = './build/src/third_party';
+const thirdPartyDir = './out/Default/gen/src/third_party';
 
 const {devDependencies = {}} = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
@@ -75,10 +75,17 @@ const aggregatedStats = {
   bundlesProcessed: 0,
   totalBundles: 0,
   bundledPackages: new Set(),
+  bundledDevToolsThirdParty: new Set(),
 };
 
 const projectNodeModulesPath =
   path.join(process.cwd(), 'node_modules') + path.sep;
+
+const devtoolsThirdPartyBuildPath =
+  path.join(
+    process.cwd(),
+    'out/Default/gen/third_party/devtools-frontend/front_end/third_party',
+  ) + path.sep;
 
 function getPackageName(modulePath) {
   // Handle rollup's virtual module paths (paths starting with 0x00)
@@ -99,6 +106,44 @@ function getPackageName(modulePath) {
   return segments[0];
 }
 
+function getDevToolsThirdPartyDir(modulePath) {
+  const absolutePathStart = modulePath.indexOf(devtoolsThirdPartyBuildPath);
+  if (absolutePathStart < 0) {
+    return null;
+  }
+
+  const relativePath = modulePath.slice(
+    devtoolsThirdPartyBuildPath.length + absolutePathStart,
+  );
+  const pkg = relativePath.split(path.sep)[0];
+  if (!pkg || pkg === 'codemirror.next') {
+    return null;
+  }
+  return path.join('third_party/devtools-frontend/front_end/third_party', pkg);
+}
+
+function parseReadmeChromium(dirPath) {
+  const readmePath = path.join(dirPath, 'README.chromium');
+  if (!fs.existsSync(readmePath)) {
+    throw new Error(`Missing README.chromium in ${dirPath}`);
+  }
+  const content = fs.readFileSync(readmePath, 'utf-8');
+  const fields = {};
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('Description:')) {
+      break;
+    }
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex > 0) {
+      const key = trimmed.slice(0, colonIndex).trim();
+      const value = trimmed.slice(colonIndex + 1).trim();
+      fields[key] = value;
+    }
+  }
+  return fields;
+}
+
 /**
  * @returns {import('rollup').Plugin}
  */
@@ -110,12 +155,21 @@ function listBundledDeps() {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type === 'chunk' && chunk.modules) {
           // chunk.modules is an object where keys are the absolute file paths
-          Object.keys(chunk.modules).forEach(modulePath => {
+          for (const [modulePath, mod] of Object.entries(chunk.modules)) {
             const packageName = getPackageName(modulePath);
             if (packageName) {
               aggregatedStats.bundledPackages.add(packageName);
             }
-          });
+            if (mod && !mod.isAsset && mod.renderedLength > 0) {
+              const devtoolsThirdPartyDir =
+                getDevToolsThirdPartyDir(modulePath);
+              if (devtoolsThirdPartyDir) {
+                aggregatedStats.bundledDevToolsThirdParty.add(
+                  devtoolsThirdPartyDir,
+                );
+              }
+            }
+          }
         }
       }
       aggregatedStats.bundlesProcessed++;
@@ -174,7 +228,9 @@ const bundleDependency = (
       // http://b/390559299 and
       // https://github.com/microsoft/TypeScript/issues/60811.
       comments: [/Copyright/i],
+      exclude: ['**/third_party/devtools-frontend/**'],
     }),
+    listBundledDeps(),
     license({
       thirdParty: {
         allow: {
@@ -212,17 +268,9 @@ const bundleDependency = (
             });
 
             // Manual license handling for devtools-frontend third_party
-            const tsConfig = JSON.parse(
-              fs.readFileSync(
-                path.join(process.cwd(), 'tsconfig.json'),
-                'utf-8',
-              ),
-            );
-            const thirdPartyDirectories = tsConfig.include.filter(location =>
-              location.includes(
-                'third_party/devtools-frontend/front_end/third_party',
-              ),
-            );
+            const thirdPartyDirectories = Array.from(
+              aggregatedStats.bundledDevToolsThirdParty,
+            ).sort();
 
             const manualLicenses = [];
             // Add devtools-frontend main license
@@ -265,18 +313,41 @@ const bundleDependency = (
 
             for (const thirdPartyDir of thirdPartyDirectories) {
               const fullPath = path.join(process.cwd(), thirdPartyDir);
-              const licenseFile = path.join(fullPath, 'LICENSE');
-              if (fs.existsSync(licenseFile)) {
-                const name = path.basename(thirdPartyDir);
-                manualLicenses.push(
-                  [
-                    `Name: ${name}`,
-                    `License:`,
-                    '',
-                    fs.readFileSync(licenseFile, 'utf-8').replaceAll('\r', ''),
-                  ].join('\n'),
+              const metadata = parseReadmeChromium(fullPath);
+              const name =
+                metadata['Short Name'] ||
+                metadata['Name'] ||
+                path.basename(thirdPartyDir);
+              const url = metadata['URL'] || 'N/A';
+              const version = metadata['Version'] || 'N/A';
+              const licenseName = metadata['License'] || 'N/A';
+              const licenseFile = path.join(
+                fullPath,
+                metadata['License File'] || 'LICENSE',
+              );
+
+              const licenses = licenseName.split(',').map(l => l.trim());
+              if (!licenses.every(l => allowedLicenses.includes(l))) {
+                throw new Error(
+                  `License violation in ${thirdPartyDir}: ${licenseName} is not in allowedLicenses`,
                 );
               }
+              if (!fs.existsSync(licenseFile)) {
+                throw new Error(
+                  `Missing license file ${licenseFile} for ${thirdPartyDir}`,
+                );
+              }
+
+              manualLicenses.push(
+                [
+                  `Name: ${name}`,
+                  `URL: ${url}`,
+                  `Version: ${version}`,
+                  `License: ${licenseName}`,
+                  '',
+                  fs.readFileSync(licenseFile, 'utf-8').replaceAll('\r', ''),
+                ].join('\n'),
+              );
             }
 
             if (manualLicenses.length > 0) {
@@ -285,12 +356,23 @@ const bundleDependency = (
 
             const divider =
               '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
-            return stringifiedDependencies.join(divider);
+            const bundledNotices = stringifiedDependencies.join(divider).trim();
+            const lighthouseNoticesPath = path.join(
+              process.cwd(),
+              'src/third_party/LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES',
+            );
+            if (fs.existsSync(lighthouseNoticesPath)) {
+              const lighthouseNotices = fs.readFileSync(
+                lighthouseNoticesPath,
+                'utf-8',
+              );
+              return `${bundledNotices}${divider}${lighthouseNotices}`;
+            }
+            return bundledNotices;
           },
         },
       },
     }),
-    listBundledDeps(),
     commonjs(),
     json(),
     nodeResolve({

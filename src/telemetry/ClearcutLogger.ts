@@ -258,8 +258,8 @@ export class ClearcutLogger {
   }
 
   async logServerError(args: {
-    toolName?: string;
     errorCode: ErrorCode;
+    toolName?: string;
   }): Promise<void> {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,

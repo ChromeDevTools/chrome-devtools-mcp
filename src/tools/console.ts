@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
-import {zod} from '../third_party/index.js';
-import type {ConsoleMessageType} from '../third_party/index.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
+import {zod, type ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
+import {
+  GET_CONSOLE_MESSAGE_TOOL_NAME,
+  LIST_CONSOLE_MESSAGES_TOOL_NAME,
+} from './toolNames.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: [
@@ -38,13 +41,11 @@ const FILTERABLE_MESSAGE_TYPES: [
   'issue',
 ];
 
-const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
-
-export const listConsoleMessages = definePageTool(
+export const listConsoleMessages: PageToolFactory = definePageTool(
   (cliArgs: ParsedArguments) => {
     return {
       name: LIST_CONSOLE_MESSAGES_TOOL_NAME,
-      description: `List all console messages for the target page since the last navigation.${cliArgs?.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
+      description: `List all console messages for the target page since the last navigation.${cliArgs.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
       annotations: {
         category: ToolCategory.DEBUGGING,
         readOnlyHint: true,
@@ -64,7 +65,7 @@ export const listConsoleMessages = definePageTool(
           .min(0)
           .optional()
           .describe(
-            'Page number to return (0-based). When omitted, returns the first page.',
+            'Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.',
           ),
         types: zod
           .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
@@ -77,7 +78,7 @@ export const listConsoleMessages = definePageTool(
           .default(false)
           .optional()
           .describe(
-            'Set to true to return the preserved messages over the last 3 navigations.',
+            `Set to true to return the preserved messages over the last ${cliArgs.maxNavigationSaved} navigations.`,
           ),
         includeStackTraces: zod
           .boolean()
@@ -94,6 +95,7 @@ export const listConsoleMessages = definePageTool(
           ),
       },
       blockedByDialog: false,
+      concurrency: 'page',
       verifyFilesSchema: {},
       handler: async (request, response) => {
         response.setIncludeConsoleData(true, {
@@ -109,8 +111,8 @@ export const listConsoleMessages = definePageTool(
   },
 );
 
-export const getConsoleMessage = definePageTool(() => ({
-  name: 'get_console_message',
+export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
+  name: GET_CONSOLE_MESSAGE_TOOL_NAME,
   description: `Gets a console message by its ID. You can get all messages by calling ${LIST_CONSOLE_MESSAGES_TOOL_NAME}.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
@@ -124,6 +126,7 @@ export const getConsoleMessage = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);

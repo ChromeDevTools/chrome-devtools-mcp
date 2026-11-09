@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import type {ElementHandle} from 'puppeteer-core';
 
 import {SnapshotFormatter} from '../../src/formatters/SnapshotFormatter.js';
-import type {TextSnapshot} from '../../src/TextSnapshot.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {
@@ -173,6 +173,41 @@ describe('snapshotFormatter', () => {
   uid=1_3 option "Deutsch" selected value="de"
 `,
     );
+  });
+
+  it('keeps long non-data url attributes in full', () => {
+    const url = 'https://example.com/?q=' + 'a'.repeat(500);
+    const node = {...createNode('1_1', 'link', 'Next'), url};
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "Next" url="${url}"\n`,
+    );
+    assert.deepStrictEqual(formatter.toJSON(), {
+      id: '1_1',
+      role: 'link',
+      name: 'Next',
+      url,
+    });
+  });
+
+  it('truncates long data url attributes in text and JSON output', () => {
+    const url = 'data:image/png;base64,' + 'A'.repeat(5000);
+    const truncated = url.slice(0, 255) + '... <truncated>';
+    const node = {...createNode('1_1', 'image', 'logo'), url};
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 image "logo" url="${truncated}"\n`,
+    );
+    assert.deepStrictEqual(formatter.toJSON(), {
+      id: '1_1',
+      role: 'image',
+      name: 'logo',
+      url: truncated,
+    });
   });
 
   it('formats a snapshot with value properties', () => {
@@ -355,16 +390,15 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      verbose: false,
-      resolveCdpElementId() {
-        return undefined;
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        verbose: false,
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);
@@ -392,16 +426,15 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      verbose: true,
-      resolveCdpElementId() {
-        return undefined;
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        verbose: true,
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);
@@ -429,17 +462,16 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      selectedElementUid: '1_1',
-      verbose: false,
-      resolveCdpElementId() {
-        return '1_1';
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        selectedElementUid: '1_1',
+        verbose: false,
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);

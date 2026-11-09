@@ -36,7 +36,6 @@ describe('FilePersistence', () => {
   });
 
   afterEach(async () => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
 

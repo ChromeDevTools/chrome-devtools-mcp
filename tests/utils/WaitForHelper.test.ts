@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -20,10 +20,6 @@ import {html, withMcpContext} from '../utils.js';
 
 describe('WaitForHelper', () => {
   const server = serverHooks();
-
-  afterEach(() => {
-    sinon.restore();
-  });
 
   it('aborts the action signal when an unhandled dialog opens', async () => {
     const pptrPage = createMockPuppeteerPage();
@@ -70,7 +66,7 @@ describe('WaitForHelper', () => {
       // The action opens a dialog asynchronously and passes no handleDialog.
       // The dialog leaves the renderer paused; without the fix,
       // waitForStableDom's setup evaluation would hang until protocolTimeout
-      // (~180s) while the tool mutex is held, freezing the session.
+      // (~180s) while the context lock is held, freezing the session.
       try {
         const result = await Promise.race([
           mcpPage.waitForEventsAfterAction(async () => {
@@ -85,10 +81,11 @@ describe('WaitForHelper', () => {
           ),
         ]);
 
-        assert(
-          result !== 'stalled',
-          'stalled because a dialog was shown; would time out with ProtocolError',
-        );
+        if (result === 'stalled') {
+          assert.fail(
+            'stalled because a dialog was shown; would time out with ProtocolError',
+          );
+        }
         // The dialog was detected but not handled (no handleDialog was passed).
         assert.strictEqual(result.dialogHandled, false);
         // The dialog is still open and recorded, so the next blockedByDialog tool

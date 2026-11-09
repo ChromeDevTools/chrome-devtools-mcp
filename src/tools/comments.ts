@@ -9,7 +9,7 @@ import {zod} from '../third_party/index.js';
 import type {CD4ACommentThread, CD4ARevealTarget} from '../types.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export type CommentThreadPayload = CD4ACommentThread;
 export type RevealTargetPayload = CD4ARevealTarget;
@@ -17,7 +17,7 @@ export type RevealTargetPayload = CD4ARevealTarget;
 const DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE =
   'DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.';
 
-export const openDevtools = definePageTool(() => ({
+export const openDevtools: PageToolFactory = definePageTool(() => ({
   name: 'open_devtools',
   description: 'Open a DevTools window for the selected page.',
   annotations: {
@@ -27,6 +27,7 @@ export const openDevtools = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
@@ -41,16 +42,37 @@ export const openDevtools = definePageTool(() => ({
   },
 }));
 
-export const getDevtoolsComments = definePageTool(() => ({
+const DEFAULT_COMMENT_WAIT_MS = 10_000;
+const MAX_COMMENT_WAIT_MS = 30_000;
+
+export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
   name: 'get_devtools_comments',
-  description: 'Retrieve user comments from the DevTools window for the page.',
+  description:
+    'Retrieve user comments from the DevTools window for the page. ' +
+    'If no comment is pending, waits up to `timeout` ms for the user to send one, then returns. ' +
+    'Call it again to keep waiting.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
     conditions: ['devtoolsComments'],
   },
-  schema: {},
+  schema: {
+    timeout: zod
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_COMMENT_WAIT_MS)
+      .optional()
+      .describe(
+        `Maximum time in milliseconds to wait for a new comment when none is pending. ` +
+          `Defaults to ${DEFAULT_COMMENT_WAIT_MS}, maximum ${MAX_COMMENT_WAIT_MS}. ` +
+          `Set to 0 to return immediately without waiting.`,
+      ),
+  },
   blockedByDialog: false,
+  // The handler only reads page state and waits for comment events, so it
+  // runs outside the task runner and other tools run during the wait.
+  concurrency: 'none',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -67,13 +89,35 @@ export const getDevtoolsComments = definePageTool(() => ({
       response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
       return;
     }
-    const threads = await bridge.getComments(devtoolsPage);
 
+    const timeout = request.params.timeout ?? DEFAULT_COMMENT_WAIT_MS;
+    const start = Date.now();
+    const deadline = start + timeout;
+    let threads = await bridge.getComments(devtoolsPage);
+    while (threads.length === 0) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        break;
+      }
+      const changed = await bridge.waitForCommentEvent(remaining);
+      if (!changed) {
+        break;
+      }
+      // Another tool may have changed state during the wait, so fetch again.
+      threads = await bridge.getComments(devtoolsPage);
+    }
+
+    if (threads.length === 0 && timeout > 0) {
+      response.appendResponseLine(
+        `Waited ${Date.now() - start}ms for new DevTools comments. Call get_devtools_comments again to keep waiting.`,
+      );
+      return;
+    }
     response.setDevToolsComments(threads);
   },
 }));
 
-export const resolveDevtoolsComment = definePageTool(() => ({
+export const resolveDevtoolsComment: PageToolFactory = definePageTool(() => ({
   name: 'resolve_devtools_comment',
   description:
     'Append an agent reply to a DevTools comment thread and mark it as resolved.',
@@ -96,6 +140,7 @@ export const resolveDevtoolsComment = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -138,7 +183,7 @@ export const resolveDevtoolsComment = definePageTool(() => ({
   },
 }));
 
-export const revealInDevtools = definePageTool(() => ({
+export const revealInDevtools: PageToolFactory = definePageTool(() => ({
   name: 'reveal_in_devtools',
   description:
     'Navigate DevTools to a specified panel and highlight a target DOM node or network request. The parameters uid and reqid are mutually exclusive.',
@@ -166,6 +211,7 @@ export const revealInDevtools = definePageTool(() => ({
       .describe('Optional network request ID to reveal in the Network panel.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
