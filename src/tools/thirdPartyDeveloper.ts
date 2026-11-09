@@ -7,7 +7,12 @@
 import {zod, ajv, type JSONSchema7} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
+import {
+  definePageTool,
+  jsonObjectTransform,
+  zodTransform,
+  type PageToolFactory,
+} from './ToolDefinition.js';
 
 export interface ToolDefinition {
   name: string;
@@ -79,6 +84,7 @@ export const executeThirdPartyDeveloperTool: PageToolFactory = definePageTool(
       toolName: zod.string().describe('The name of the tool to execute'),
       params: zod
         .string()
+        .transform(zodTransform(jsonObjectTransform))
         .optional()
         .describe('The JSON-stringified parameters to pass to the tool'),
     },
@@ -87,24 +93,7 @@ export const executeThirdPartyDeveloperTool: PageToolFactory = definePageTool(
     verifyFilesSchema: {},
     handler: async (request, response) => {
       const toolName = request.params.toolName;
-      let params: Record<string, unknown> = {};
-      if (request.params.params) {
-        try {
-          const parsed = JSON.parse(request.params.params);
-          if (
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            !Array.isArray(parsed)
-          ) {
-            params = parsed;
-          } else {
-            throw new Error('Parsed params is not an object');
-          }
-        } catch (e) {
-          const errorMessage = e instanceof Error ? e.message : String(e);
-          throw new Error(`Failed to parse params as JSON: ${errorMessage}`);
-        }
-      }
+      const params = request.params.params ?? {};
 
       const toolGroups = await request.page.discoverThirdPartyDeveloperTools();
       let tool;
