@@ -812,12 +812,8 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async openDevTools(): Promise<Page | undefined> {
-    const devtoolsPage = await this.pptrPage.openDevTools();
-    if (this.#config.resolved.devtoolsComments) {
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
-    }
-    return devtoolsPage;
+  async openDevTools(): Promise<Page> {
+    return await this.pptrPage.openDevTools();
   }
 
   getConsoleData(
