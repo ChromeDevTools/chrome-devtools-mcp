@@ -29,6 +29,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--categoryNetworkMocks`/ `--category-network-mocks`**
+  Set to true to include network mocking tools. Changing this option requires restarting the server.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--categoryDebugging`/ `--category-debugging`**
   Set to false to exclude tools related to debugging.
   - **Type:** boolean
