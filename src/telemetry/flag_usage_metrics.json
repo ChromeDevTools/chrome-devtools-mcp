@@ -490,5 +490,9 @@
   {
     "name": "category_webauthn",
     "flagType": "boolean"
+  },
+  {
+    "name": "auth_helper_present",
+    "flagType": "boolean"
   }
 ]
