@@ -370,7 +370,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                   }
                   break;
               }
-              if (signal.aborted) {
+              if (signal.aborted && page.getDialog()) {
                 response.appendResponseLine(DIALOG_BEFORE_LOAD_MESSAGE);
               }
             },

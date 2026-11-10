@@ -337,14 +337,14 @@ describe('pages', () => {
           {
             params: {
               url: 'data:text/html,<script>alert("loading")</script>',
-              timeout: 10_000,
+              timeout: 30_000,
             },
           },
           response,
           context,
         );
 
-        assert.ok(Date.now() - start < 10_000);
+        assert.ok(Date.now() - start < 5_000);
         const page = context.getSelectedMcpPage();
         assert.strictEqual(page, context.getPageById(2));
         const dialog = page.getDialog();
@@ -1260,7 +1260,7 @@ describe('pages', () => {
           {
             params: {
               url: 'data:text/html,<script>alert("loading")</script>',
-              timeout: 10_000,
+              timeout: 30_000,
             },
             page,
           },
@@ -1268,7 +1268,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.ok(Date.now() - start < 10_000);
+        assert.ok(Date.now() - start < 5_000);
         const dialog = page.getDialog();
         assert.ok(dialog);
         assert.strictEqual(dialog.message(), 'loading');
@@ -1278,6 +1278,27 @@ describe('pages', () => {
         );
         await dialog.dismiss();
       });
+    });
+
+    it('does not report a dialog-blocked load when no dialog is open', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const controller = new AbortController();
+      page.waitForEventsAfterAction.callsFake(async action => {
+        await action(controller.signal);
+        return {};
+      });
+      page.pptrPage.goto.callsFake(async () => {
+        controller.abort();
+        return null;
+      });
+
+      await navigatePage(args).handler(
+        {params: {url: 'https://example.com'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('go forward with error', async () => {
