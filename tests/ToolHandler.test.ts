@@ -10,10 +10,12 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import {Extension} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
+import {handleResponse} from '../src/daemon/client.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
@@ -22,6 +24,8 @@ import {FilePersistence} from '../src/telemetry/persistence.js';
 import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
 import {WatchdogClient} from '../src/telemetry/WatchdogClient.js';
 import {
+  CdpBrowser,
+  CdpExtension,
   ProtocolError,
   ProtocolErrorCode,
   zod,
@@ -29,6 +33,7 @@ import {
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {emulate} from '../src/tools/emulation.js';
+import {listExtensions} from '../src/tools/extensions.js';
 import {pressKey, typeText} from '../src/tools/input.js';
 import {
   defineBrowserlessTool,
@@ -43,7 +48,11 @@ import {evaluateScript} from '../src/tools/script.js';
 import {mockNetwork} from '../src/tools/network.js';
 import {createTools} from '../src/tools/tools.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
-import {createMockMcpContext, createMockMcpPage} from './mocks.js';
+import {
+  createMockMcpContext,
+  createMockMcpPage,
+  createMockPuppeteerBrowser,
+} from './mocks.js';
 import {getMockBrowser, withMcpContext} from './utils.js';
 
 describe('ToolHandler', () => {
@@ -69,6 +78,84 @@ describe('ToolHandler', () => {
       locator,
     ).parseConfig();
   }
+
+  describe('list_extensions JSON output', () => {
+    for (const scenario of [
+      {
+        name: 'preserves enabled and disabled extension metadata',
+        extensions: [
+          {
+            id: 'id1',
+            name: 'Extension 1',
+            version: '1.0',
+            enabled: true,
+            path: '/path/to/ext1',
+          },
+          {
+            id: 'id2',
+            name: 'Extension 2',
+            version: '2.0',
+            enabled: false,
+            path: '/path/to/ext2',
+          },
+        ],
+        text:
+          '## Extensions\n' +
+          'id=id1 "Extension 1" v1.0 Enabled\n' +
+          'id=id2 "Extension 2" v2.0 Disabled',
+      },
+      {
+        name: 'preserves an empty extension array',
+        extensions: [],
+        text: '## Extensions\nNo extensions installed.',
+      },
+    ]) {
+      it(scenario.name, async () => {
+        const config = parseConfig([
+          '--category-extensions',
+          '--experimental-structured-content',
+        ]);
+        const context = createMockMcpContext();
+        const browser = sinon.createStubInstance(CdpBrowser);
+        context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+        context.listExtensions.resolves(
+          new Map(
+            scenario.extensions.map(({id, name, version, enabled, path}) => {
+              const extension = new CdpExtension(
+                id,
+                version,
+                name,
+                path,
+                enabled,
+                browser,
+              );
+              assert.ok(extension instanceof Extension);
+              return [id, extension];
+            }),
+          ),
+        );
+        const handler = new ToolHandler(
+          listExtensions(config.resolved),
+          config,
+          async () => context,
+          sinon.spy(),
+        );
+
+        const result = await handler.handle({}, {viaMcp: true});
+        const wireResult: typeof result = JSON.parse(JSON.stringify(result));
+        const expected = {extensions: scenario.extensions};
+
+        assert.deepStrictEqual(wireResult, {
+          content: [{type: 'text', text: scenario.text}],
+          structuredContent: expected,
+        });
+        assert.deepStrictEqual(
+          JSON.parse(await handleResponse(wireResult, 'json')),
+          expected,
+        );
+      });
+    }
+  });
 
   it('calls getPageById for page scoped tools when pageId is provided', async () => {
     let handlerCalled = false;

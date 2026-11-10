@@ -1615,7 +1615,15 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
 
     if (data.extensions) {
       const extensionArray = Array.from(data.extensions.values());
-      structuredContent.extensions = extensionArray;
+      structuredContent.extensions = extensionArray.map(
+        ({id, name, version, enabled, path}) => ({
+          id,
+          name,
+          version,
+          enabled,
+          path,
+        }),
+      );
       response.push('## Extensions');
       if (extensionArray.length === 0) {
         response.push('No unpacked extensions found.');
