@@ -28,12 +28,9 @@ jobs:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Sync DevTools dependencies
+      - name: Install and sync dependencies
         shell: bash
-        run: npm run gclient-sync
+        run: npm run sync
 
       - name: Build and bundle
         run: npm run bundle
