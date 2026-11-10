@@ -825,7 +825,7 @@ export class McpPage implements ContextPage {
       });
     } catch (e) {
       logger?.(
-        `DevTools universe is not available after ${DEVTOOLS_UNIVERSE_TIMEOUT_MS} ms`,
+        `DevTools might not have loaded completely within ${DEVTOOLS_UNIVERSE_TIMEOUT_MS / 1000} seconds`,
         e,
       );
     }
