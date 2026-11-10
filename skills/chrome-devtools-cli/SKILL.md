@@ -159,7 +159,7 @@ chrome-devtools screencast_stop 1 # Stops the active screencast on page 1
 ## Extensions
 
 ```bash
-chrome-devtools list_extensions # Lists all the Chrome extensions installed in the browser
+chrome-devtools list_extensions # Lists the unpacked Chrome extensions loaded in the browser
 chrome-devtools install_extension "/path/to/extension" # Installs a Chrome extension from the given path
 chrome-devtools uninstall_extension "extension_id" # Uninstalls a Chrome extension by its ID
 chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome extension by its ID

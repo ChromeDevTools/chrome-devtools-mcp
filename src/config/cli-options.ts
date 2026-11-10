@@ -1406,7 +1406,7 @@ export const commands: Commands = {
   },
   list_extensions: {
     description:
-      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
+      'Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {},
   },
