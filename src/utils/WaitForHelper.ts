@@ -324,6 +324,31 @@ export interface WaitForEventsResult {
   openedPages?: Set<Target>;
 }
 
+export function raceWithSignal<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, {once: true});
+    Promise.resolve(promise).then(
+      value => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function getNetworkMultiplierFromString(
   condition: string | null,
 ): number {
