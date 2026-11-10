@@ -44,7 +44,7 @@ describe('fetchWithValidatedRedirects', () => {
       const fetch = sinon.stub(globalThis, 'fetch').resolves(redirect);
       await assert.rejects(
         fetchWithValidatedRedirects(new URL('https://allowed.example/start'), {
-          validateUrl: url => validateNetworkUrl(url, policy),
+          policy,
         }),
         /blocklist|allowlist/,
       );
@@ -61,10 +61,7 @@ describe('fetchWithValidatedRedirects', () => {
     const fetch = sinon.stub(globalThis, 'fetch');
     await assert.rejects(
       fetchWithValidatedRedirects(new URL('https://blocked.example/start'), {
-        validateUrl: url =>
-          validateNetworkUrl(url, {
-            blockedUrlPattern: ['https://blocked.example/*'],
-          }),
+        policy: {blockedUrlPattern: ['https://blocked.example/*']},
       }),
       /Blocked by blocklist/,
     );
@@ -97,7 +94,7 @@ describe('fetchWithValidatedRedirects', () => {
     const response = await fetchWithValidatedRedirects(
       new URL('https://example.com/start'),
       {
-        validateUrl: url => validateNetworkUrl(url, {}),
+        policy: {},
         method: 'HEAD',
         headers,
       },
@@ -133,7 +130,7 @@ describe('fetchWithValidatedRedirects', () => {
     );
     await assert.rejects(
       fetchWithValidatedRedirects(new URL('https://example.com/start'), {
-        validateUrl: url => validateNetworkUrl(url, {}),
+        policy: {},
       }),
       /Unsupported URL protocol: file:/,
     );
@@ -151,7 +148,7 @@ describe('fetchWithValidatedRedirects', () => {
     sinon.stub(globalThis, 'fetch').resolves(response);
     await assert.rejects(
       fetchWithValidatedRedirects(new URL('https://example.com/start'), {
-        validateUrl: url => validateNetworkUrl(url, {}),
+        policy: {},
       }),
       /Redirect has no Location header/,
     );
@@ -170,7 +167,7 @@ describe('fetchWithValidatedRedirects', () => {
     });
     await assert.rejects(
       fetchWithValidatedRedirects(new URL('https://example.com/loop'), {
-        validateUrl: url => validateNetworkUrl(url, {}),
+        policy: {},
       }),
       /Too many redirects/,
     );

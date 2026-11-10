@@ -32,7 +32,7 @@ export class NetworkOverridesFormatter {
       const source =
         override.kind === 'file'
           ? override.responseFilePath + ' (' + override.contentType + ')'
-          : override.redirectUrl;
+          : override.upstreamUrl;
       const resourceType = override.resourceType
         ? ' [' + override.resourceType + ']'
         : '';

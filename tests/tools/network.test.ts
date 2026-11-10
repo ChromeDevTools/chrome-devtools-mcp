@@ -75,10 +75,10 @@ describe('network', () => {
       const {page, context, response, args} = createHandlerMocks();
       const override = {
         id: 7,
-        kind: 'redirect',
+        kind: 'upstream',
         urlPattern: 'https://example.com/script.js*',
         resourceType: 'script',
-        redirectUrl: 'https://example.com/replacement.js',
+        upstreamUrl: 'https://example.com/replacement.js',
         diagnostics: {hits: 0, errors: 0, navigations: 0},
       } satisfies NetworkOverride;
       page.mockNetwork.resolves(override);
@@ -87,7 +87,7 @@ describe('network', () => {
           params: {
             route: override.urlPattern,
             resourceType: 'script',
-            upstream: override.redirectUrl,
+            upstream: override.upstreamUrl,
           },
           page,
         },
@@ -95,10 +95,10 @@ describe('network', () => {
         context,
       );
       sinon.assert.calledOnceWithExactly(page.mockNetwork, {
-        kind: 'redirect',
+        kind: 'upstream',
         urlPattern: override.urlPattern,
         resourceType: 'script',
-        redirectUrl: override.redirectUrl,
+        upstreamUrl: override.upstreamUrl,
       });
       sinon.assert.notCalled(page.listNetworkMocks);
       sinon.assert.notCalled(context.validatePath);
@@ -124,10 +124,10 @@ describe('network', () => {
         /Blocked by blocklist/,
       );
       sinon.assert.calledOnceWithExactly(page.mockNetwork, {
-        kind: 'redirect',
+        kind: 'upstream',
         urlPattern: undefined,
         resourceType: undefined,
-        redirectUrl: 'https://blocked.example/script.js',
+        upstreamUrl: 'https://blocked.example/script.js',
       });
       sinon.assert.notCalled(response.appendResponseLine);
     });
@@ -226,9 +226,9 @@ describe('network', () => {
         {
           id: 2,
           diagnostics: {hits: 0, errors: 0, navigations: 1},
-          kind: 'redirect',
+          kind: 'upstream',
           urlPattern: 'https://example.com/missing.js',
-          redirectUrl: 'https://example.com/replacement.js',
+          upstreamUrl: 'https://example.com/replacement.js',
         },
       ]);
       await mockNetwork(args).handler({params: {}, page}, response, context);

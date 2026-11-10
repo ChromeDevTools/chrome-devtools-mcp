@@ -14,7 +14,6 @@ interface UrlAccessPolicy {
 
 const CROSS_ORIGIN_REDIRECT_HEADERS = new Set([
   'accept',
-  'accept-encoding',
   'accept-language',
   'cache-control',
   'origin',
@@ -28,12 +27,14 @@ export function getRedirectHeaders(
   targetUrl: URL,
   originalHeaders: Record<string, string>,
 ): Record<string, string> {
-  if (sourceUrl.origin === targetUrl.origin) {
-    return originalHeaders;
-  }
+  const sameOrigin = sourceUrl.origin === targetUrl.origin;
   const headers: Record<string, string> = {};
   for (const [name, value] of Object.entries(originalHeaders)) {
-    if (CROSS_ORIGIN_REDIRECT_HEADERS.has(name.toLowerCase())) {
+    const lowerName = name.toLowerCase();
+    if (lowerName === 'accept-encoding') {
+      continue;
+    }
+    if (sameOrigin || CROSS_ORIGIN_REDIRECT_HEADERS.has(lowerName)) {
       headers[name] = value;
     }
   }
@@ -69,7 +70,7 @@ export function validateNetworkUrl(url: URL, policy: UrlAccessPolicy): void {
 export async function fetchWithValidatedRedirects(
   url: URL,
   options: {
-    validateUrl: (url: URL) => void;
+    policy: UrlAccessPolicy;
     method?: 'GET' | 'HEAD';
     headers?: Record<string, string>;
   },
@@ -81,7 +82,7 @@ export async function fetchWithValidatedRedirects(
     ? Object.fromEntries(new Headers(options.headers))
     : undefined;
   for (let redirectCount = 0; ; redirectCount++) {
-    options.validateUrl(currentUrl);
+    validateNetworkUrl(currentUrl, options.policy);
     const response = await fetch(currentUrl, {
       redirect: 'manual',
       ...(options.method ? {method: options.method} : {}),

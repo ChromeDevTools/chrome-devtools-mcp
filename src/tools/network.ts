@@ -251,7 +251,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
     };
     let input: NetworkMockInput | undefined;
     if (params.upstream !== undefined) {
-      input = {...filter, kind: 'redirect', redirectUrl: params.upstream};
+      input = {...filter, kind: 'upstream', upstreamUrl: params.upstream};
     } else if (params.body !== undefined) {
       const responseFilePath = params.body;
       input = {

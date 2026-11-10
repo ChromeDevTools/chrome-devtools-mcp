@@ -61,7 +61,6 @@ import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog, redactUrlForLogging} from './utils/logger.js';
 import {
   fetchWithValidatedRedirects,
-  validateNetworkUrl,
   validateUrlNotBlocked,
 } from './utils/network.js';
 import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
@@ -1222,7 +1221,7 @@ export class McpContext implements Context, BrowserlessContext {
 
   async #loadNetworkResource(url: URL): Promise<string> {
     const response = await fetchWithValidatedRedirects(url, {
-      validateUrl: url => validateNetworkUrl(url, this.#config.resolved),
+      policy: this.#config.resolved,
     });
     if (!response.ok) {
       throw new Error(

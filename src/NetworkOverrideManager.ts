@@ -32,9 +32,9 @@ export interface NetworkMockFilter {
   resourceType?: ResourceType;
 }
 
-export interface RedirectNetworkOverrideInput extends NetworkMockFilter {
-  kind: 'redirect';
-  redirectUrl: string;
+export interface UpstreamNetworkOverrideInput extends NetworkMockFilter {
+  kind: 'upstream';
+  upstreamUrl: string;
 }
 
 export interface FileNetworkOverrideInput extends NetworkMockFilter {
@@ -45,7 +45,7 @@ export interface FileNetworkOverrideInput extends NetworkMockFilter {
 }
 
 export type NetworkMockInput =
-  RedirectNetworkOverrideInput | FileNetworkOverrideInput;
+  UpstreamNetworkOverrideInput | FileNetworkOverrideInput;
 
 interface NetworkOverrideBase extends BaseNetworkOverride {
   id: number;
@@ -57,9 +57,9 @@ interface NetworkOverrideBase extends BaseNetworkOverride {
   };
 }
 
-export interface RedirectNetworkOverride extends NetworkOverrideBase {
-  kind: 'redirect';
-  redirectUrl: string;
+export interface UpstreamNetworkOverride extends NetworkOverrideBase {
+  kind: 'upstream';
+  upstreamUrl: string;
 }
 
 export interface FileNetworkOverride extends NetworkOverrideBase {
@@ -68,15 +68,15 @@ export interface FileNetworkOverride extends NetworkOverrideBase {
   contentType: string;
 }
 
-export type NetworkOverride = RedirectNetworkOverride | FileNetworkOverride;
+export type NetworkOverride = UpstreamNetworkOverride | FileNetworkOverride;
 
 interface StoredNetworkOverrideBase extends NetworkOverrideBase {
   matcher: URLPattern;
 }
 
-interface StoredRedirectNetworkOverride extends StoredNetworkOverrideBase {
-  kind: 'redirect';
-  redirectUrl: string;
+interface StoredUpstreamNetworkOverride extends StoredNetworkOverrideBase {
+  kind: 'upstream';
+  upstreamUrl: string;
 }
 
 interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
@@ -87,7 +87,7 @@ interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
 }
 
 type StoredNetworkOverride =
-  StoredRedirectNetworkOverride | StoredFileNetworkOverride;
+  StoredUpstreamNetworkOverride | StoredFileNetworkOverride;
 
 const DEFAULT_URL_PATTERN = '*://*:*/*';
 
@@ -124,11 +124,11 @@ function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
     resourceType: override.resourceType,
     diagnostics: {...override.diagnostics},
   };
-  if (override.kind === 'redirect') {
+  if (override.kind === 'upstream') {
     return {
       ...base,
       kind: override.kind,
-      redirectUrl: override.redirectUrl,
+      upstreamUrl: override.upstreamUrl,
     };
   }
   return {
@@ -215,12 +215,12 @@ export class NetworkOverrideManager {
       matcher: new URLPattern(urlPattern),
       diagnostics: {hits: 0, errors: 0, navigations: 0},
     };
-    if (input.kind === 'redirect') {
-      validateNetworkUrl(new URL(input.redirectUrl), this.config.resolved);
+    if (input.kind === 'upstream') {
+      validateNetworkUrl(new URL(input.upstreamUrl), this.config.resolved);
       return {
         ...base,
         kind: input.kind,
-        redirectUrl: input.redirectUrl,
+        upstreamUrl: input.upstreamUrl,
       };
     }
 
@@ -391,8 +391,8 @@ export class NetworkOverrideManager {
 
     override.diagnostics.hits++;
     try {
-      if (override.kind === 'redirect') {
-        await this.#fulfillUpstream(request, override.redirectUrl);
+      if (override.kind === 'upstream') {
+        await this.#fulfillUpstream(request, override.upstreamUrl);
         return;
       }
 
@@ -416,7 +416,7 @@ export class NetworkOverrideManager {
       const source =
         override.kind === 'file'
           ? override.responseFilePath
-          : redactUrlForLogging(override.redirectUrl);
+          : redactUrlForLogging(override.upstreamUrl);
       const detail =
         override.kind === 'file'
           ? message
@@ -433,7 +433,7 @@ export class NetworkOverrideManager {
 
   async #fulfillUpstream(
     request: HTTPRequest,
-    redirectUrl: string,
+    upstreamUrl: string,
   ): Promise<void> {
     const method = request.method();
     if (method !== 'GET' && method !== 'HEAD') {
@@ -441,19 +441,27 @@ export class NetworkOverrideManager {
     }
     const headers = getRedirectHeaders(
       new URL(request.url()),
-      new URL(redirectUrl),
+      new URL(upstreamUrl),
       request.headers(),
     );
-    const response = await fetchWithValidatedRedirects(new URL(redirectUrl), {
-      validateUrl: url => validateNetworkUrl(url, this.config.resolved),
+    const response = await fetchWithValidatedRedirects(new URL(upstreamUrl), {
+      policy: this.config.resolved,
       method,
       headers,
     });
-    const responseHeaders: Record<string, string> = {};
+    const responseHeaders: Record<string, string | string[]> = {};
     for (const [name, value] of response.headers) {
-      if (name !== 'content-encoding' && name !== 'content-length') {
+      if (
+        name !== 'content-encoding' &&
+        name !== 'content-length' &&
+        name !== 'set-cookie'
+      ) {
         responseHeaders[name] = value;
       }
+    }
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) {
+      responseHeaders['set-cookie'] = cookies;
     }
     await request.respond({
       status: response.status,

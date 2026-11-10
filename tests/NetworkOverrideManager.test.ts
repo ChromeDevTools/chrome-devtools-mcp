@@ -28,15 +28,15 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     const previous = await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://example.com/replacement.js',
+      upstreamUrl: 'https://example.com/replacement.js',
     });
     await assert.rejects(
       manager.mock({
-        kind: 'redirect',
+        kind: 'upstream',
         urlPattern: '*://*:*/*app.js',
-        redirectUrl: 'https://blocked.example/replacement.js',
+        upstreamUrl: 'https://blocked.example/replacement.js',
       }),
       /Blocked by blocklist/,
     );
@@ -53,12 +53,12 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://allowed.example/replacement.js',
+      upstreamUrl: 'https://allowed.example/replacement.js',
     });
     const fetch = sinon.stub(globalThis, 'fetch').resolves(
-      new Response('redirect', {
+      new Response('upstream', {
         status: 302,
         headers: {location: 'https://blocked.example/secret'},
       }),
@@ -84,9 +84,9 @@ describe('NetworkOverrideManager', () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(pptrPage, config);
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://example.com/replacement.js',
+      upstreamUrl: 'https://example.com/replacement.js',
     });
     config.commit(
       createMockServerConfig({
@@ -109,9 +109,9 @@ describe('NetworkOverrideManager', () => {
       createMockServerConfig(),
     );
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://cdn.example/start',
+      upstreamUrl: 'https://cdn.example/start',
     });
     const fetch = sinon.stub(globalThis, 'fetch');
     fetch
@@ -149,9 +149,9 @@ describe('NetworkOverrideManager', () => {
     );
     const upstream = 'https://user:secret@example.com/app.js?token=secret';
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: 'https://example.com/app.js',
-      redirectUrl: upstream,
+      upstreamUrl: upstream,
     });
     const fetch = sinon
       .stub(globalThis, 'fetch')
@@ -609,9 +609,9 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://example.com/start',
+      upstreamUrl: 'https://example.com/start',
     });
     const fetch = sinon.stub(globalThis, 'fetch').resolves(
       new Response(null, {
@@ -632,6 +632,83 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
+  for (const {upstream, headers} of [
+    {
+      upstream: 'https://example.com/replacement.js',
+      headers: {accept: 'text/javascript', authorization: 'secret'},
+    },
+    {
+      upstream: 'https://cdn.example/replacement.js',
+      headers: {accept: 'text/javascript'},
+    },
+  ]) {
+    it('does not forward Accept-Encoding to ' + upstream, async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const manager = new NetworkOverrideManager(
+        pptrPage,
+        createMockServerConfig(),
+      );
+      await manager.mock({
+        kind: 'upstream',
+        urlPattern: '*://*:*/*app.js',
+        upstreamUrl: upstream,
+      });
+      const fetch = sinon
+        .stub(globalThis, 'fetch')
+        .resolves(new Response('js'));
+      const request = createMockHTTPRequest();
+      request.headers.returns(
+        Object.freeze({
+          Accept: 'text/javascript',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          Authorization: 'secret',
+        }),
+      );
+      await pptrPage.on.firstCall.args[1](request);
+      sinon.assert.calledOnceWithExactly(fetch, new URL(upstream), {
+        redirect: 'manual',
+        method: 'GET',
+        headers,
+      });
+      sinon.assert.notCalled(request.abort);
+      await manager.dispose();
+    });
+  }
+
+  it('preserves multiple Set-Cookie headers in upstream responses', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({
+      kind: 'upstream',
+      urlPattern: '*://*:*/*app.js',
+      upstreamUrl: 'https://example.com/replacement.js',
+    });
+    const cookies = [
+      'session=abc; Path=/; HttpOnly',
+      'theme=dark; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/',
+    ];
+    const headers = new Headers({'content-type': 'text/javascript'});
+    for (const cookie of cookies) {
+      headers.append('set-cookie', cookie);
+    }
+    sinon.stub(globalThis, 'fetch').resolves(new Response('js', {headers}));
+    const request = createMockHTTPRequest();
+    await pptrPage.on.firstCall.args[1](request);
+    sinon.assert.calledOnceWithExactly(request.respond, {
+      status: 200,
+      headers: {
+        'content-type': 'text/javascript',
+        'set-cookie': cookies,
+      },
+      body: new TextEncoder().encode('js'),
+    });
+    sinon.assert.notCalled(request.abort);
+    await manager.dispose();
+  });
+
   it('fulfills decoded upstream bodies without stale compression headers', async () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(
@@ -639,9 +716,9 @@ describe('NetworkOverrideManager', () => {
       createMockServerConfig(),
     );
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://example.com/replacement.js',
+      upstreamUrl: 'https://example.com/replacement.js',
     });
     sinon.stub(globalThis, 'fetch').resolves(
       new Response('decoded', {
@@ -672,9 +749,9 @@ describe('NetworkOverrideManager', () => {
       createMockServerConfig(),
     );
     await manager.mock({
-      kind: 'redirect',
+      kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
-      redirectUrl: 'https://example.com/replacement.js',
+      upstreamUrl: 'https://example.com/replacement.js',
     });
     const fetch = sinon.stub(globalThis, 'fetch');
     const request = createMockHTTPRequest();
