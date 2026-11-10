@@ -153,13 +153,29 @@ export async function startDaemon(
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms
 
+function getCommandResponseTimeout(command: DaemonMessage): number {
+  if (command.method !== 'invoke_tool') {
+    return SEND_COMMAND_TIMEOUT;
+  }
+  const toolTimeout = command.args?.timeout;
+  if (
+    typeof toolTimeout !== 'number' ||
+    !Number.isFinite(toolTimeout) ||
+    toolTimeout <= 0
+  ) {
+    return SEND_COMMAND_TIMEOUT;
+  }
+  // Leave time for the daemon to return the tool result without overflowing timers.
+  return Math.min(toolTimeout + SEND_COMMAND_TIMEOUT, 2 ** 31 - 1);
+}
+
 /**
  * `sendCommand` opens a socket connection sends a single command and disconnects.
  */
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout: number = SEND_COMMAND_TIMEOUT,
+  timeout: number = getCommandResponseTimeout(command),
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {
