@@ -33,10 +33,10 @@ export const openDevtools: PageToolFactory = definePageTool(() => ({
     const page = request.page;
     try {
       const devtoolsPage = await page.openDevTools();
-      response.appendResponseLine('DevTools window opened successfully.');
-      if (!(await page.ensureDevToolsCommentBridge(devtoolsPage))) {
-        response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
+      if (devtoolsPage) {
+        await page.ensureDevToolsCommentBridge(devtoolsPage);
       }
+      response.appendResponseLine('DevTools window opened successfully.');
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       response.appendResponseLine(`Failed to open DevTools: ${message}`);

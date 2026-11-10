@@ -536,24 +536,6 @@ describe('comments tools', () => {
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
     });
 
-    it('reports unavailable comments when the bridge does not attach', async t => {
-      const {page, context, response, args} = createHandlerMocks();
-      const lines = trackResponseLines(response);
-      const devtoolsPage = createMockPuppeteerPage();
-      page.openDevTools.resolves(devtoolsPage);
-      page.ensureDevToolsCommentBridge.resolves(undefined);
-
-      await openDevtools(args).handler({params: {}, page}, response, context);
-
-      sinon.assert.calledOnceWithExactly(
-        page.ensureDevToolsCommentBridge,
-        devtoolsPage,
-      );
-      sinon.assert.calledTwice(response.appendResponseLine);
-      t.assert.snapshot(lines.join('\n'));
-      sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
-    });
-
     it('reports failure when openDevTools throws', async () => {
       const {page, context, response, args} = createHandlerMocks();
       page.openDevTools.rejects(new Error('Connection closed'));

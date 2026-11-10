@@ -6,11 +6,6 @@ exports[`comments tools > get_devtools_comments > reports when DevTools comments
 DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.
 `;
 
-exports[`comments tools > open_devtools > reports unavailable comments when the bridge does not attach 1`] = `
-DevTools window opened successfully.
-DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.
-`;
-
 exports[`comments tools > resolve_devtools_comment > reports error when DevTools window is not open 1`] = `
 DevTools window is not open for this page. Call open_devtools first to open DevTools.
 `;

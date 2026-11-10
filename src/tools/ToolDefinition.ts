@@ -567,7 +567,7 @@ export type ContextPage = Readonly<{
     options?: {timeout?: number; visible?: boolean},
   ): Promise<Element>;
   getDevToolsPage(): Promise<Page | undefined>;
-  openDevTools(): Promise<Page>;
+  openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined>;
