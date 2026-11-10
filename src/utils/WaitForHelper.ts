@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  FrameEvent,
-  type Frame,
-  type Target,
-  type Page,
-  type Protocol,
-  type CdpPage,
-  type Dialog,
-  type PredefinedNetworkConditions,
+import type {
+  Target,
+  Page,
+  Protocol,
+  CdpPage,
+  Dialog,
+  PredefinedNetworkConditions,
 } from '../third_party/index.js';
 import {logger} from './logger.js';
 
@@ -180,36 +178,20 @@ export class WaitForHelper {
       this.#publicPage.off('popup', popupHandler);
     });
 
-    // Puppeteer emits `FrameNavigatedWithinDocument` right before
-    // `framenavigated` for same-document navigations, so any other main frame
-    // `framenavigated` means a new document, including a reload or a
-    // back/forward cache restore.
-    let pendingSameDocumentNavigation = false;
-    const mainFrame = this.#publicPage.mainFrame();
-    const withinDocumentHandler = (): void => {
-      pendingSameDocumentNavigation = true;
-    };
-    const frameNavigatedHandler = (frame: Frame): void => {
-      if (frame !== this.#publicPage.mainFrame()) {
-        return;
-      }
-      if (pendingSameDocumentNavigation) {
-        pendingSameDocumentNavigation = false;
-      } else {
+    // CDP reports each new document the main frame commits, a reload or a
+    // back/forward cache restore included, with `Page.frameNavigated`, while
+    // a same-document navigation comes as `Page.navigatedWithinDocument`.
+    const frameNavigatedHandler = (
+      event: Protocol.Page.FrameNavigatedEvent,
+    ): void => {
+      if (!event.frame.parentId) {
         this.#loadedNewDocument = true;
       }
     };
-    mainFrame.on(
-      FrameEvent.FrameNavigatedWithinDocument,
-      withinDocumentHandler,
-    );
-    this.#publicPage.on('framenavigated', frameNavigatedHandler);
+    const client = this.#page._client();
+    client.on('Page.frameNavigated', frameNavigatedHandler);
     this.#abortController.signal.addEventListener('abort', () => {
-      mainFrame.off(
-        FrameEvent.FrameNavigatedWithinDocument,
-        withinDocumentHandler,
-      );
-      this.#publicPage.off('framenavigated', frameNavigatedHandler);
+      client.off('Page.frameNavigated', frameNavigatedHandler);
     });
 
     // A scoped AbortController used to clean up navigation probe listeners.
