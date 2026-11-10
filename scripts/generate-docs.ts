@@ -11,16 +11,19 @@ import type {Options as YargsOptions} from 'yargs';
 import {
   mcpOptions,
   type ParsedArguments,
-} from '../build/src/config/mcp-options.js';
+} from '../out/Default/gen/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,
   categoryToFlagName,
-} from '../build/src/config/category-options.js';
-import {zod} from '../build/src/third_party/index.js';
-import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
+} from '../out/Default/gen/src/config/category-options.js';
+import {zod} from '../out/Default/gen/src/third_party/index.js';
+import {ToolCategory, labels} from '../out/Default/gen/src/tools/categories.js';
+import {isSlimTool} from '../out/Default/gen/src/tools/ToolDefinition.js';
 import type {AnyToolDefinition} from '../src/tools/ToolDefinition.js';
-import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
+import {
+  createTools,
+  requiresHiddenFlag,
+} from '../out/Default/gen/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';

@@ -30,7 +30,11 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
-    'third_party/devtools-frontend/**',
+    'build/**',
+    'build_overrides/**',
+    'buildtools/**',
+    'out/**',
+    'third_party/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
@@ -558,7 +562,7 @@ export default defineConfig([
   },
   {
     name: 'Scripts files',
-    files: ['scripts/**/*'],
+    files: ['scripts/**/*.{js,mjs,cjs,ts}'],
     rules: {
       'no-console': 'off',
       'no-restricted-syntax': 'off',

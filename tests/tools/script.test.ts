@@ -30,7 +30,7 @@ import {
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-sw',
+  '../../../../../tests/tools/fixtures/extension-sw',
 );
 
 describe('script', () => {

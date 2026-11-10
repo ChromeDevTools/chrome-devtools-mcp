@@ -11,6 +11,7 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {TimeoutError, zod} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1174,6 +1175,40 @@ describe('input', () => {
       });
     });
 
+    it('reports failure when the locator rejects a fill', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fill(args).handler(
+          {
+            params: {uid: '1_1', value: 'changed', includeSnapshot: true},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5070);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'changed',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
     it('does not fail when filling opens a dialog', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const {handle, locator} = createMockElementHandle();
@@ -1296,6 +1331,47 @@ describe('input', () => {
   });
 
   describe('fill form', () => {
+    it('stops when the locator rejects a form value', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fillForm(args).handler(
+          {
+            params: {
+              elements: [
+                {uid: '1_1', value: 'abc'},
+                {uid: '1_2', value: 'next'},
+              ],
+              includeSnapshot: true,
+            },
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5030);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'abc',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
     it('successfully fills out the form', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1745,7 +1821,7 @@ describe('input', () => {
         await pressKey(args).handler(
           {
             params: {
-              key: 'Control+Shift+C',
+              key: ['C', 'Control', 'Shift'],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1753,6 +1829,10 @@ describe('input', () => {
           context,
         );
 
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+Shift+C',
+        );
         assert.deepStrictEqual(await page.evaluate('logs'), [
           'dControl',
           'dShift',
@@ -1762,6 +1842,68 @@ describe('input', () => {
           'uControl',
         ]);
       });
+    });
+
+    it('parses valid keys and rejects invalid keys in press_key and type_text schemas', () => {
+      const {args} = createHandlerMocks();
+      const pressKeySchema = zod.object(pressKey(args).schema);
+      assert.deepStrictEqual(
+        pressKeySchema.safeParse({pageId: 1, key: 'Control+Shift+C'}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            key: ['C', 'Control', 'Shift'],
+          },
+        },
+      );
+      const invalidPressKey = pressKeySchema.safeParse({
+        pageId: 1,
+        key: 'NotAKey',
+      });
+      assert.strictEqual(invalidPressKey.success, false);
+      assert.match(
+        invalidPressKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
+
+      const typeTextSchema = zod.object(typeText(args).schema);
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({
+          pageId: 1,
+          text: 'hello',
+          submitKey: 'Enter',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: 'Enter',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({pageId: 1, text: 'hello', submitKey: ''}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: undefined,
+          },
+        },
+      );
+      const invalidSubmitKey = typeTextSchema.safeParse({
+        pageId: 1,
+        text: 'hello',
+        submitKey: 'NotAKey',
+      });
+      assert.strictEqual(invalidSubmitKey.success, false);
+      assert.match(
+        invalidSubmitKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
     });
 
     it('releases held modifiers when the main key press fails', async () => {
@@ -1789,7 +1931,7 @@ describe('input', () => {
             pressKey(args).handler(
               {
                 params: {
-                  key: 'Control+Shift+C',
+                  key: ['C', 'Control', 'Shift'],
                 },
                 page: context.getSelectedMcpPage(),
               },

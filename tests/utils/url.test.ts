@@ -438,6 +438,54 @@ describe('validateUrl', () => {
     );
   });
 
+  it('should reject view-source nesting deeper than the unwrap limit', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    const notValid = /The view-source: wrapped content is not a valid URL\./;
+    // Past the unwrap limit the target can no longer be inspected, so the
+    // validator must fail closed instead of checking the outer wrapper.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(6) + 'file:///etc/passwd',
+          noFileNavigations,
+        ),
+      notValid,
+    );
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(6) + 'chrome://settings',
+          noFileNavigations,
+        ),
+      notValid,
+    );
+    // Exactly at the limit still unwraps to the real target.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(5) + 'file:///etc/passwd',
+          noFileNavigations,
+        ),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should reject view-source URLs whose wrapped content is not a valid URL', () => {
+    assert.throws(
+      () =>
+        validateUrl('view-source:example.com', {
+          javascriptEvaluation: undefined,
+          categoryExtensions: undefined,
+          fileNavigations: false,
+        }),
+      /The view-source: wrapped content is not a valid URL\./,
+    );
+  });
+
   it('should reject view-source URLs that target devtools:, chrome:, chrome-untrusted:, and chrome-extension:', () => {
     // These previously bypassed validateUrl entirely: the devtools:/chrome:
     // checks were evaluated against the outer `view-source:` protocol

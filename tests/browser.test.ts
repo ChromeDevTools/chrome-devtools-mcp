@@ -753,6 +753,43 @@ describe('browser', () => {
     });
   });
 
+  describe('missingDisplayLaunchError', () => {
+    const missingXServer = new Error(
+      'Missing X server to start the headful browser. Either set headless ' +
+        'to true or use xvfb-run to run your Puppeteer script.',
+    );
+
+    it('names --headless when a headed launch has no X server', () => {
+      const error = BrowserManager.missingDisplayLaunchError(
+        missingXServer,
+        false,
+      );
+      assert.ok(error);
+      assert.match(error.message, /--headless/);
+      assert.match(error.message, /Missing X server/);
+      assert.strictEqual(error.cause, missingXServer);
+    });
+
+    it('does not explain failures in headless mode', () => {
+      assert.strictEqual(
+        BrowserManager.missingDisplayLaunchError(missingXServer, true),
+        undefined,
+      );
+    });
+
+    it('does not explain unrelated failures', () => {
+      assert.strictEqual(
+        BrowserManager.missingDisplayLaunchError(
+          new Error(
+            'Protocol error (Target.setDiscoverTargets): Target closed',
+          ),
+          false,
+        ),
+        undefined,
+      );
+    });
+  });
+
   it('cannot launch multiple times with the same profile', async () => {
     await runWithRetry(async () => {
       const tmpDir = os.tmpdir();

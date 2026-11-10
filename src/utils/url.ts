@@ -261,7 +261,7 @@ function unwrapViewSource(url: URL): URL | null {
       return null;
     }
   }
-  return current;
+  return current.protocol === 'view-source:' ? null : current;
 }
 
 /**
