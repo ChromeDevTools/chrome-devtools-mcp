@@ -1479,8 +1479,8 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.',
-    category: 'Network',
+      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks. (requires flag: --categoryNetworkMocks=true)',
+    category: 'Network mocks',
     args: {
       pageId: {
         name: 'pageId',
@@ -1493,7 +1493,7 @@ export const commands: Commands = {
         name: 'route',
         type: 'string',
         description:
-          'Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
+          'Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
         required: false,
         positional: false,
       },
@@ -1875,8 +1875,8 @@ export const commands: Commands = {
   },
   remove_network_mock: {
     description:
-      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace.',
-    category: 'Network',
+      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace. (requires flag: --categoryNetworkMocks=true)',
+    category: 'Network mocks',
     args: {
       pageId: {
         name: 'pageId',
@@ -1889,7 +1889,7 @@ export const commands: Commands = {
         name: 'route',
         type: 'string',
         description:
-          'Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
+          'Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
         required: false,
         positional: false,
       },

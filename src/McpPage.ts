@@ -961,7 +961,7 @@ export class McpPage implements ContextPage {
     return this.#networkOverrideManager;
   }
 
-  listNetworkOverrides(filter?: NetworkMockFilter): NetworkOverride[] {
+  listNetworkMocks(filter?: NetworkMockFilter): NetworkOverride[] {
     return this.#networkOverrideManager?.list(filter) ?? [];
   }
 

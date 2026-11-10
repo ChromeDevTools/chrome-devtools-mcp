@@ -121,6 +121,9 @@ chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from load
 
 ## Network
 
+Network mocking commands require `--categoryNetworkMocks=true` at server startup.
+Changing this flag requires a server restart.
+
 ```bash
 chrome-devtools get_network_request 1 # Get the currently selected network request for page 1
 chrome-devtools get_network_request 1 --reqid 1 --requestFilePath "req.md" # Get request by id and save to file

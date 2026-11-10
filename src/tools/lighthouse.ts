@@ -268,7 +268,7 @@ export const lighthouseAudit: PageToolFactory = definePageTool(
 
       const lhr = result.lhr;
       const {warning} = new NetworkOverridesFormatter(
-        page.listNetworkOverrides(),
+        page.listNetworkMocks(),
       ).toJSON();
       if (warning) {
         lhr.runWarnings.push(warning);

@@ -580,7 +580,7 @@ export type ContextPage = Readonly<{
   lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
   lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
   mockNetwork(input: NetworkMockInput): Promise<NetworkOverride>;
-  listNetworkOverrides(filter?: NetworkMockFilter): NetworkOverride[];
+  listNetworkMocks(filter?: NetworkMockFilter): NetworkOverride[];
   removeNetworkMocks(filter: NetworkMockFilter): Promise<number>;
 }>;
 

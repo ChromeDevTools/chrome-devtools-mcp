@@ -180,8 +180,7 @@ const mockFilterSchema = {
     })
     .optional()
     .describe(
-      'Absolute URLPattern using the same syntax and restrictions as ' +
-        'allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js ' +
+      'Absolute URLPattern, e.g. https://example.com/app.js ' +
         'or `*://*:*/app.js`. Use `*` for wildcards; ' +
         'omitted query strings match any query. Regex and `:name` groups ' +
         'are rejected. Inspection and removal compare the stored pattern ' +
@@ -223,7 +222,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
     'every request, affecting measurements. Service workers can bypass mocks. ' +
     'Use remove_network_mock to remove mocks.',
   annotations: {
-    category: ToolCategory.NETWORK,
+    category: ToolCategory.NETWORK_MOCKS,
     readOnlyHint: false,
   },
   schema: mockNetworkSchema.shape,
@@ -256,7 +255,7 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
         'Network mock configured. Reload or navigate the page to apply it.',
       );
     } else {
-      overrides = request.page.listNetworkOverrides(filter);
+      overrides = request.page.listNetworkMocks(filter);
     }
 
     if (overrides.length === 0) {
@@ -278,7 +277,7 @@ export const removeNetworkMock: PageToolFactory = definePageTool(() => ({
     'Removing the last mock restores the HTTP cache and stops interception. ' +
     'Changes are rejected during a performance trace.',
   annotations: {
-    category: ToolCategory.NETWORK,
+    category: ToolCategory.NETWORK_MOCKS,
     readOnlyHint: false,
   },
   schema: mockFilterSchema,

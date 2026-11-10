@@ -1332,7 +1332,7 @@ describe('ToolHandler', () => {
     it(
       'validates mock_network body files before resolving the page: ' + body,
       async () => {
-        const config = parseConfig();
+        const config = parseConfig(['--categoryNetworkMocks']);
         const context = createMockMcpContext();
         context.ensureBrowser.resolves(getMockBrowser());
         context.validatePath.rejects(new Error('Access denied'));

@@ -62,7 +62,7 @@ describe('network', () => {
           );
           sinon.assert.notCalled(context.validatePath);
           sinon.assert.notCalled(page.mockNetwork);
-          sinon.assert.notCalled(page.listNetworkOverrides);
+          sinon.assert.notCalled(page.listNetworkMocks);
           sinon.assert.notCalled(response.appendResponseLine);
         },
       );
@@ -127,9 +127,9 @@ describe('network', () => {
           JSON.stringify(params),
         async () => {
           const {page, context, response, args} = createHandlerMocks();
-          page.listNetworkOverrides.returns([]);
+          page.listNetworkMocks.returns([]);
           await mockNetwork(args).handler({params, page}, response, context);
-          sinon.assert.calledOnceWithExactly(page.listNetworkOverrides, {
+          sinon.assert.calledOnceWithExactly(page.listNetworkMocks, {
             urlPattern: params.route,
             resourceType: params.resourceType,
           });
@@ -144,7 +144,7 @@ describe('network', () => {
 
     it('formats hit counts, unmatched warnings and replacement errors when inspecting', async () => {
       const {page, context, response, args} = createHandlerMocks();
-      page.listNetworkOverrides.returns([
+      page.listNetworkMocks.returns([
         {
           id: 1,
           diagnostics: {
@@ -169,7 +169,7 @@ describe('network', () => {
         },
       ]);
       await mockNetwork(args).handler({params: {}, page}, response, context);
-      sinon.assert.calledOnceWithExactly(page.listNetworkOverrides, {
+      sinon.assert.calledOnceWithExactly(page.listNetworkMocks, {
         urlPattern: undefined,
         resourceType: undefined,
       });
@@ -177,7 +177,7 @@ describe('network', () => {
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         new NetworkOverridesFormatter(
-          page.listNetworkOverrides.firstCall.returnValue,
+          page.listNetworkMocks.firstCall.returnValue,
         ).toString(),
       );
     });

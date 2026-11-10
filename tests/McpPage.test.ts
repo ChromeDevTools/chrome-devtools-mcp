@@ -313,7 +313,7 @@ describe('McpPage', () => {
       await assert.rejects(page.removeNetworkMocks({}), /trace is running/);
       page.setIsRunningPerformanceTrace(false);
       await page.removeNetworkMocks({});
-      assert.deepStrictEqual(page.listNetworkOverrides(), []);
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
       page.dispose();
     });
     it('initializes interception and releases it when overrides are cleared', async () => {
@@ -328,11 +328,11 @@ describe('McpPage', () => {
         responseFilePath: '/tmp/replacement.js',
         loadResponseFile: async () => new Uint8Array(),
       });
-      assert.deepStrictEqual(page.listNetworkOverrides(), [overrides]);
+      assert.deepStrictEqual(page.listNetworkMocks(), [overrides]);
       sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
       sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
       await page.removeNetworkMocks({});
-      assert.deepStrictEqual(page.listNetworkOverrides(), []);
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
       sinon.assert.calledWithExactly(
         pptrPage.setRequestInterception.secondCall,
         false,
@@ -379,12 +379,11 @@ describe('McpPage', () => {
         responseFilePath: '/tmp/app.js',
         loadResponseFile: async () => new Uint8Array(),
       });
-      assert.deepStrictEqual(
-        page.listNetworkOverrides({resourceType: 'script'}),
-        [script],
-      );
+      assert.deepStrictEqual(page.listNetworkMocks({resourceType: 'script'}), [
+        script,
+      ]);
       assert.equal(await page.removeNetworkMocks({resourceType: 'image'}), 1);
-      assert.deepStrictEqual(page.listNetworkOverrides(), [script]);
+      assert.deepStrictEqual(page.listNetworkMocks(), [script]);
       sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
       await page.removeNetworkMocks({});
       page.dispose();

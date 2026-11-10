@@ -74,7 +74,7 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       return;
     }
     const page = request.page;
-    const networkOverrides = page.listNetworkOverrides();
+    const networkOverrides = page.listNetworkMocks();
     const {warning} = new NetworkOverridesFormatter(networkOverrides).toJSON();
     if (warning) {
       response.appendResponseLine(warning);
@@ -197,7 +197,7 @@ export const stopTrace: PageToolFactory = definePageTool(
         return;
       }
       const {warning} = new NetworkOverridesFormatter(
-        page.listNetworkOverrides(),
+        page.listNetworkMocks(),
       ).toJSON();
       if (warning) {
         response.appendResponseLine(warning);

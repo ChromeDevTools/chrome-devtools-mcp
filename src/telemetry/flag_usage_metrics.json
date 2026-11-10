@@ -490,5 +490,13 @@
   {
     "name": "category_webauthn",
     "flagType": "boolean"
+  },
+  {
+    "name": "category_network_mocks_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_network_mocks",
+    "flagType": "boolean"
   }
 ]

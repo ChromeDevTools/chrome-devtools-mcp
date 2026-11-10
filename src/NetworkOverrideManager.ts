@@ -152,9 +152,6 @@ export class NetworkOverrideManager {
         override.resourceType === input.resourceType,
     );
     const override = await this.#createOverride(input, existing);
-    if (this.#page.isClosed()) {
-      throw new Error('Cannot update mocks on a closed page.');
-    }
     const previous = this.#overrides;
     const overrides = new Map(previous);
     overrides.delete(override.id);

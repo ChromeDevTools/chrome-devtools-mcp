@@ -42,7 +42,7 @@ describe('network override measurements', () => {
         (fails ? 'failure' : 'success'),
       async () => {
         const {page, context, response, args} = createHandlerMocks();
-        page.listNetworkOverrides.returns(overrides);
+        page.listNetworkMocks.returns(overrides);
         page.pptrPage.url.returns('https://example.com/');
         if (fails) {
           page.pptrPage.goto.onSecondCall().rejects(new Error('Reload failed'));
@@ -72,7 +72,7 @@ describe('network override measurements', () => {
     context.isRunningPerformanceTrace.returns(true);
     page.isRunningPerformanceTrace.returns(true);
     page.pptrPage.tracing.stop.resolves(raw);
-    page.listNetworkOverrides.returns(overrides);
+    page.listNetworkMocks.returns(overrides);
     context.saveFile.resolves({filename: '/tmp/trace.json'});
     await stopTrace(args).handler(
       {params: {filePath: '/tmp/trace.json'}, page},
@@ -102,7 +102,7 @@ describe('network override measurements', () => {
     context.isRunningPerformanceTrace.returns(true);
     page.isRunningPerformanceTrace.returns(true);
     page.pptrPage.tracing.stop.resolves(new TextEncoder().encode('{}'));
-    page.listNetworkOverrides.returns(overrides);
+    page.listNetworkMocks.returns(overrides);
     context.saveFile.resolves({filename: '/tmp/trace.json'});
     await assert.rejects(
       stopTrace(args).handler(
@@ -122,7 +122,7 @@ describe('network override measurements', () => {
   it('warns about overrides in Lighthouse output and saved reports', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const result = createMockRunnerResult({runWarnings: []});
-    page.listNetworkOverrides.returns(overrides);
+    page.listNetworkMocks.returns(overrides);
     page.lighthouseSnapshot.resolves(result);
     context.saveTemporaryFile.resolves({filepath: '/tmp/report.json'});
     await lighthouseAudit(args).handler(

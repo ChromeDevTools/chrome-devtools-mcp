@@ -10,6 +10,7 @@ import {URLPattern} from '../../src/third_party/cli.ts';
 import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
+  serverArgs: ['--categoryNetworkMocks'],
   prompt:
     'Open the website at <TEST_URL> and replace the script named my-third-party.js using my local JavaScript file at /my-third-party-local.js.',
   maxTurns: 4,

@@ -283,16 +283,14 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
 export function createMockHTTPRequest(
   options: {
     url?: string;
-    method?: string;
     resourceType?: ResourceType;
-    headers?: Record<string, string>;
   } = {},
 ): sinon.SinonStubbedInstance<CdpHTTPRequest> {
   const request = sinon.createStubInstance(CdpHTTPRequest);
   request.url.returns(options.url ?? 'https://example.com/app.js');
-  request.method.returns(options.method ?? 'GET');
+  request.method.returns('GET');
   request.resourceType.returns(options.resourceType ?? 'script');
-  request.headers.returns(options.headers ?? {});
+  request.headers.returns({});
   request.continue.resolves();
   request.respond.resolves();
   request.abort.resolves();
@@ -482,7 +480,7 @@ export function createMockMcpPage(
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
-  page.listNetworkOverrides.returns([]);
+  page.listNetworkMocks.returns([]);
   page.close.callsFake(async () => {
     await pptrPage.close({runBeforeUnload: false});
   });

@@ -27,11 +27,9 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (4 tools)
+- **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-  - [`mock_network`](#mock_network)
-  - [`remove_network_mock`](#remove_network_mock)
 - **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -58,6 +56,9 @@
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
   - [`query_heapsnapshot_objects`](#query_heapsnapshot_objects)
+- **[Network mocks](#network-mocks)** (2 tools)
+  - [`mock_network`](#mock_network)
+  - [`remove_network_mock`](#remove_network_mock)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
   - [`list_extensions`](#list_extensions)
@@ -378,31 +379,6 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
-
----
-
-### `mock_network`
-
-**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks.
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension.
-- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
-- **route** (string) _(optional)_: Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
-
----
-
-### `remove_network_mock`
-
-**Description:** Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace.
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
-- **route** (string) _(optional)_: Absolute URLPattern using the same syntax and restrictions as allowedUrlPattern/blockedUrlPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
 
 ---
 
@@ -741,6 +717,35 @@ in the DevTools Elements panel (if any).
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **sortBy** (enum: "retainedSize", "selfSize", "id") _(optional)_: Sort order for results. Default is retainedSize.
+
+---
+
+## Network mocks
+
+> NOTE: The Network mocks category is not active by default. Use the '--categoryNetworkMocks' flag.
+
+### `mock_network`
+
+**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks. (requires flag: --categoryNetworkMocks=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
+
+---
+
+### `remove_network_mock`
+
+**Description:** Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace. (requires flag: --categoryNetworkMocks=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
 
 ---
 
