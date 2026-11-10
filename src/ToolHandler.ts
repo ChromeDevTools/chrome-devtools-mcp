@@ -35,6 +35,7 @@ import {
 } from './tools/ToolDefinition.js';
 import {getErrorMessage, toError} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
+import {raceWithSignal} from './utils/raceWithSignal.js';
 import type {TaskQueue} from './utils/TaskRunner.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -56,23 +57,6 @@ import {isLocalBrowserEndpoint} from './utils/url.js';
 export const TOOL_CALL_TIMEOUT_MS = 60_000;
 
 class ToolCallTimeoutError extends Error {}
-
-function rejectOnAbort(signal: AbortSignal): {
-  promise: Promise<never>;
-  [Symbol.dispose]: () => void;
-} {
-  const {promise, reject} = Promise.withResolvers<never>();
-  const onAbort = (): void => reject(signal.reason);
-  if (signal.aborted) {
-    onAbort();
-  } else {
-    signal.addEventListener('abort', onAbort, {once: true});
-  }
-  return {
-    promise,
-    [Symbol.dispose]: () => signal.removeEventListener('abort', onAbort),
-  };
-}
 
 function buildDisabledMessage(
   toolName: string,
@@ -330,8 +314,9 @@ export class ToolHandler {
   }
 
   /**
-   * Races a promise against TOOL_CALL_TIMEOUT_MS, calling onTimeout() if the
-   * timer wins. The loser of the race is left running — there is no way to
+   * Races a promise against TOOL_CALL_TIMEOUT_MS and signal abort, calling
+   * onTimeout() only if the timer wins, never on abort.
+   * The loser of the race is left running — there is no way to
    * cancel a pending connect/launch — but since nothing is left awaiting it,
    * it cannot block subsequent tool calls.
    */
@@ -340,7 +325,6 @@ export class ToolHandler {
     onTimeout: () => void,
     signal: AbortSignal,
   ): Promise<T> {
-    using cancellation = rejectOnAbort(signal);
     const timeoutError = new ToolCallTimeoutError(
       `Tool "${this.#tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`,
     );
@@ -350,7 +334,7 @@ export class ToolHandler {
       timer.unref?.();
     });
     try {
-      return await Promise.race([promise, timeout, cancellation.promise]);
+      return await raceWithSignal(Promise.race([promise, timeout]), signal);
     } catch (err) {
       if (err === timeoutError) {
         onTimeout();
@@ -505,11 +489,7 @@ export class ToolHandler {
   ): Promise<CallToolResult> {
     const signal = options?.signal ?? new AbortController().signal;
     signal.throwIfAborted();
-    using cancellation = rejectOnAbort(signal);
-    const context = await Promise.race([
-      this.getContext(),
-      cancellation.promise,
-    ]);
+    const context = await raceWithSignal(this.getContext(), signal);
     let queueGuard: Disposable | undefined;
     try {
       queueGuard = await this.#queueFor(context, rawArgs)?.scheduleTask(signal);
@@ -564,10 +544,10 @@ export class ToolHandler {
           );
       const executionGuard = guard.move();
       const completion = execution.finally(() => executionGuard.dispose());
-      const {content, structuredContent} = await Promise.race([
+      const {content, structuredContent} = await raceWithSignal(
         completion,
-        cancellation.promise,
-      ]);
+        signal,
+      );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
       } = {

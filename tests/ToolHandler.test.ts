@@ -113,7 +113,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, true);
   });
 
-  describe('cancellation', {timeout: 30_000}, () => {
+  describe('cancellation', () => {
     const modes: Array<ToolConcurrency | 'browserless'> = [
       'exclusive',
       'page',

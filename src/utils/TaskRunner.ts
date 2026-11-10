@@ -11,7 +11,7 @@ interface Entry {
   priority: Priority;
   running: boolean;
   resolve: () => void;
-  reject: (error: Error) => void;
+  reject: (reason: unknown) => void;
 }
 
 /** The runner methods a queue uses. Not part of the public API. */
@@ -140,7 +140,7 @@ export class TaskRunner {
     }
   }
 
-  #cancelEntry(entry: Entry, reason: Error): void {
+  #cancelEntry(entry: Entry, reason: unknown): void {
     if (entry.running || !this.#entries.includes(entry)) {
       return;
     }
