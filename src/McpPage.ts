@@ -154,6 +154,7 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+const DEVTOOLS_UNIVERSE_TIMEOUT_MS = 5_000;
 
 /**
  * Chrome reports a URL-derived placeholder as the target title until the
@@ -812,10 +813,21 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async openDevTools(): Promise<Page | undefined> {
+  /**
+   * Opens the DevTools window and waits until the DevTools frontend creates
+   * its universe, which also creates the CD4A bridge when it is enabled.
+   */
+  async openDevTools(): Promise<Page> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    if (this.#config.resolved.devtoolsComments) {
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    try {
+      await devtoolsPage.waitForFunction(() => Boolean(window.universe), {
+        timeout: DEVTOOLS_UNIVERSE_TIMEOUT_MS,
+      });
+    } catch (e) {
+      logger?.(
+        `DevTools might not have loaded completely within ${DEVTOOLS_UNIVERSE_TIMEOUT_MS / 1000} seconds`,
+        e,
+      );
     }
     return devtoolsPage;
   }
