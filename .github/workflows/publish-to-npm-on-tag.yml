@@ -32,8 +32,8 @@ jobs:
         shell: bash
         run: npm run sync
 
-      - name: Build and bundle
-        run: npm run bundle
+      - name: Build
+        run: npm run build
         env:
           NODE_ENV: 'production'
 

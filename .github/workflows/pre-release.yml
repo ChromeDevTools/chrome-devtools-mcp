@@ -44,9 +44,9 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
-      - name: Build and bundle
+      - name: Build
         shell: bash
-        run: npm run bundle
+        run: npm run build
         env:
           NODE_ENV: 'production'
 
