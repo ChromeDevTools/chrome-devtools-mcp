@@ -161,6 +161,7 @@ third_party/.gclient*
 third_party/.gcs_entries
 third_party/cpython3
 third_party/depot_tools/
+third_party/inspector_protocol
 third_party/ninja
 third_party/node
 third_party/typescript

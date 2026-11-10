@@ -42,17 +42,18 @@ const allowedLicenses = [
   '0BSD',
 ];
 
-const thirdPartyDir = './out/Default/gen/src/third_party';
+const projectRoot = import.meta.dirname;
+const thirdPartyDir = path.join(projectRoot, 'out/Default/gen/src/third_party');
 
 const {devDependencies = {}} = JSON.parse(
-  fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
+  fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
 );
 
 // special case for puppeteer, from which we only bundle puppeteer-core
 devDependencies['puppeteer-core'] = devDependencies['puppeteer'];
 
 const packageLock = JSON.parse(
-  fs.readFileSync(path.join(process.cwd(), 'package-lock.json'), 'utf-8'),
+  fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf-8'),
 );
 
 function getResolvedVersion(packageName) {
@@ -63,7 +64,7 @@ function getResolvedVersion(packageName) {
 function getDevToolsFrontendCommit() {
   try {
     return execSync('git rev-parse HEAD', {
-      cwd: path.join(process.cwd(), 'third_party/devtools-frontend'),
+      cwd: path.join(projectRoot, 'third_party/devtools-frontend'),
       encoding: 'utf-8',
     }).trim();
   } catch {
@@ -79,11 +80,11 @@ const aggregatedStats = {
 };
 
 const projectNodeModulesPath =
-  path.join(process.cwd(), 'node_modules') + path.sep;
+  path.join(projectRoot, 'node_modules') + path.sep;
 
 const devtoolsThirdPartyBuildPath =
   path.join(
-    process.cwd(),
+    projectRoot,
     'out/Default/gen/third_party/devtools-frontend/front_end/third_party',
   ) + path.sep;
 
@@ -232,6 +233,7 @@ const bundleDependency = (
     }),
     listBundledDeps(),
     license({
+      cwd: projectRoot,
       thirdParty: {
         allow: {
           test: dependency => {
@@ -275,7 +277,7 @@ const bundleDependency = (
             const manualLicenses = [];
             // Add devtools-frontend main license
             const cdtfLicensePath = path.join(
-              process.cwd(),
+              projectRoot,
               'third_party/devtools-frontend/LICENSE',
             );
             if (fs.existsSync(cdtfLicensePath)) {
@@ -297,7 +299,7 @@ const bundleDependency = (
 
             // Add lighthouse main license
             const lighthouseLicensePath = path.join(
-              process.cwd(),
+              projectRoot,
               'node_modules/lighthouse/LICENSE',
             );
             if (fs.existsSync(lighthouseLicensePath)) {
@@ -312,7 +314,7 @@ const bundleDependency = (
             }
 
             for (const thirdPartyDir of thirdPartyDirectories) {
-              const fullPath = path.join(process.cwd(), thirdPartyDir);
+              const fullPath = path.join(projectRoot, thirdPartyDir);
               const metadata = parseReadmeChromium(fullPath);
               const name =
                 metadata['Short Name'] ||
@@ -358,7 +360,7 @@ const bundleDependency = (
               '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
             const bundledNotices = stringifiedDependencies.join(divider).trim();
             const lighthouseNoticesPath = path.join(
-              process.cwd(),
+              projectRoot,
               'src/third_party/LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES',
             );
             if (fs.existsSync(lighthouseNoticesPath)) {

@@ -1381,40 +1381,38 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.commentBridge, undefined);
     });
 
-    it('creates and attaches commentBridge when openDevTools is called', async () => {
+    it('waits for the DevTools universe when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage({
         config: createMockServerConfig({devtoolsComments: true}),
       });
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      assert.strictEqual(mcpPage.commentBridge, undefined);
-
       const result = await mcpPage.openDevTools();
+
       assert.strictEqual(result, devtoolsPage);
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-    });
-
-    it('does not attach commentBridge in openDevTools() when devtoolsComments is disabled', async () => {
-      const config = createMockServerConfig({devtoolsComments: true});
-      const {mcpPage, pptrPage} = await createMcpPage({config});
-      const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
-      pptrPage.openDevTools.resolves(devtoolsPage);
-
-      await mcpPage.openDevTools();
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-
-      config.commit(createMockServerConfig());
-      mcpPage.disposeCommentBridge();
-      devtoolsPage.exposeFunction.resetHistory();
-
-      const result = await mcpPage.openDevTools();
-      assert.strictEqual(result, devtoolsPage);
+      sinon.assert.calledOnceWithMatch(
+        devtoolsPage.waitForFunction,
+        sinon.match.func,
+        {timeout: 5_000},
+      );
+      sinon.assert.callOrder(
+        pptrPage.openDevTools,
+        devtoolsPage.waitForFunction,
+      );
       assert.strictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.notCalled(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the DevTools page when the DevTools universe wait times out', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.waitForFunction.rejects(new Error('Timed out'));
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      const result = await mcpPage.openDevTools();
+
+      assert.strictEqual(result, devtoolsPage);
     });
 
     it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
@@ -1446,7 +1444,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1489,7 +1487,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1508,7 +1506,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
 
       config.commit(createMockServerConfig());
@@ -1540,7 +1538,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       mcpPage.disposeCommentBridge();
       assert.strictEqual(mcpPage.commentBridge, undefined);
 

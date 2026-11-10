@@ -38,15 +38,11 @@ jobs:
         shell: bash
         run: npm install -g npm@latest
 
-      - name: Install dependencies
+      - name: Install and sync dependencies
         shell: bash
-        run: npm ci
+        run: npm run sync
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
-
-      - name: Sync DevTools dependencies
-        shell: bash
-        run: npm run gclient-sync
 
       - name: Build and bundle
         shell: bash
