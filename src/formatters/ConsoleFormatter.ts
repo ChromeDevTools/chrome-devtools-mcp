@@ -6,6 +6,7 @@
 
 import {
   createStackTraceForConsoleMessage,
+  type SessionLike,
   type TargetUniverse,
   SymbolizedError,
 } from '../devtools/DevtoolsUtils.js';
@@ -47,6 +48,15 @@ interface ConsoleMessageDetailed extends ConsoleMessageConcise {
   args: string[];
   // pre-formatted stacktrace.
   stackTrace?: string;
+}
+
+function isSession(value: unknown): value is SessionLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'send' in value &&
+    typeof value.send === 'function'
+  );
 }
 
 // JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
@@ -171,7 +181,9 @@ export class ConsoleFormatter {
                 targetId: msg._targetId(),
                 // The objectId is only valid on the session of its handle.
                 session:
-                  arg instanceof DevTools.CdpJSHandle ? arg.client : undefined,
+                  'client' in arg && isSession(arg.client)
+                    ? arg.client
+                    : undefined,
               });
             }
             if (!isJsonLike(remoteObject)) {

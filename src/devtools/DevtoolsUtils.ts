@@ -226,8 +226,8 @@ export type ExceptionDetailsLike =
   | Protocol.Runtime.ExceptionDetails
   | DevTools.Protocol.Runtime.ExceptionDetails;
 
-// Puppeteer's internal handles return a CDPSession type that is not
-// assignable to the public one.
+// Only `send()` is used, so the session of a handle from any copy of
+// Puppeteer qualifies.
 export type SessionLike = Pick<CDPSession, 'send'>;
 
 export type StackTraceLike =

@@ -473,7 +473,8 @@ describe('console', () => {
           response,
           context,
         );
-        // Only Puppeteer's session wraps this object.
+        // Only Puppeteer's session wraps this object, so the Error below gets
+        // a different objectId on each session.
         await page.pptrPage.evaluateHandle(() => ({}));
         await page.pptrPage.evaluate(() => {
           function logError() {
