@@ -499,6 +499,27 @@ describe('McpResponse', () => {
     });
   });
 
+  for (const backgroundColor of ['#0f172a', null]) {
+    it(`reports background color only when configured: ${backgroundColor}`, async () => {
+      const page = createMockMcpPage();
+      sinon.stub(page, 'backgroundColor').get(() => backgroundColor);
+      const context = createMockMcpContext({selectedPage: page});
+      const response = new McpResponse(createMockServerConfig());
+      response.setPage(page);
+      const {content, structuredContent} = await response.handle(context);
+      assert.deepStrictEqual(
+        structuredContent,
+        backgroundColor ? {backgroundColor} : {},
+      );
+      assert.strictEqual(
+        getTextContent(content[0]).includes(
+          'Emulating default background color: #0f172a',
+        ),
+        backgroundColor !== null,
+      );
+    });
+  }
+
   it('adds color scheme emulation setting when it is set', async t => {
     await withMcpContext(async (response, context) => {
       await context.getSelectedMcpPage().emulate({colorScheme: 'dark'});
