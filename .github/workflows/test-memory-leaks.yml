@@ -38,7 +38,7 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run build
+        run: npm run build:release
 
       - name: Disable AppArmor
         shell: bash
