@@ -360,68 +360,83 @@ describe('daemon pid handling', () => {
         code: 'EPERM',
         identity: 'daemon',
         expected: true,
-        inspectionCalls: 1,
+        pid: 1234567891,
       },
       {
         name: 'rejects ESRCH without inspecting identity',
         code: 'ESRCH',
         identity: 'daemon',
         expected: false,
-        inspectionCalls: 0,
+        pid: 1234567892,
       },
       {
         name: 'rejects an unrelated process after EPERM',
         code: 'EPERM',
         identity: 'unrelated',
         expected: false,
-        inspectionCalls: 1,
+        pid: 1234567893,
       },
       {
         name: 'preserves liveness when EPERM prevents inspection',
         code: 'EPERM',
         identity: 'unavailable',
         expected: true,
-        inspectionCalls: 1,
+        pid: 1234567894,
       },
     ]) {
-      it(scenario.name, async () => {
+      it(scenario.name, () => {
         using tempDir = createTempDir('cdm-permission-test-');
         process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-        const child = spawn(
-          process.execPath,
-          ['-e', 'setInterval(() => {}, 1000)'],
-          {stdio: 'ignore'},
-        );
-        assert.ok(child.pid);
-        try {
-          writePidFile(SESSION_ID, `${child.pid}\n`);
-          sinon
-            .stub(fs, 'existsSync')
-            .callThrough()
-            .withArgs('/proc')
-            .returns(false);
-          const inspection = sinon.stub(childProcess, 'execFileSync');
-          if (scenario.identity === 'unavailable') {
-            inspection.throws(new Error('process inspection denied'));
-          } else {
-            inspection.returns(
-              scenario.identity === 'daemon'
-                ? `${process.execPath} ${DAEMON_SCRIPT_PATH}`
-                : `${process.execPath} unrelated.js`,
-            );
-          }
-          const probe = sinon.stub(process, 'kill').callThrough();
-          probe
-            .withArgs(child.pid, 0)
-            .throws(
-              Object.assign(new Error('probe denied'), {code: scenario.code}),
-            );
-          assert.strictEqual(isDaemonRunning(SESSION_ID), scenario.expected);
-          sinon.assert.calledOnceWithExactly(probe, child.pid, 0);
-          sinon.assert.callCount(inspection, scenario.inspectionCalls);
-        } finally {
-          child.kill();
-          await once(child, 'exit', {signal: AbortSignal.timeout(5000)});
+        writePidFile(SESSION_ID, `${scenario.pid}\n`);
+        sinon
+          .stub(fs, 'existsSync')
+          .callThrough()
+          .withArgs('/proc')
+          .returns(false);
+        const inspection = sinon.stub(childProcess, 'execFileSync');
+        if (scenario.identity === 'unavailable') {
+          inspection.throws(new Error('process inspection denied'));
+        } else {
+          inspection.returns(
+            scenario.identity === 'daemon'
+              ? `${process.execPath} ${DAEMON_SCRIPT_PATH}`
+              : `${process.execPath} unrelated.js`,
+          );
+        }
+        const probe = sinon.stub(process, 'kill');
+        probe
+          .withArgs(scenario.pid, 0)
+          .throws(
+            Object.assign(new Error('probe denied'), {code: scenario.code}),
+          );
+        assert.strictEqual(isDaemonRunning(SESSION_ID), scenario.expected);
+        sinon.assert.calledOnceWithExactly(probe, scenario.pid, 0);
+        if (scenario.code === 'ESRCH') {
+          sinon.assert.notCalled(inspection);
+        } else if (IS_WINDOWS) {
+          sinon.assert.calledOnceWithExactly(
+            inspection,
+            'powershell.exe',
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-Command',
+              '(Get-CimInstance Win32_Process -Filter ' +
+                `"ProcessId = ${scenario.pid}").CommandLine`,
+            ],
+            {
+              encoding: 'utf-8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+              windowsHide: true,
+            },
+          );
+        } else {
+          sinon.assert.calledOnceWithExactly(
+            inspection,
+            'ps',
+            ['-p', String(scenario.pid), '-o', 'command='],
+            {encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore']},
+          );
         }
       });
     }
