@@ -425,11 +425,15 @@ export class NetworkOverrideManager {
     }
 
     override.diagnostics.hits++;
+    if (override.abort) {
+      await this.#abortRequest(request);
+      return;
+    }
+    if (override.kind === 'passthrough') {
+      await this.#continueRequest(request);
+      return;
+    }
     try {
-      if (override.abort) {
-        await this.#abortRequest(request);
-        return;
-      }
       if (override.kind === 'upstream') {
         await this.#fulfillUpstream(
           request,
@@ -438,11 +442,6 @@ export class NetworkOverrideManager {
         );
         return;
       }
-      if (override.kind === 'passthrough') {
-        await this.#continueRequest(request);
-        return;
-      }
-
       const body = await override.loadResponseFile();
       await request.respond({
         status: 200,
@@ -466,11 +465,7 @@ export class NetworkOverrideManager {
       const source =
         override.kind === 'file'
           ? override.responseFilePath
-          : redactUrlForLogging(
-              override.kind === 'upstream'
-                ? override.upstreamUrl
-                : request.url(),
-            );
+          : redactUrlForLogging(override.upstreamUrl);
       const detail =
         override.kind === 'file'
           ? message

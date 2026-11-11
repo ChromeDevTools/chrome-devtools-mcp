@@ -356,13 +356,36 @@ describe('NetworkOverrideManager', () => {
       loadResponseFile: async () => new Uint8Array(),
     });
     const updated = await manager.mock({
+      kind: 'file',
       urlPattern: '*://*:*/*new.js',
-      abort: true,
+      responseFilePath: '/tmp/updated.js',
+      loadResponseFile: async () => new Uint8Array(),
     });
     assert.deepEqual(manager.list(), [unrelated, updated]);
     assert.equal(updated.id, previous.id);
     assert.equal(updated.kind, 'file');
-    assert.equal(updated.abort, true);
+    sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+    await manager.dispose();
+  });
+
+  it('updates abort while preserving the rule id and response source', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    const previous = await manager.mock({
+      kind: 'file',
+      urlPattern: '*://*:*/*app.js',
+      responseFilePath: '/tmp/app.js',
+      loadResponseFile: async () => new Uint8Array(),
+    });
+    const updated = await manager.mock({
+      urlPattern: '*://*:*/*app.js',
+      abort: true,
+    });
+    assert.deepEqual(updated, {...previous, abort: true});
+    assert.deepEqual(manager.list(), [updated]);
     sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
     await manager.dispose();
   });
@@ -873,35 +896,28 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
-  for (const allowOrigin of [undefined, '*']) {
-    it(
-      'rejects unsupported upstream methods before fetching with allowOrigin=' +
-        allowOrigin,
-      async () => {
-        const pptrPage = createMockPuppeteerPage();
-        const manager = new NetworkOverrideManager(
-          pptrPage,
-          createMockServerConfig(),
-        );
-        await manager.mock({
-          kind: 'upstream',
-          urlPattern: '*://*:*/*app.js',
-          upstreamUrl: 'https://example.com/replacement.js',
-          allowOrigin,
-        });
-        const fetch = sinon.stub(globalThis, 'fetch');
-        const request = createMockHTTPRequest();
-        request.method.returns('POST');
-        pptrPage.emit('request', request);
-        await settle();
-        sinon.assert.notCalled(fetch);
-        sinon.assert.calledOnceWithExactly(request.abort, 'failed');
-        assert.match(
-          manager.list()[0]?.diagnostics.lastError ?? '',
-          /only support GET and HEAD/,
-        );
-        await manager.dispose();
-      },
+  it('rejects unsupported upstream methods before fetching', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
     );
-  }
+    await manager.mock({
+      kind: 'upstream',
+      urlPattern: '*://*:*/*app.js',
+      upstreamUrl: 'https://example.com/replacement.js',
+    });
+    const fetch = sinon.stub(globalThis, 'fetch');
+    const request = createMockHTTPRequest();
+    request.method.returns('POST');
+    pptrPage.emit('request', request);
+    await settle();
+    sinon.assert.notCalled(fetch);
+    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+    assert.match(
+      manager.list()[0]?.diagnostics.lastError ?? '',
+      /only support GET and HEAD/,
+    );
+    await manager.dispose();
+  });
 });

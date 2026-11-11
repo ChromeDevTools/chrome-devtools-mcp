@@ -202,7 +202,11 @@ const mockNetworkSchema = zod
       .boolean()
       .optional()
       .describe(
-        'Abort matching requests when true; false disables abortion while preserving the replacement source. Abortion takes precedence over body, upstream, and allowOrigin.',
+        'Abort matching requests when true. When false, use the stored ' +
+          'body or upstream source, or send the request to the network if ' +
+          'neither is set. A mock without a source still wins over older ' +
+          'matching mocks. Abortion takes precedence over body, upstream, ' +
+          'and allowOrigin.',
       ),
     allowOrigin: zod
       .string()

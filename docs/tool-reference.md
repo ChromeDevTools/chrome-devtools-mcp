@@ -731,7 +731,7 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **abort** (boolean) _(optional)_: Abort matching requests when true; false disables abortion while preserving the replacement source. Abortion takes precedence over body, upstream, and allowOrigin.
+- **abort** (boolean) _(optional)_: Abort matching requests when true. When false, use the stored body or upstream source, or send the request to the network if neither is set. A mock without a source still wins over older matching mocks. Abortion takes precedence over body, upstream, and allowOrigin.
 - **allowOrigin** (string) _(optional)_: Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.
 - **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.
 - **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
