@@ -10,7 +10,7 @@ import path from 'node:path';
 import type {Readable, Writable} from 'node:stream';
 import {describe, it} from 'node:test';
 
-import {executablePath} from 'puppeteer';
+import {getExecutablePath} from './utils.js';
 
 type Server = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -30,7 +30,7 @@ async function spawnServer(): Promise<Server> {
       '--headless',
       '--isolated',
       '--executable-path',
-      await executablePath(),
+      await getExecutablePath(),
     ],
     {
       env: {

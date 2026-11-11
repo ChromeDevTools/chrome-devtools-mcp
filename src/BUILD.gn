@@ -65,7 +65,10 @@ template("third_party_bundle") {
         "$target_gen_dir/third_party/${invoker.entrypoint_name}.js"
     bundle_all = true
     platform = "node"
-    deps = [ ":third_party_sources" ]
+    deps = [
+      ":third_party",
+      ":third_party_sources",
+    ]
     forward_variables_from(invoker,
                            [
                              "external",

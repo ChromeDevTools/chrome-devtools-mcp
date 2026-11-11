@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {executablePath} from 'puppeteer';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
@@ -21,6 +20,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks} from './server.js';
+import {getExecutablePath} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -169,6 +169,33 @@ describe('browser', () => {
       sinon.assert.calledOnceWithMatch(launchStub, {
         channel: undefined,
         executablePath: '/path/to/chrome',
+      });
+    });
+
+    it('falls back to CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH when executablePath is unset on default or stable channel', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+      sinon.stub(process, 'env').value({
+        ...process.env,
+        CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH: '/env/chrome',
+      });
+
+      const stableManager = new BrowserManager(
+        createMockServerConfig({isolated: true, channel: 'stable'}),
+      );
+      await stableManager.ensureBrowser();
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        channel: undefined,
+        executablePath: '/env/chrome',
+      });
+
+      const canaryManager = new BrowserManager(
+        createMockServerConfig({isolated: true, channel: 'canary'}),
+      );
+      await canaryManager.ensureBrowser();
+      sinon.assert.calledWithMatch(launchStub.secondCall, {
+        channel: 'chrome-canary',
+        executablePath: undefined,
       });
     });
 
@@ -802,7 +829,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
         }),
       );
       const browser1 = await manager1.ensureBrowser();
@@ -813,7 +840,7 @@ describe('browser', () => {
               headless: true,
               isolated: false,
               userDataDir: folderPath,
-              executablePath: await executablePath(),
+              executablePath: await getExecutablePath(),
             }),
           );
           const browser2 = await manager2.ensureBrowser();
@@ -844,7 +871,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
           viewport: {
             width: 1501,
             height: 801,
@@ -879,7 +906,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
           chromeArg: ['--remote-debugging-port=0'],
         }),
       );
@@ -919,7 +946,7 @@ describe('browser', () => {
           createMockServerConfig({
             headless: true,
             isolated: true,
-            executablePath: await executablePath(),
+            executablePath: await getExecutablePath(),
             blockedUrlPattern: ['*://*:*/blocked.html'],
           }),
         );
@@ -964,7 +991,7 @@ describe('browser', () => {
           createMockServerConfig({
             headless: true,
             isolated: true,
-            executablePath: await executablePath(),
+            executablePath: await getExecutablePath(),
             allowedUrlPattern: ['*://*:*/allowed.html'],
           }),
         );

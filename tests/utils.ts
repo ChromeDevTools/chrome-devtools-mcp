@@ -15,7 +15,7 @@ import path from 'node:path';
 import type {TestContext} from 'node:test';
 
 import type {Browser} from 'puppeteer';
-import puppeteer, {Locator} from 'puppeteer';
+import puppeteer, {executablePath, Locator} from 'puppeteer';
 
 import type {
   Frame,
@@ -458,6 +458,10 @@ export function getMockBrowser(options?: {
   return browser;
 }
 
+export async function getExecutablePath(): Promise<string> {
+  return process.env['PUPPETEER_EXECUTABLE_PATH'] ?? (await executablePath());
+}
+
 export const CLI_PATH: string = path.resolve(
   import.meta.dirname,
   '../src/bin/chrome-devtools.js',
@@ -475,7 +479,15 @@ export async function runCli(
       finalArgs.unshift('--sessionId', sessionId);
     }
     const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(process.env['PUPPETEER_EXECUTABLE_PATH']
+          ? {
+              CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH:
+                process.env['PUPPETEER_EXECUTABLE_PATH'],
+            }
+          : {}),
+      },
       cwd: options?.cwd,
     });
     let stdout = '';
