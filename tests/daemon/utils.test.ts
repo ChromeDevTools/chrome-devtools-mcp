@@ -354,6 +354,78 @@ describe('daemon pid handling', () => {
   });
 
   describe('isDaemonRunning', () => {
+    for (const scenario of [
+      {
+        name: 'recognizes a daemon after EPERM',
+        code: 'EPERM',
+        identity: 'daemon',
+        expected: true,
+        inspectionCalls: 1,
+      },
+      {
+        name: 'rejects ESRCH without inspecting identity',
+        code: 'ESRCH',
+        identity: 'daemon',
+        expected: false,
+        inspectionCalls: 0,
+      },
+      {
+        name: 'rejects an unrelated process after EPERM',
+        code: 'EPERM',
+        identity: 'unrelated',
+        expected: false,
+        inspectionCalls: 1,
+      },
+      {
+        name: 'preserves liveness when EPERM prevents inspection',
+        code: 'EPERM',
+        identity: 'unavailable',
+        expected: true,
+        inspectionCalls: 1,
+      },
+    ]) {
+      it(scenario.name, async () => {
+        using tempDir = createTempDir('cdm-permission-test-');
+        process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+        const child = spawn(
+          process.execPath,
+          ['-e', 'setInterval(() => {}, 1000)'],
+          {stdio: 'ignore'},
+        );
+        assert.ok(child.pid);
+        try {
+          writePidFile(SESSION_ID, `${child.pid}\n`);
+          sinon
+            .stub(fs, 'existsSync')
+            .callThrough()
+            .withArgs('/proc')
+            .returns(false);
+          const inspection = sinon.stub(childProcess, 'execFileSync');
+          if (scenario.identity === 'unavailable') {
+            inspection.throws(new Error('process inspection denied'));
+          } else {
+            inspection.returns(
+              scenario.identity === 'daemon'
+                ? `${process.execPath} ${DAEMON_SCRIPT_PATH}`
+                : `${process.execPath} unrelated.js`,
+            );
+          }
+          const probe = sinon.stub(process, 'kill').callThrough();
+          probe
+            .withArgs(child.pid, 0)
+            .throws(
+              Object.assign(new Error('probe denied'), {code: scenario.code}),
+            );
+          assert.strictEqual(isDaemonRunning(SESSION_ID), scenario.expected);
+          sinon.assert.calledOnceWithExactly(probe, child.pid, 0);
+          sinon.assert.callCount(inspection, scenario.inspectionCalls);
+        } finally {
+          child.kill();
+          await once(child, 'exit', {signal: AbortSignal.timeout(5000)});
+        }
+      });
+    }
+
     it('returns false when no pid file exists', () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
