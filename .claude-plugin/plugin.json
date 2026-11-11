@@ -11,12 +11,5 @@
         "chrome-devtools-mcp@1.13.0"
       ]
     }
-  },
-  "commands": [
-    {
-      "name": "inspect-in-devtools",
-      "description": "Open a DevTools window for the current page to debug it.",
-      "prompt": "Run the inspect-in-devtools skill to open the Chrome DevTools window for the selected page."
-    }
-  ]
+  }
 }
