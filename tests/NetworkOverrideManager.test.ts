@@ -65,7 +65,8 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(
       fetch,
       new URL('https://allowed.example/replacement.js'),
@@ -96,7 +97,8 @@ describe('NetworkOverrideManager', () => {
     );
     const request = createMockHTTPRequest();
     const fetch = sinon.stub(globalThis, 'fetch');
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(request.abort, 'failed');
     sinon.assert.notCalled(request.continue);
     sinon.assert.notCalled(fetch);
@@ -127,7 +129,8 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledWithExactly(
       fetch.secondCall,
       new URL('https://cdn.example/final'),
@@ -158,7 +161,8 @@ describe('NetworkOverrideManager', () => {
       .stub(globalThis, 'fetch')
       .rejects(new Error('Failed to fetch ' + upstream));
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(fetch, new URL(upstream), {
       redirect: 'manual',
       method: 'GET',
@@ -626,7 +630,8 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(
       fetch,
       new URL('https://example.com/start'),
@@ -670,7 +675,8 @@ describe('NetworkOverrideManager', () => {
           Authorization: 'secret',
         }),
       );
-      await pptrPage.on.firstCall.args[1](request);
+      pptrPage.emit('request', request);
+      await settle();
       sinon.assert.calledOnceWithExactly(fetch, new URL(upstream), {
         redirect: 'manual',
         method: 'GET',
@@ -702,7 +708,8 @@ describe('NetworkOverrideManager', () => {
     }
     sinon.stub(globalThis, 'fetch').resolves(new Response('js', {headers}));
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
       headers: {
@@ -736,7 +743,8 @@ describe('NetworkOverrideManager', () => {
       }),
     );
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
       headers: {
@@ -762,7 +770,8 @@ describe('NetworkOverrideManager', () => {
     const fetch = sinon.stub(globalThis, 'fetch');
     const request = createMockHTTPRequest();
     request.method.returns('POST');
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.notCalled(fetch);
     sinon.assert.calledOnceWithExactly(request.abort, 'failed');
     assert.match(
