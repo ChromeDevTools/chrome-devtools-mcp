@@ -154,23 +154,23 @@ export type MockCSSFunctionRule =
 export function mockListener(): {
   on: (
     eventName: string | symbol | number,
-    listener: (data: unknown) => void,
+    listener: (event: unknown, eventData: never) => void,
   ) => void;
   off: (
     eventName: string | symbol | number,
-    listener?: (data: unknown) => void,
+    listener?: (event: unknown, eventData: never) => void,
   ) => void;
   emit: (eventName: string | symbol | number, data?: unknown) => void;
   listenerCount: (eventName: string | symbol | number) => number;
 } {
   const listeners: Record<
     string | symbol | number,
-    Array<(data: unknown) => void>
+    Array<(event: unknown, eventData: never) => void>
   > = {};
   return {
     on(
       eventName: string | symbol | number,
-      listener: (data: unknown) => void,
+      listener: (event: unknown, eventData: never) => void,
     ): void {
       const arr = listeners[eventName];
       if (arr) {
@@ -181,7 +181,7 @@ export function mockListener(): {
     },
     off(
       eventName: string | symbol | number,
-      listener?: (data: unknown) => void,
+      listener?: (event: unknown, eventData: never) => void,
     ): void {
       const arr = listeners[eventName];
       if (!arr) {
@@ -195,7 +195,7 @@ export function mockListener(): {
     },
     emit(eventName: string | symbol | number, data?: unknown): void {
       for (const listener of listeners[eventName] ?? []) {
-        listener(data);
+        Reflect.apply(listener, undefined, [data]);
       }
     },
     listenerCount(eventName: string | symbol | number): number {
@@ -229,7 +229,7 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.once.callsFake((eventName, handler) => {
     const onceHandler = (data: unknown) => {
       browserListener.off(eventName, onceHandler);
-      handler(data);
+      Reflect.apply(handler, undefined, [data]);
     };
     browserListener.on(eventName, onceHandler);
     return browser;

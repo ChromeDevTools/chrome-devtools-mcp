@@ -17,6 +17,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {NetworkOverridesFormatter} from '../src/formatters/NetworkOverridesFormatter.js';
+import {settle} from './utils.js';
 
 describe('NetworkOverrideManager', () => {
   it('retains existing rules when a replacement URL is blocked', async () => {
@@ -186,11 +187,11 @@ describe('NetworkOverrideManager', () => {
       responseFilePath: '/tmp/replacement.js',
       loadResponseFile: async () => new Uint8Array(),
     });
-    const handle = pptrPage.on.firstCall.args[1];
     const request = createMockHTTPRequest();
-    await handle(request);
+    pptrPage.emit('request', request);
     const unmatched = createMockHTTPRequest({resourceType: 'fetch'});
-    await handle(unmatched);
+    pptrPage.emit('request', unmatched);
+    await settle();
     assert.deepEqual(manager.list()[0]?.diagnostics, {
       hits: 1,
       errors: 0,
@@ -225,17 +226,17 @@ describe('NetworkOverrideManager', () => {
       /Navigate or reload/,
     );
     pptrPage.emit('framenavigated', pptrPage.mainFrame());
-    const handle = pptrPage.on.firstCall.args[1];
     const mainFrame = pptrPage.mainFrame();
     const childFrame = createMockPuppeteerPage().mainFrame();
     assert.ok(mainFrame instanceof CdpFrame);
     assert.ok(childFrame instanceof CdpFrame);
     const subframe = createMockHTTPRequest({resourceType: 'document'});
     subframe.frame.returns(childFrame);
-    await handle(subframe);
+    pptrPage.emit('request', subframe);
     const script = createMockHTTPRequest();
     script.frame.returns(mainFrame);
-    await handle(script);
+    pptrPage.emit('request', script);
+    await settle();
     assert.equal(manager.list()[0]?.diagnostics.navigations, 0);
     assert.doesNotMatch(
       new NetworkOverridesFormatter(manager.list()).toString(),
@@ -243,7 +244,8 @@ describe('NetworkOverrideManager', () => {
     );
     const document = createMockHTTPRequest({resourceType: 'document'});
     document.frame.returns(mainFrame);
-    await handle(document);
+    pptrPage.emit('request', document);
+    await settle();
     assert.equal(manager.list()[0]?.diagnostics.navigations, 1);
     assert.match(
       new NetworkOverridesFormatter(manager.list()).toString(),
@@ -273,11 +275,11 @@ describe('NetworkOverrideManager', () => {
         responseFilePath: '/tmp/app.js',
         loadResponseFile: async () => new Uint8Array(),
       });
-      const handle = pptrPage.on.firstCall.args[1];
       const request = createMockHTTPRequest({
         url: 'https://example.com/app.js?v=1',
       });
-      await handle(request);
+      pptrPage.emit('request', request);
+      await settle();
       sinon.assert.calledOnceWithExactly(request.respond, {
         status: 200,
         contentType: 'application/javascript; charset=utf-8',
@@ -288,7 +290,8 @@ describe('NetworkOverrideManager', () => {
       const unmatched = createMockHTTPRequest({
         url: 'https://example.com/app.jsxv=1',
       });
-      await handle(unmatched);
+      pptrPage.emit('request', unmatched);
+      await settle();
       sinon.assert.calledOnceWithExactly(unmatched.continue);
       sinon.assert.notCalled(unmatched.respond);
       await manager.dispose();
@@ -314,7 +317,8 @@ describe('NetworkOverrideManager', () => {
       loadResponseFile,
     });
     const request = createMockHTTPRequest();
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     assert.deepEqual(manager.list()[0]?.diagnostics, {
       hits: 1,
       errors: 1,
@@ -544,7 +548,8 @@ describe('NetworkOverrideManager', () => {
     );
     assert.equal(pptrPage.listenerCount('request'), 1);
     const request = createMockHTTPRequest();
-    await pptrPage.on.secondCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
       contentType: 'application/javascript; charset=utf-8',
@@ -584,7 +589,8 @@ describe('NetworkOverrideManager', () => {
     const request = createMockHTTPRequest({
       url: 'http://localhost:8080/app.js?v=1',
     });
-    await pptrPage.on.firstCall.args[1](request);
+    pptrPage.emit('request', request);
+    await settle();
     sinon.assert.calledOnceWithExactly(request.respond, {
       status: 200,
       contentType: 'application/javascript; charset=utf-8',

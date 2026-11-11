@@ -41,9 +41,9 @@ import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
   createMockParsedArguments,
+  createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockServerConfig,
-  mockListener,
   stripUndefined,
 } from './mocks.js';
 
@@ -451,31 +451,11 @@ export function getMockBrowser(options?: {
   wsEndpoint?: string;
 }): Browser {
   const page = createMockPuppeteerPage();
-  const listener = mockListener();
-  page.on.callsFake((eventName, handler) => {
-    listener.on(eventName, handler);
-    return page;
-  });
-  page.off.callsFake((eventName, handler) => {
-    if (handler) {
-      listener.off(eventName, handler);
-    }
-    return page;
-  });
-  (page as unknown as {emit: typeof listener.emit}).emit = listener.emit;
-  const pages = [page as unknown as Page];
-  return {
-    process() {
-      return options?.process ?? null;
-    },
-    wsEndpoint() {
-      return options?.wsEndpoint ?? '';
-    },
-    pages() {
-      return Promise.resolve(pages);
-    },
-    ...mockListener(),
-  } as Browser;
+  const browser = createMockPuppeteerBrowser();
+  browser.process.returns(options?.process ?? null);
+  browser.wsEndpoint.returns(options?.wsEndpoint ?? '');
+  browser.pages.resolves([page]);
+  return browser;
 }
 
 export const CLI_PATH: string = path.resolve(
