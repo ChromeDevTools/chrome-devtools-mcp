@@ -79,7 +79,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.6.0",
     "prettier": "^3.6.2",
-    "puppeteer": "25.16.0",
+    "puppeteer": "25.17.0",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",

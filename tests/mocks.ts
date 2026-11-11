@@ -24,7 +24,12 @@
 
 import './setupDevTools.js';
 
-import type {Frame, Mouse, SerializedAXNode} from 'puppeteer-core';
+import {
+  EventEmitter,
+  type Frame,
+  type Mouse,
+  type SerializedAXNode,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
@@ -146,62 +151,53 @@ export type MockCSSRegisteredProperty =
 export type MockCSSFunctionRule =
   sinon.SinonStubbedInstance<DevTools.CSSRule.CSSFunctionRule>;
 
+interface StubbedEventEmitter<Self> {
+  on: sinon.SinonStub<
+    [type: PropertyKey, handler: (event: unknown, eventData: never) => void],
+    Self
+  >;
+  off: sinon.SinonStub<
+    [type: PropertyKey, handler?: (event: unknown, eventData: never) => void],
+    Self
+  >;
+  once: sinon.SinonStub<
+    [type: PropertyKey, handler: (event: unknown, eventData: never) => void],
+    Self
+  >;
+  emit: sinon.SinonStub<[type: PropertyKey, event: unknown], boolean>;
+  listenerCount: sinon.SinonStub<[type: PropertyKey], number>;
+  removeAllListeners: sinon.SinonStub<[type?: PropertyKey], Self>;
+}
+
 /**
- * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
- * Puppeteer objects (Page, CDPSession, Browser) so tests can trigger events
- * synchronously without a real browser.
+ * Wires a Sinon-stubbed Puppeteer EventEmitter subclass to a real Puppeteer
+ * `EventEmitter` instance (`sinon.createStubInstance` skips constructors, so
+ * EventEmitter's private fields are not initialized on the stub itself).
  */
-export function mockListener(): {
-  on: (
-    eventName: string | symbol | number,
-    listener: (data: unknown) => void,
-  ) => void;
-  off: (
-    eventName: string | symbol | number,
-    listener?: (data: unknown) => void,
-  ) => void;
-  emit: (eventName: string | symbol | number, data?: unknown) => void;
-  listenerCount: (eventName: string | symbol | number) => number;
-} {
-  const listeners: Record<
-    string | symbol | number,
-    Array<(data: unknown) => void>
-  > = {};
-  return {
-    on(
-      eventName: string | symbol | number,
-      listener: (data: unknown) => void,
-    ): void {
-      const arr = listeners[eventName];
-      if (arr) {
-        arr.push(listener);
-      } else {
-        listeners[eventName] = [listener];
-      }
-    },
-    off(
-      eventName: string | symbol | number,
-      listener?: (data: unknown) => void,
-    ): void {
-      const arr = listeners[eventName];
-      if (!arr) {
-        return;
-      }
-      if (!listener) {
-        delete listeners[eventName];
-        return;
-      }
-      listeners[eventName] = arr.filter(entry => entry !== listener);
-    },
-    emit(eventName: string | symbol | number, data?: unknown): void {
-      for (const listener of listeners[eventName] ?? []) {
-        listener(data);
-      }
-    },
-    listenerCount(eventName: string | symbol | number): number {
-      return listeners[eventName]?.length ?? 0;
-    },
-  };
+function stubEventEmitter<Self>(stub: StubbedEventEmitter<Self> & Self): void {
+  const emitter = new EventEmitter<Record<PropertyKey, unknown>>();
+  stub.on.callsFake((eventName, handler) => {
+    emitter.on(eventName, handler);
+    return stub;
+  });
+  stub.off.callsFake((eventName, handler) => {
+    emitter.off(eventName, handler);
+    return stub;
+  });
+  stub.once.callsFake((eventName, handler) => {
+    emitter.once(eventName, handler);
+    return stub;
+  });
+  stub.emit.callsFake((eventName, data) => {
+    return emitter.emit(eventName, data);
+  });
+  stub.listenerCount.callsFake(eventName => {
+    return emitter.listenerCount(eventName);
+  });
+  stub.removeAllListeners.callsFake(eventName => {
+    emitter.removeAllListeners(eventName);
+    return stub;
+  });
 }
 
 export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser> {
@@ -216,28 +212,7 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.targets.returns([]);
   browser.browserContexts.returns([]);
   browser.process.returns(null);
-
-  const browserListener = mockListener();
-  browser.on.callsFake((eventName, handler) => {
-    browserListener.on(eventName, handler);
-    return browser;
-  });
-  browser.off.callsFake((eventName, handler) => {
-    browserListener.off(eventName, handler);
-    return browser;
-  });
-  browser.once.callsFake((eventName, handler) => {
-    const onceHandler = (data: unknown) => {
-      browserListener.off(eventName, onceHandler);
-      handler(data);
-    };
-    browserListener.on(eventName, onceHandler);
-    return browser;
-  });
-  browser.emit.callsFake((eventName, data) => {
-    browserListener.emit(eventName, data);
-    return true;
-  });
+  stubEventEmitter(browser);
 
   return browser;
 }
@@ -268,15 +243,7 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
   session.id.returns('<mock-session-id>');
   session.send.resolves();
   session.detach.resolves();
-  const listener = mockListener();
-  session.on.callsFake((eventName, handler) => {
-    listener.on(eventName, handler);
-    return session;
-  });
-  session.off.callsFake((eventName, handler) => {
-    listener.off(eventName, handler);
-    return session;
-  });
+  stubEventEmitter(session);
   return session;
 }
 
@@ -300,20 +267,7 @@ export function createMockHTTPRequest(
 export function createMockPuppeteerPage(): MockPuppeteerPage {
   const pptrPage = sinon.createStubInstance(CdpPage);
   const page = pptrPage as unknown as sinon.SinonStubbedInstance<Page>;
-  const pageListener = mockListener();
-  page.listenerCount.callsFake(pageListener.listenerCount);
-  page.on.callsFake((eventName, handler) => {
-    pageListener.on(eventName, handler);
-    return page;
-  });
-  page.off.callsFake((eventName, handler) => {
-    pageListener.off(eventName, handler);
-    return page;
-  });
-  page.emit.callsFake((eventName, data) => {
-    pageListener.emit(eventName, data);
-    return true;
-  });
+  stubEventEmitter(page);
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
@@ -322,19 +276,7 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   // can trigger it.
   const mainFrameStub = sinon.createStubInstance(CdpFrame);
   mainFrameStub.page.returns(pptrPage);
-  const mainFrameListener = mockListener();
-  mainFrameStub.on.callsFake((eventName, handler) => {
-    mainFrameListener.on(eventName, handler);
-    return mainFrameStub;
-  });
-  mainFrameStub.off.callsFake((eventName, handler) => {
-    mainFrameListener.off(eventName, handler);
-    return mainFrameStub;
-  });
-  mainFrameStub.emit.callsFake((eventName, data) => {
-    mainFrameListener.emit(eventName, data);
-    return true;
-  });
+  stubEventEmitter(mainFrameStub);
   // SinonStubbedInstance<CdpFrame> is not assignable to Frame due to private fields.
   page.mainFrame.returns(mainFrameStub as unknown as Frame);
 
@@ -342,13 +284,15 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   // in the McpPage constructor. Not on the CdpPage prototype, so added
   // explicitly. It needs real on/off/emit behavior so tests can trigger CDP
   // events directly via cdpSession.emit(...).
-  const cdpListener = mockListener();
+  const cdpListener = new EventEmitter<Record<PropertyKey, unknown>>();
   const cdpSession = {
-    on: sinon.stub().callsFake(cdpListener.on),
-    off: sinon.stub().callsFake(cdpListener.off),
+    on: sinon.stub().callsFake(cdpListener.on.bind(cdpListener)),
+    off: sinon.stub().callsFake(cdpListener.off.bind(cdpListener)),
     send: sinon.stub().resolves({}),
     target: sinon.stub().returns({_targetId: '<mock>'}),
-    emit: cdpListener.emit,
+    emit: (eventName: PropertyKey, data?: unknown): void => {
+      cdpListener.emit(eventName, data);
+    },
   };
   // @ts-expect-error internal API
   page._client = sinon.stub().returns(cdpSession);
