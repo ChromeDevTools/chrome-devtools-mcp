@@ -47,3 +47,7 @@ jobs:
       - name: Run memory leak tests
         shell: bash
         run: npm run profile -- --threshold-percentage=1
+
+      - name: Check idle memory footprint
+        shell: bash
+        run: npm run profile:footprint
