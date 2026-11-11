@@ -46,6 +46,7 @@ function verifyPackageContents() {
       '-tsconfig.json',
       '-tsconfig.ref.json',
       '.stamp',
+      '.d',
     ];
     for (const file of files) {
       if (forbiddenSuffixes.some(suffix => file.endsWith(suffix))) {
