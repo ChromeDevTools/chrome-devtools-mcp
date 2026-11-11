@@ -46,7 +46,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: npm run build
+        run: npm run build:release
 
       - name: Verify server.json
         if: runner.os == 'Linux'

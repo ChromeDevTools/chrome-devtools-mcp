@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -13,6 +13,7 @@
     "clean": "node scripts/clean.ts",
     "clean:submodules": "node scripts/clean-submodules.ts",
     "build": "node scripts/ninja.ts",
+    "build:release": "node scripts/gn-gen.ts --args=is_debug=false && node scripts/ninja.ts",
     "typecheck": "node scripts/ninja.ts",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .",
@@ -33,8 +34,9 @@
     "verify-npm-package": "node scripts/verify-npm-package.js",
     "eval": "npm run build && node scripts/eval_gemini.ts",
     "count-tokens": "node scripts/count_tokens.ts",
-    "profile": "npm run build && node scripts/profile/profile_mcp.ts",
-    "test:memory": "npm run build && node scripts/profile/profile_mcp.ts --threshold-percentage 1"
+    "profile": "npm run build:release && node scripts/profile/profile_mcp.ts",
+    "test:memory": "npm run build:release && node scripts/profile/profile_mcp.ts --threshold-percentage 1",
+    "profile:footprint": "npm run build:release && node scripts/profile/footprint_mcp.ts"
   },
   "files": [
     "out/Default/gen/src",

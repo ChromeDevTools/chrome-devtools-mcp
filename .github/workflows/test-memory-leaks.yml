@@ -38,7 +38,7 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run build
+        run: npm run build:release
 
       - name: Disable AppArmor
         shell: bash
@@ -47,3 +47,7 @@ jobs:
       - name: Run memory leak tests
         shell: bash
         run: npm run profile -- --threshold-percentage=1
+
+      - name: Check idle memory footprint
+        shell: bash
+        run: npm run profile:footprint

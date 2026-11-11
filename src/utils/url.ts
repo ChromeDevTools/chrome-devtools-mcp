@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+
 // Node 22 has no global URLPattern. The CLI bundle exports Puppeteer's
 // polyfill, so this module does not need the full third-party bundle.
 import {URLPattern} from '../third_party/cli.js';
@@ -65,11 +67,51 @@ export function isLocalhost(url?: string): boolean {
 const UNSPECIFIED_HOSTNAMES = new Set(['0.0.0.0', '[::]', '[::ffff:0:0]']);
 
 /**
+ * Serializes a host name or IP address the way `URL#hostname` does, or returns
+ * undefined if it is not a valid host.
+ */
+function toUrlHostname(host: string): string | undefined {
+  try {
+    return new URL(`http://${host.includes(':') ? `[${host}]` : host}`)
+      .hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Checks whether a `URL#hostname` is the host name of the local machine or an
+ * address of one of its network interfaces.
+ */
+function isLocalMachineHostname(hostname: string): boolean {
+  const normalized = hostname.replace(/\.$/, '');
+  if (normalized === toUrlHostname(os.hostname())) {
+    return true;
+  }
+  let interfaces: ReturnType<typeof os.networkInterfaces>;
+  try {
+    interfaces = os.networkInterfaces();
+  } catch {
+    // Some platforms cannot enumerate interfaces; keep the loopback checks.
+    return false;
+  }
+  for (const addresses of Object.values(interfaces)) {
+    for (const {address} of addresses ?? []) {
+      if (toUrlHostname(address) === normalized) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Determines whether a browser endpoint URL points to the local machine.
  *
  * In addition to {@link isLocalhost}, this accepts the unspecified addresses
- * 0.0.0.0 and [::]. A connection to an unspecified address reaches the local
- * machine.
+ * 0.0.0.0 and [::], the local host name, and the addresses of the local
+ * network interfaces (for example a LAN or Docker bridge IP). A connection to
+ * any of these reaches the local machine.
  *
  * @param url The browser endpoint URL (for example, a WebSocket endpoint).
  * @returns true if the endpoint is on the local machine.
@@ -87,7 +129,10 @@ export function isLocalBrowserEndpoint(url: string): boolean {
   if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
     return false;
   }
-  return UNSPECIFIED_HOSTNAMES.has(parsed.hostname);
+  return (
+    UNSPECIFIED_HOSTNAMES.has(parsed.hostname) ||
+    isLocalMachineHostname(parsed.hostname)
+  );
 }
 
 export interface ValidateUrlOptions {
