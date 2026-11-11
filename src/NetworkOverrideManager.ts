@@ -7,13 +7,20 @@
 import path from 'node:path';
 
 import {URLPattern} from './third_party/cli.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {
+  fetchWithValidatedRedirects,
+  getRedirectHeaders,
+  validateNetworkUrl,
+} from './utils/network.js';
+
 import {
   type HTTPRequest,
   Mutex,
   type Page,
   type ResourceType,
 } from './third_party/index.js';
-import {logger} from './utils/logger.js';
+import {logger, redactUrlForLogging} from './utils/logger.js';
 
 interface BaseNetworkOverride {
   urlPattern: string;
@@ -25,6 +32,11 @@ export interface NetworkMockFilter {
   resourceType?: ResourceType;
 }
 
+export interface UpstreamNetworkOverrideInput extends NetworkMockFilter {
+  kind: 'upstream';
+  upstreamUrl: string;
+}
+
 export interface FileNetworkOverrideInput extends NetworkMockFilter {
   kind: 'file';
   responseFilePath: string;
@@ -32,7 +44,8 @@ export interface FileNetworkOverrideInput extends NetworkMockFilter {
   loadResponseFile: () => Promise<Uint8Array<ArrayBufferLike>>;
 }
 
-export type NetworkMockInput = FileNetworkOverrideInput;
+export type NetworkMockInput =
+  UpstreamNetworkOverrideInput | FileNetworkOverrideInput;
 
 interface NetworkOverrideBase extends BaseNetworkOverride {
   id: number;
@@ -44,16 +57,26 @@ interface NetworkOverrideBase extends BaseNetworkOverride {
   };
 }
 
+export interface UpstreamNetworkOverride extends NetworkOverrideBase {
+  kind: 'upstream';
+  upstreamUrl: string;
+}
+
 export interface FileNetworkOverride extends NetworkOverrideBase {
   kind: 'file';
   responseFilePath: string;
   contentType: string;
 }
 
-export type NetworkOverride = FileNetworkOverride;
+export type NetworkOverride = UpstreamNetworkOverride | FileNetworkOverride;
 
 interface StoredNetworkOverrideBase extends NetworkOverrideBase {
   matcher: URLPattern;
+}
+
+interface StoredUpstreamNetworkOverride extends StoredNetworkOverrideBase {
+  kind: 'upstream';
+  upstreamUrl: string;
 }
 
 interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
@@ -63,7 +86,8 @@ interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
   loadResponseFile: () => Promise<Uint8Array<ArrayBufferLike>>;
 }
 
-type StoredNetworkOverride = StoredFileNetworkOverride;
+type StoredNetworkOverride =
+  StoredUpstreamNetworkOverride | StoredFileNetworkOverride;
 
 const DEFAULT_URL_PATTERN = '*://*:*/*';
 
@@ -100,6 +124,13 @@ function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
     resourceType: override.resourceType,
     diagnostics: {...override.diagnostics},
   };
+  if (override.kind === 'upstream') {
+    return {
+      ...base,
+      kind: override.kind,
+      upstreamUrl: override.upstreamUrl,
+    };
+  }
   return {
     ...base,
     kind: override.kind,
@@ -133,7 +164,10 @@ export class NetworkOverrideManager {
     return this.#handleRequest(request);
   };
 
-  constructor(page: Page) {
+  constructor(
+    page: Page,
+    private readonly config: ReadonlyServerConfig,
+  ) {
     this.#page = page;
   }
 
@@ -181,6 +215,14 @@ export class NetworkOverrideManager {
       matcher: new URLPattern(urlPattern),
       diagnostics: {hits: 0, errors: 0, navigations: 0},
     };
+    if (input.kind === 'upstream') {
+      validateNetworkUrl(new URL(input.upstreamUrl), this.config.resolved);
+      return {
+        ...base,
+        kind: input.kind,
+        upstreamUrl: input.upstreamUrl,
+      };
+    }
 
     await input.loadResponseFile();
     return {
@@ -349,6 +391,11 @@ export class NetworkOverrideManager {
 
     override.diagnostics.hits++;
     try {
+      if (override.kind === 'upstream') {
+        await this.#fulfillUpstream(request, override.upstreamUrl);
+        return;
+      }
+
       const body = await override.loadResponseFile();
       await request.respond({
         status: 200,
@@ -359,20 +406,68 @@ export class NetworkOverrideManager {
         body,
       });
     } catch (error) {
-      const message =
+      const message: string =
         typeof error === 'object' &&
         error !== null &&
         'message' in error &&
         typeof error.message === 'string'
           ? error.message
           : String(error);
-      const source = override.responseFilePath;
+      const source =
+        override.kind === 'file'
+          ? override.responseFilePath
+          : redactUrlForLogging(override.upstreamUrl);
+      const detail =
+        override.kind === 'file'
+          ? message
+          : message.replace(/https?:\/\/[^\s"'<>]+/gi, url =>
+              redactUrlForLogging(url),
+            );
       override.diagnostics.errors++;
       override.diagnostics.lastError =
-        'Failed to load ' + source + ': ' + message;
+        'Failed to load ' + source + ': ' + detail;
       logger?.('Failed to apply network mock ' + override.id);
       await this.#abortRequest(request);
     }
+  }
+
+  async #fulfillUpstream(
+    request: HTTPRequest,
+    upstreamUrl: string,
+  ): Promise<void> {
+    const method = request.method();
+    if (method !== 'GET' && method !== 'HEAD') {
+      throw new Error('Upstream mocks only support GET and HEAD requests.');
+    }
+    const headers = getRedirectHeaders(
+      new URL(request.url()),
+      new URL(upstreamUrl),
+      request.headers(),
+    );
+    const response = await fetchWithValidatedRedirects(new URL(upstreamUrl), {
+      policy: this.config.resolved,
+      method,
+      headers,
+    });
+    const responseHeaders: Record<string, string | string[]> = {};
+    for (const [name, value] of response.headers) {
+      if (
+        name !== 'content-encoding' &&
+        name !== 'content-length' &&
+        name !== 'set-cookie'
+      ) {
+        responseHeaders[name] = value;
+      }
+    }
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) {
+      responseHeaders['set-cookie'] = cookies;
+    }
+    await request.respond({
+      status: response.status,
+      headers: responseHeaders,
+      body: new Uint8Array(await response.arrayBuffer()),
+    });
   }
 
   async #continueRequest(request: HTTPRequest): Promise<void> {

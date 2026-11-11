@@ -114,6 +114,7 @@ ts_library("tests") {
     "utils/id.test.ts",
     "utils/keyboard.test.ts",
     "utils/logger.test.ts",
+    "utils/network.test.ts",
     "utils/pagination.test.ts",
     "utils/raceWithSignal.test.ts",
     "utils/resourceType.test.ts",

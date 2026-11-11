@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {NetworkOverride} from '../../src/NetworkOverrideManager.js';
 import {NetworkOverridesFormatter} from '../../src/formatters/NetworkOverridesFormatter.js';
 import {
   mockNetwork,
@@ -45,7 +46,9 @@ describe('network', () => {
     });
 
     for (const params of [
+      {body: './script.js', upstream: 'https://example.com/script.js'},
       {body: ' '},
+      {upstream: 'file:///tmp/script.js'},
       {route: '/app.js*', body: './app.js'},
       {route: '*app.js*', body: './app.js'},
       {route: 'https://example.com/:file', body: './app.js'},
@@ -67,6 +70,67 @@ describe('network', () => {
         },
       );
     }
+
+    it('updates an upstream mock with the exact supplied actions', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const override = {
+        id: 7,
+        kind: 'upstream',
+        urlPattern: 'https://example.com/script.js*',
+        resourceType: 'script',
+        upstreamUrl: 'https://example.com/replacement.js',
+        diagnostics: {hits: 0, errors: 0, navigations: 0},
+      } satisfies NetworkOverride;
+      page.mockNetwork.resolves(override);
+      await mockNetwork(args).handler(
+        {
+          params: {
+            route: override.urlPattern,
+            resourceType: 'script',
+            upstream: override.upstreamUrl,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'upstream',
+        urlPattern: override.urlPattern,
+        resourceType: 'script',
+        upstreamUrl: override.upstreamUrl,
+      });
+      sinon.assert.notCalled(page.listNetworkMocks);
+      sinon.assert.notCalled(context.validatePath);
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.firstCall,
+        'Network mock configured. Reload or navigate the page to apply it.',
+      );
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.secondCall,
+        new NetworkOverridesFormatter([override]).toString(),
+      );
+    });
+
+    it('propagates upstream policy failures without reporting success', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.mockNetwork.rejects(new Error('Blocked by blocklist'));
+      await assert.rejects(
+        mockNetwork(args).handler(
+          {params: {upstream: 'https://blocked.example/script.js'}, page},
+          response,
+          context,
+        ),
+        /Blocked by blocklist/,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'upstream',
+        urlPattern: undefined,
+        resourceType: undefined,
+        upstreamUrl: 'https://blocked.example/script.js',
+      });
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
 
     it('revalidates the canonical body file before each read', async () => {
       const {page, context, response, args} = createHandlerMocks();
@@ -162,10 +226,9 @@ describe('network', () => {
         {
           id: 2,
           diagnostics: {hits: 0, errors: 0, navigations: 1},
-          kind: 'file',
+          kind: 'upstream',
           urlPattern: 'https://example.com/missing.js',
-          responseFilePath: '/tmp/replacement.js',
-          contentType: 'text/javascript',
+          upstreamUrl: 'https://example.com/replacement.js',
         },
       ]);
       await mockNetwork(args).handler({params: {}, page}, response, context);
