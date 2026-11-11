@@ -34,8 +34,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          NODE_ENV: 'production'
 
       - name: Publish chrome-devtools-mcp
         run: |

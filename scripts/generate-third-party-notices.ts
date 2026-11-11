@@ -126,7 +126,9 @@ function getPackageDir(file: string): string | undefined {
 
 function findLicenseFile(directory: string): string | undefined {
   const name = fs
-    .readdirSync(directory)
+    .readdirSync(directory, {withFileTypes: true})
+    .filter(entry => entry.isFile())
+    .map(entry => entry.name)
     .sort()
     .find(candidate => /^licen[sc]e/i.test(candidate));
   return name ? path.join(directory, name) : undefined;

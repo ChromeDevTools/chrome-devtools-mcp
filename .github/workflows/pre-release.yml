@@ -47,8 +47,6 @@ jobs:
       - name: Build
         shell: bash
         run: npm run build
-        env:
-          NODE_ENV: 'production'
 
       - name: Verify server.json
         if: runner.os == 'Linux'

@@ -44,7 +44,8 @@
     "!**/*.js.map",
     "!**/*.d.ts",
     "!**/*-tsconfig*.json",
-    "!**/*.stamp"
+    "!**/*.stamp",
+    "!**/*.d"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",
