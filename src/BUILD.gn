@@ -153,6 +153,7 @@ ts_library("mcp_lib") {
     "utils/logger.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",
+    "utils/raceWithSignal.ts",
     "utils/resourceType.ts",
     "utils/text.ts",
     "utils/timeout.ts",
