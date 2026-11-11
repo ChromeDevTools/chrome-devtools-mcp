@@ -52,6 +52,15 @@ describe('network', () => {
       {allowOrigin: 'https://example.com\r\nX-Header: value'},
       {allowOrigin: '\n*\n'},
       {allowOrigin: ' '},
+      {allowOrigin: 'https://example.com/path'},
+      {allowOrigin: 'https://example.com/'},
+      {allowOrigin: 'https://example.com?query=1'},
+      {allowOrigin: 'https://example.com#fragment'},
+      {allowOrigin: 'https://user:password@example.com'},
+      {allowOrigin: 'https://example.com:443'},
+      {allowOrigin: 'https://example.com https://other.example'},
+      {allowOrigin: 'example.com'},
+      {allowOrigin: 'file:///tmp/script.js'},
       {route: '/app.js*', abort: true},
       {resourceType: 'websocket', abort: true},
       {route: '*app.js*', body: './app.js'},
@@ -73,6 +82,20 @@ describe('network', () => {
         },
       );
     }
+
+    it('accepts wildcard, null, and serialized origins for allowOrigin', () => {
+      const schema = mockNetwork(createMockParsedArguments()).schema
+        .allowOrigin;
+      for (const origin of [
+        '*',
+        'null',
+        'https://example.com',
+        'http://localhost:8080',
+        'https://[::1]:8443',
+      ]) {
+        assert.strictEqual(schema.parse(origin), origin);
+      }
+    });
 
     it('updates an upstream mock with the exact supplied actions', async () => {
       const {page, context, response, args} = createHandlerMocks();
@@ -152,8 +175,9 @@ describe('network', () => {
       const {page, context, response, args} = createHandlerMocks();
       page.mockNetwork.resolves({
         id: 1,
-        kind: 'passthrough',
+        kind: 'upstream',
         urlPattern: '*://*:*/*',
+        upstreamUrl: 'https://example.com/app.js',
         allowOrigin: '*',
         diagnostics: {hits: 0, errors: 0, navigations: 0},
       });

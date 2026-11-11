@@ -259,6 +259,14 @@ export class NetworkOverrideManager {
         loadResponseFile: input.loadResponseFile,
       };
     }
+    if (
+      base.allowOrigin !== undefined &&
+      (!existing || existing.kind === 'passthrough')
+    ) {
+      throw new Error(
+        'allowOrigin requires a body or upstream source on the mock.',
+      );
+    }
     return existing ? {...existing, ...base} : {...base, kind: 'passthrough'};
   }
 
@@ -419,7 +427,7 @@ export class NetworkOverrideManager {
     override.diagnostics.hits++;
     try {
       if (override.abort) {
-        await request.abort('failed');
+        await this.#abortRequest(request);
         return;
       }
       if (override.kind === 'upstream') {
@@ -431,15 +439,7 @@ export class NetworkOverrideManager {
         return;
       }
       if (override.kind === 'passthrough') {
-        if (override.allowOrigin !== undefined) {
-          await this.#fulfillUpstream(
-            request,
-            request.url(),
-            override.allowOrigin,
-          );
-        } else {
-          await this.#continueRequest(request);
-        }
+        await this.#continueRequest(request);
         return;
       }
 
@@ -492,9 +492,7 @@ export class NetworkOverrideManager {
   ): Promise<void> {
     const method = request.method();
     if (method !== 'GET' && method !== 'HEAD') {
-      throw new Error(
-        'Upstream and allow-origin mocks only support GET and HEAD requests.',
-      );
+      throw new Error('Upstream mocks only support GET and HEAD requests.');
     }
     const headers = getRedirectHeaders(
       new URL(request.url()),
@@ -548,7 +546,7 @@ export class NetworkOverrideManager {
     try {
       await request.abort('failed');
     } catch (error) {
-      logger?.('Failed to abort a request after a network mock error', error);
+      logger?.('Failed to abort an intercepted network request', error);
     }
   }
 }

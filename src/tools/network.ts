@@ -206,15 +206,19 @@ const mockNetworkSchema = zod
       ),
     allowOrigin: zod
       .string()
-      .refine(
-        value => !/[\r\n]/.test(value),
-        'allowOrigin cannot contain line breaks.',
-      )
-      .trim()
-      .min(1)
+      .refine(value => {
+        if (value === '*' || value === 'null') {
+          return true;
+        }
+        try {
+          return new URL(value).origin === value;
+        } catch {
+          return false;
+        }
+      }, 'allowOrigin must be *, null, or a serialized origin such as https://example.com.')
       .optional()
       .describe(
-        'Set the Access-Control-Allow-Origin response header, for example * or https://example.com. This does not configure preflight or credential headers.',
+        'Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.',
       ),
     body: zod
       .string()
@@ -251,9 +255,10 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
     'abort=true suppresses its response and allowOrigin header. ' +
     'The most recently updated matching mock wins and persists across ' +
     'navigations. Configure before navigating or reloading; inspection shows ' +
-    'hit counts and replacement errors. Upstream and allowOrigin-only ' +
-    'responses use server-side GET/HEAD fetches. Changes are rejected during ' +
-    'a performance trace. Mocks disable the page HTTP cache and intercept ' +
+    'hit counts and replacement errors. allowOrigin requires a body or ' +
+    'upstream source. Upstream responses use server-side GET/HEAD fetches. ' +
+    'Changes are rejected during a performance trace. ' +
+    'Mocks disable the page HTTP cache and intercept ' +
     'every request, affecting measurements. Service workers can bypass mocks. ' +
     'Use remove_network_mock to remove mocks.',
   annotations: {
