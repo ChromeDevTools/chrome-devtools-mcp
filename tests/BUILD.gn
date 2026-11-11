@@ -115,6 +115,7 @@ ts_library("tests") {
     "utils/keyboard.test.ts",
     "utils/logger.test.ts",
     "utils/pagination.test.ts",
+    "utils/raceWithSignal.test.ts",
     "utils/resourceType.test.ts",
     "utils/text.test.ts",
     "utils/timeout.test.ts",
