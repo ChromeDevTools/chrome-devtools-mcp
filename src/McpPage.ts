@@ -974,13 +974,16 @@ export class McpPage implements ContextPage {
     toolName: string,
     params: Record<string, unknown>,
     response: Response,
+    signal?: AbortSignal,
   ): Promise<void> {
     const webmcpTool = this.pptrPage.webmcp
       .tools()
       .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
     if (webmcpTool) {
-      const {status, output, errorText, exception} =
-        await webmcpTool.execute(params);
+      const {status, output, errorText, exception} = await webmcpTool.execute(
+        params,
+        {signal},
+      );
       if (status !== 'Completed') {
         const error = exception?.description ?? exception?.value ?? errorText;
         throw new Error(
