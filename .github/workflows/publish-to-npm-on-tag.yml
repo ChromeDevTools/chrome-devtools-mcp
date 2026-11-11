@@ -33,7 +33,7 @@ jobs:
         run: npm run sync
 
       - name: Build
-        run: npm run build
+        run: npm run build:release
 
       - name: Publish chrome-devtools-mcp
         run: |
