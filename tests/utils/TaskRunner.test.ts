@@ -5,15 +5,14 @@
  */
 
 import assert from 'node:assert';
+import {getEventListeners} from 'node:events';
 import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import {TaskRunner, type TaskQueue} from '../../src/utils/TaskRunner.js';
 
-async function settle(): Promise<void> {
-  await new Promise(resolve => setImmediate(resolve));
-}
+import {settle} from '../utils.js';
 
 interface ControlledTask {
   /** True once the queue is held. */
@@ -49,6 +48,124 @@ function createTree() {
 }
 
 describe('TaskRunner', () => {
+  describe('cancellation', () => {
+    it('preserves the reason for an already aborted signal', async () => {
+      const queue = new TaskRunner().createQueue();
+      const controller = new AbortController();
+      controller.abort('request cancelled');
+      await assert.rejects(queue.scheduleTask(controller.signal), reason => {
+        assert.strictEqual(reason, controller.signal.reason);
+        return true;
+      });
+      using guard = await queue.scheduleTask();
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+    });
+
+    it('unblocks another child after cancelling a waiting parent', async () => {
+      const {parent, childA, childB} = createTree();
+      using running = await childA.scheduleTask();
+      const controller = new AbortController();
+      const waiting = parent.scheduleTask(controller.signal);
+      const b = start(childB);
+      await settle();
+      assert.strictEqual(b.started, false);
+      controller.abort();
+      await assert.rejects(waiting, {name: 'AbortError'});
+      await settle();
+      assert.strictEqual(b.started, true);
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+      b.finish();
+      await b.done;
+    });
+
+    it('cancels acquisition while waiting', async () => {
+      const queue = new TaskRunner().createQueue();
+      const holder = await queue.scheduleTask();
+      const controller = new AbortController();
+      const pending = queue.scheduleTask(controller.signal);
+      controller.abort();
+      await assert.rejects(pending, {name: 'AbortError'});
+      holder[Symbol.dispose]();
+      using probe = await queue.scheduleTask();
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+    });
+
+    it('keeps guard ownership with its caller after cancellation', async () => {
+      const queue = new TaskRunner().createQueue();
+      const controller = new AbortController();
+      const guard = await queue.scheduleTask(controller.signal);
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+      controller.abort();
+      const next = start(queue);
+      await settle();
+      assert.strictEqual(next.started, false);
+      guard[Symbol.dispose]();
+      await settle();
+      assert.strictEqual(next.started, true);
+      next.finish();
+      await next.done;
+      assert.throws(() => guard[Symbol.dispose](), /already disposed/);
+    });
+
+    it('preserves the reason when cancelling a waiting task', async () => {
+      const queue = new TaskRunner().createQueue();
+      using holder = await queue.scheduleTask();
+      const controller = new AbortController();
+      const pending = queue.scheduleTask(controller.signal);
+      controller.abort('request cancelled');
+      await assert.rejects(pending, reason => {
+        assert.strictEqual(reason, controller.signal.reason);
+        return true;
+      });
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+    });
+
+    it('keeps an acquired guard when aborted before promise delivery', async () => {
+      const queue = new TaskRunner().createQueue();
+      const controller = new AbortController();
+      const reason = new Error('request cancelled');
+      const pending = queue.scheduleTask(controller.signal);
+      controller.abort(reason);
+      const guard = await pending;
+      const next = start(queue);
+      await settle();
+      assert.strictEqual(next.started, false);
+      guard[Symbol.dispose]();
+      await settle();
+      assert.strictEqual(next.started, true);
+      next.finish();
+      await next.done;
+    });
+
+    for (const cancelFirst of [false, true]) {
+      it(`races disposal with abort (cancelFirst=${cancelFirst})`, async () => {
+        const queue = new TaskRunner().createQueue();
+        using running = await queue.scheduleTask();
+        const controller = new AbortController();
+        const pending = queue.scheduleTask(controller.signal);
+        const closed = new Error('Page closed');
+        if (cancelFirst) {
+          controller.abort();
+          queue.dispose(closed);
+        } else {
+          queue.dispose(closed);
+          controller.abort();
+        }
+        await assert.rejects(pending, reason => {
+          assert.strictEqual(
+            reason,
+            cancelFirst ? controller.signal.reason : closed,
+          );
+          return true;
+        });
+        assert.deepStrictEqual(
+          getEventListeners(controller.signal, 'abort'),
+          [],
+        );
+      });
+    }
+  });
+
   it('runs tasks on unrelated queues at the same time', async () => {
     const {childA, childB} = createTree();
     const a = start(childA);

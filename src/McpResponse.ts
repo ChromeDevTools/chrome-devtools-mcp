@@ -1618,7 +1618,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
       structuredContent.extensions = extensionArray;
       response.push('## Extensions');
       if (extensionArray.length === 0) {
-        response.push('No extensions installed.');
+        response.push('No unpacked extensions found.');
       } else {
         const extensionsMessage = extensionArray
           .map(extension => {
