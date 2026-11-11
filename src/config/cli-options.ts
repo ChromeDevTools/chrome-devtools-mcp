@@ -1479,7 +1479,7 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body or upstream updates the exact route/resourceType pair. An omitted route matches any URL. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks. (requires flag: --categoryNetworkMocks=true)',
+      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route matches any URL. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. allowOrigin requires a body or upstream source. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks. (requires flag: --categoryNetworkMocks=true)',
     category: 'Network mocks',
     args: {
       pageId: {
@@ -1524,6 +1524,22 @@ export const commands: Commands = {
           'fedcm',
           'other',
         ],
+      },
+      abort: {
+        name: 'abort',
+        type: 'boolean',
+        description:
+          'Abort matching requests when true. When false, use the stored body or upstream source, or send the request to the network if neither is set. A mock without a source still wins over older matching mocks. Abortion takes precedence over body, upstream, and allowOrigin.',
+        required: false,
+        positional: false,
+      },
+      allowOrigin: {
+        name: 'allowOrigin',
+        type: 'string',
+        description:
+          'Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.',
+        required: false,
+        positional: false,
       },
       body: {
         name: 'body',

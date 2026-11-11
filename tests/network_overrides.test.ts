@@ -245,6 +245,53 @@ describe('network overrides integration', () => {
     });
   });
 
+  it('enforces CORS for cross-origin fetches with allowOrigin and fails requests with abort: true', async () => {
+    using directory = createTempDir('network-mock-cors-');
+    const body = join(directory.path, 'response.txt');
+    await writeFile(body, 'mock response');
+    server.addHtmlRoute('/cors-page', html`<main>CORS test</main>`);
+    server.addRoute('/cors-response', (_req, res) => {
+      res.end('original response');
+    });
+    const route = server
+      .getRoute('/cors-response')
+      .replace('127.0.0.1', 'localhost');
+
+    await withMcpContext(async (response, context, args) => {
+      const mcpPage = context.getSelectedMcpPage();
+      const page = mcpPage.pptrPage;
+      await page.goto(server.getRoute('/cors-page'));
+      const fetchBody = () =>
+        page.evaluate(async url => {
+          const response = await fetch(url, {
+            signal: AbortSignal.timeout(5_000),
+          });
+          return await response.text();
+        }, route);
+
+      await mockNetwork(args).handler(
+        {params: {route, body}, page: mcpPage},
+        response,
+        context,
+      );
+      await assert.rejects(fetchBody, /Failed to fetch/);
+
+      await mockNetwork(args).handler(
+        {params: {route, allowOrigin: server.baseUrl}, page: mcpPage},
+        response,
+        context,
+      );
+      assert.strictEqual(await fetchBody(), 'mock response');
+
+      await mockNetwork(args).handler(
+        {params: {route, abort: true}, page: mcpPage},
+        response,
+        context,
+      );
+      await assert.rejects(fetchBody, /Failed to fetch/);
+    });
+  });
+
   it('aborts the request when a local file disappears', async () => {
     using directory = createTempDir('network-override-');
     const filePath = join(directory.path, 'removed-override.js');
