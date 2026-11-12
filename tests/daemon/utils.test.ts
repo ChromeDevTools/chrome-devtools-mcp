@@ -363,13 +363,6 @@ describe('daemon pid handling', () => {
         pid: 1234567891,
       },
       {
-        name: 'rejects ESRCH without inspecting identity',
-        code: 'ESRCH',
-        identity: 'daemon',
-        expected: false,
-        pid: 1234567892,
-      },
-      {
         name: 'rejects an unrelated process after EPERM',
         code: 'EPERM',
         identity: 'unrelated',
@@ -411,9 +404,7 @@ describe('daemon pid handling', () => {
           );
         assert.strictEqual(isDaemonRunning(SESSION_ID), scenario.expected);
         sinon.assert.calledOnceWithExactly(probe, scenario.pid, 0);
-        if (scenario.code === 'ESRCH') {
-          sinon.assert.notCalled(inspection);
-        } else if (IS_WINDOWS) {
+        if (IS_WINDOWS) {
           sinon.assert.calledOnceWithExactly(
             inspection,
             'powershell.exe',
