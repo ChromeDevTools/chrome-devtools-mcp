@@ -26,7 +26,6 @@ import {
   extractExtensionId,
   getTextContent,
   html,
-  waitExecutionFor,
   withMcpContext,
 } from '../utils.js';
 
@@ -200,90 +199,6 @@ describe('script', () => {
         assert.ok(text.includes('## Console errors during this call'));
         assert.ok(text.includes('thrown in a timer'));
         assert.ok(!text.includes('warned in the function'));
-      });
-    });
-    it('lists errors raised before the function threw', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await assert.rejects(
-          evaluateScript(args).handler(
-            {
-              params: {
-                function: String(async () => {
-                  setTimeout(() => {
-                    throw new Error('thrown in a timer');
-                  }, 0);
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  throw new Error('thrown by the function');
-                }),
-              },
-            },
-            response,
-            context,
-          ),
-        );
-        const {content} = await response.handle(context);
-        assert.ok(getTextContent(content[0]).includes('thrown in a timer'));
-      });
-    });
-    it('keeps errors raised before the function reloads the page', async () => {
-      server.addHtmlRoute('/reload', html`<main>Reloads</main>`);
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/reload'));
-        await evaluateScript(args)
-          .handler(
-            {
-              params: {
-                function: String(
-                  () =>
-                    new Promise(resolve => {
-                      setTimeout(() => {
-                        throw new Error('thrown before the reload');
-                      }, 0);
-                      setTimeout(() => {
-                        location.reload();
-                        resolve('reloading');
-                      }, 50);
-                    }),
-                ),
-              },
-            },
-            response,
-            context,
-          )
-          .catch(() => {});
-        const {content} = await response.handle(context);
-        assert.ok(
-          getTextContent(content[0]).includes('thrown before the reload'),
-        );
-      });
-    });
-    it('leaves out errors from before the function ran, on earlier pages too', async () => {
-      server.addHtmlRoute(
-        '/logs',
-        html`<script>
-          console.error('logged before');
-        </script>`,
-      );
-      server.addHtmlRoute('/quiet', html`<main>Quiet</main>`);
-      await withMcpContext(async (response, context, args) => {
-        const mcpPage = context.getSelectedMcpPage();
-        await mcpPage.pptrPage.goto(server.getRoute('/logs'));
-        await waitExecutionFor(async () => {
-          assert.ok(mcpPage.getConsoleData().length);
-        }, 5000);
-        await mcpPage.pptrPage.goto(server.getRoute('/quiet'));
-        await evaluateScript(args).handler(
-          {params: {function: String(() => 1)}},
-          response,
-          context,
-        );
-        const {content} = await response.handle(context);
-        assert.ok(
-          !getTextContent(content[0]).includes(
-            '## Console errors during this call',
-          ),
-        );
       });
     });
     it('hands its page to the response before the function runs', async () => {

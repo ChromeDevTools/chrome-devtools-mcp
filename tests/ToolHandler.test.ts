@@ -2194,53 +2194,54 @@ describe('ToolHandler', () => {
     assert.deepStrictEqual(focusStates, [false, true]);
   });
 
-  const handOverCases: Array<{
-    concurrency: DefinedPageTool['concurrency'];
-    handedOver: boolean;
-  }> = [
-    {concurrency: 'exclusive', handedOver: true},
-    {concurrency: 'none', handedOver: false},
-  ];
-  for (const {concurrency, handedOver} of handOverCases) {
-    it(`${handedOver ? 'hands' : 'does not hand'} the page of a page tool with concurrency '${concurrency}' to the response`, async () => {
-      sinon
-        .stub(McpResponse.prototype, 'handle')
-        .resolves({content: [], structuredContent: {}});
-      const includeConsoleErrorsFrom = sinon.spy(
-        McpResponse.prototype,
-        'includeConsoleErrorsFrom',
-      );
-      const config = parseConfig();
-      const mockContext = createMockMcpContext();
-      mockContext.ensureBrowser.resolves(
-        getMockBrowser({process: sinon.createStubInstance(ChildProcess)}),
-      );
-      const mockPage = createMockMcpPage();
-      mockContext.getPageById.returns(mockPage);
-      const tool = definePageTool(() => ({
-        name: 'page_tool',
-        description: 'A page scoped tool',
-        annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
-        schema: {},
-        blockedByDialog: false,
-        concurrency,
-        verifyFilesSchema: {},
-        handler: async () => {},
-      }))(config.resolved);
+  async function handlePageToolCall(
+    concurrency: DefinedPageTool['concurrency'],
+  ) {
+    sinon
+      .stub(McpResponse.prototype, 'handle')
+      .resolves({content: [], structuredContent: {}});
+    const includeConsoleErrorsFrom = sinon.spy(
+      McpResponse.prototype,
+      'includeConsoleErrorsFrom',
+    );
+    const config = parseConfig();
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({process: sinon.createStubInstance(ChildProcess)}),
+    );
+    const mockPage = createMockMcpPage();
+    mockContext.getPageById.returns(mockPage);
+    const tool = definePageTool(() => ({
+      name: 'page_tool',
+      description: 'A page scoped tool',
+      annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
+      schema: {},
+      blockedByDialog: false,
+      concurrency,
+      verifyFilesSchema: {},
+      handler: async () => {},
+    }))(config.resolved);
 
-      await new ToolHandler(
-        tool,
-        config,
-        async () => mockContext,
-        sinon.spy(),
-      ).handle({pageId: 1});
+    await new ToolHandler(
+      tool,
+      config,
+      async () => mockContext,
+      sinon.spy(),
+    ).handle({pageId: 1});
 
-      assert.deepStrictEqual(
-        includeConsoleErrorsFrom.args,
-        handedOver ? [[mockPage]] : [],
-      );
-    });
+    return {includeConsoleErrorsFrom, mockPage};
   }
+
+  it("hands the page of a page tool with concurrency 'exclusive' to the response", async () => {
+    const {includeConsoleErrorsFrom, mockPage} =
+      await handlePageToolCall('exclusive');
+    sinon.assert.calledOnceWithExactly(includeConsoleErrorsFrom, mockPage);
+  });
+
+  it("does not hand the page of a page tool with concurrency 'none' to the response", async () => {
+    const {includeConsoleErrorsFrom} = await handlePageToolCall('none');
+    sinon.assert.notCalled(includeConsoleErrorsFrom);
+  });
 
   describe('browserless tools', () => {
     function createBrowserlessTool(

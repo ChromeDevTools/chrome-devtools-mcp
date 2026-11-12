@@ -59,7 +59,6 @@ import {
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
-  ContextPage,
   DevToolsData,
   ImageContentData,
   LighthouseData,
@@ -161,7 +160,7 @@ export class McpResponse implements Response {
   #page?: McpPage;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
-  #consoleErrorsFrom?: {page: ContextPage; lastMessageId: number};
+  #consoleErrorsFrom?: {page: McpPage; lastMessageId: number};
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
   #webAuthnFormatter?: WebAuthnFormatter;
@@ -283,7 +282,7 @@ export class McpResponse implements Response {
     };
   }
 
-  includeConsoleErrorsFrom(page: ContextPage): void {
+  includeConsoleErrorsFrom(page: McpPage): void {
     this.#consoleErrorsFrom = {
       page,
       lastMessageId: page.getLatestConsoleMessageId(),
@@ -706,7 +705,7 @@ export class McpResponse implements Response {
     }
     return await this.#formatConsoleData(
       errorsFrom.page.getConsoleDataAfter(errorsFrom.lastMessageId),
-      this.#page,
+      errorsFrom.page,
       {types: ['error']},
     );
   }

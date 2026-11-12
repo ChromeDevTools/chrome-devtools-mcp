@@ -537,8 +537,6 @@ export type ContextPage = Readonly<{
   setScreenRecorder(data: ScreenRecorderData | null): void;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
-  getLatestConsoleMessageId(): number;
-  getConsoleDataAfter(id: number): ReturnType<McpPage['getConsoleDataAfter']>;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
