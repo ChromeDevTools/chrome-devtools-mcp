@@ -1396,5 +1396,68 @@
         "argType": "boolean"
       }
     ]
+  },
+  {
+    "name": "set_logpoints",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "logpoints_count",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "mock_network",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      },
+      {
+        "name": "body_length",
+        "argType": "number"
+      },
+      {
+        "name": "upstream_length",
+        "argType": "number"
+      },
+      {
+        "name": "abort",
+        "argType": "boolean"
+      },
+      {
+        "name": "allow_origin_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "remove_network_mock",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      }
+    ]
   }
 ]

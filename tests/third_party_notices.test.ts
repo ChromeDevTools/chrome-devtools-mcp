@@ -10,13 +10,13 @@ import {describe, it} from 'node:test';
 
 describe('THIRD_PARTY_NOTICES', () => {
   it('matches snapshot', t => {
-    const noticesPath = path.join(
-      process.cwd(),
-      'build/src/third_party/THIRD_PARTY_NOTICES',
+    const noticesPath = path.resolve(
+      import.meta.dirname,
+      '../src/third_party/THIRD_PARTY_NOTICES',
     );
     if (!fs.existsSync(noticesPath)) {
       throw new Error(
-        'THIRD_PARTY_NOTICES does not exist, run `npm ci && npm run bundle`',
+        'THIRD_PARTY_NOTICES does not exist, run `npm run build`',
       );
     }
     const content = fs.readFileSync(noticesPath, 'utf-8');

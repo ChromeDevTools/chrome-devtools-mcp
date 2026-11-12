@@ -405,6 +405,9 @@ class PageEventSubscriber {
 export class NetworkCollector extends PageCollector<HTTPRequest> {
   static readonly MAX_REQUESTS_PER_NAVIGATION = 1_000;
 
+  /** The navigation request that started the latest navigation, if any. */
+  #navigationRequest?: HTTPRequest;
+
   constructor(
     page: Page,
     {
@@ -432,19 +435,25 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
   override splitAfterNavigation(): void {
     const requests = this.storage[0];
 
+    // A navigation without a request, such as a back/forward cache restore or
+    // about:blank, must not claim the request of the previous navigation.
     const lastRequestIdx = requests.findLastIndex(request => {
-      return request.frame() === this.pptrPage.mainFrame()
-        ? request.isNavigationRequest()
-        : false;
+      return (
+        request !== this.#navigationRequest &&
+        request.frame() === this.pptrPage.mainFrame() &&
+        request.isNavigationRequest()
+      );
     });
 
     // Keep all requests since the last navigation request including that
     // navigation request itself.
     // Keep the reference
     if (lastRequestIdx !== -1) {
+      this.#navigationRequest = requests[lastRequestIdx];
       const fromCurrentNavigation = requests.splice(lastRequestIdx);
       this.storage.unshift(fromCurrentNavigation);
     } else {
+      this.#navigationRequest = undefined;
       this.storage.unshift([]);
     }
     this.storage.splice(this.maxNavigationSaved);

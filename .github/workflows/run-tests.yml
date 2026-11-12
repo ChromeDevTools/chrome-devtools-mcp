@@ -30,7 +30,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
-          submodules: true
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -38,9 +37,9 @@ jobs:
           cache: npm
           node-version: 22 # build works only with 22+.
 
-      - name: Install dependencies
+      - name: Install and sync dependencies
         shell: bash
-        run: npm ci
+        run: npm run sync
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
@@ -49,7 +48,7 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run bundle
+        run: npm run build
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
@@ -71,11 +70,6 @@ jobs:
           npm run test:no-build --
           ${{ matrix.os == 'windows-latest' && '--test-concurrency=1' || '' }}
           ${{ github.event_name == 'merge_group' && '--retry' || '' }}
-
-      - name: Run notices tests
-        shell: bash
-        run: >
-          npm run test:notices:no-build
 
   # Gating job for branch protection.
   test-success:

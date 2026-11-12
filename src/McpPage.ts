@@ -16,7 +16,15 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
+import type {Logpoint, LogpointOptions} from './LogpointManager.js';
+import {LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
+import {
+  NetworkOverrideManager,
+  type NetworkOverride,
+  type NetworkMockFilter,
+  type NetworkMockInput,
+} from './NetworkOverrideManager.js';
 import {
   type Locator,
   PredefinedNetworkConditions,
@@ -152,6 +160,7 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+const DEVTOOLS_UNIVERSE_TIMEOUT_MS = 5_000;
 
 /**
  * Chrome reports a URL-derived placeholder as the target title until the
@@ -204,6 +213,9 @@ export class McpPage implements ContextPage {
   #webAuthnEnabled = false;
   #webAuthnAuthenticator?: WebAuthnAuthenticator;
 
+  // Logpoints, created on first use.
+  #logpointManager?: LogpointManager;
+
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
@@ -221,6 +233,7 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
+  #networkOverrideManager?: NetworkOverrideManager;
 
   constructor(
     target: Target,
@@ -362,6 +375,10 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
+      this.#networkOverrideManager = new NetworkOverrideManager(
+        page,
+        this.#config,
+      );
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
@@ -429,6 +446,27 @@ export class McpPage implements ContextPage {
 
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
+  }
+
+  /**
+   * Makes the given logpoints the complete set of logpoints on the page, see
+   * {@link LogpointManager.setLogpoints}. The manager is created on first
+   * use, so an empty list on a page without logpoints is a no-op.
+   */
+  setLogpoints(logpoints: LogpointOptions[]): Promise<Logpoint[]> {
+    if (!this.#logpointManager) {
+      if (logpoints.length === 0) {
+        return Promise.resolve([]);
+      }
+      const devtoolsUniverse = this.devtoolsUniverse;
+      if (!devtoolsUniverse) {
+        throw new Error(
+          `DevTools universe is not available for page ${this.id ?? '?'}.`,
+        );
+      }
+      this.#logpointManager = new LogpointManager(devtoolsUniverse);
+    }
+    return this.#logpointManager.setLogpoints(logpoints);
   }
 
   getWebAuthnAuthenticator():
@@ -786,10 +824,21 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async openDevTools(): Promise<Page | undefined> {
+  /**
+   * Opens the DevTools window and waits until the DevTools frontend creates
+   * its universe, which also creates the CD4A bridge when it is enabled.
+   */
+  async openDevTools(): Promise<Page> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    if (this.#config.resolved.devtoolsComments) {
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    try {
+      await devtoolsPage.waitForFunction(() => Boolean(window.universe), {
+        timeout: DEVTOOLS_UNIVERSE_TIMEOUT_MS,
+      });
+    } catch (e) {
+      logger?.(
+        `DevTools might not have loaded completely within ${DEVTOOLS_UNIVERSE_TIMEOUT_MS / 1000} seconds`,
+        e,
+      );
     }
     return devtoolsPage;
   }
@@ -883,8 +932,11 @@ export class McpPage implements ContextPage {
       });
     }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
+    void this.#networkOverrideManager?.dispose();
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
+    this.#logpointManager?.dispose();
+    this.#logpointManager = undefined;
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     this.#webAuthnAuthenticator = undefined;
@@ -892,6 +944,33 @@ export class McpPage implements ContextPage {
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
     });
+  }
+
+  async mockNetwork(input: NetworkMockInput): Promise<NetworkOverride> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.mock(input);
+  }
+
+  async #getNetworkOverrideManagerForChanges(): Promise<NetworkOverrideManager> {
+    if (this.#isRunningPerformanceTrace) {
+      throw new Error(
+        'Cannot change network mocks while a performance trace is running.',
+      );
+    }
+    await this.init();
+    if (!this.#networkOverrideManager) {
+      throw new Error(`McpPage (id=${this.id}) is not initialized.`);
+    }
+    return this.#networkOverrideManager;
+  }
+
+  listNetworkMocks(filter?: NetworkMockFilter): NetworkOverride[] {
+    return this.#networkOverrideManager?.list(filter) ?? [];
+  }
+
+  async removeNetworkMocks(filter: NetworkMockFilter): Promise<number> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.remove(filter);
   }
 
   async executeThirdPartyDeveloperTool(

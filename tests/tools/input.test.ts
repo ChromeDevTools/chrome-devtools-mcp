@@ -11,7 +11,7 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {TimeoutError} from '../../src/third_party/index.js';
+import {TimeoutError, zod} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1821,7 +1821,7 @@ describe('input', () => {
         await pressKey(args).handler(
           {
             params: {
-              key: 'Control+Shift+C',
+              key: ['C', 'Control', 'Shift'],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1829,6 +1829,10 @@ describe('input', () => {
           context,
         );
 
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+Shift+C',
+        );
         assert.deepStrictEqual(await page.evaluate('logs'), [
           'dControl',
           'dShift',
@@ -1838,6 +1842,68 @@ describe('input', () => {
           'uControl',
         ]);
       });
+    });
+
+    it('parses valid keys and rejects invalid keys in press_key and type_text schemas', () => {
+      const {args} = createHandlerMocks();
+      const pressKeySchema = zod.object(pressKey(args).schema);
+      assert.deepStrictEqual(
+        pressKeySchema.safeParse({pageId: 1, key: 'Control+Shift+C'}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            key: ['C', 'Control', 'Shift'],
+          },
+        },
+      );
+      const invalidPressKey = pressKeySchema.safeParse({
+        pageId: 1,
+        key: 'NotAKey',
+      });
+      assert.strictEqual(invalidPressKey.success, false);
+      assert.match(
+        invalidPressKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
+
+      const typeTextSchema = zod.object(typeText(args).schema);
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({
+          pageId: 1,
+          text: 'hello',
+          submitKey: 'Enter',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: 'Enter',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({pageId: 1, text: 'hello', submitKey: ''}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: undefined,
+          },
+        },
+      );
+      const invalidSubmitKey = typeTextSchema.safeParse({
+        pageId: 1,
+        text: 'hello',
+        submitKey: 'NotAKey',
+      });
+      assert.strictEqual(invalidSubmitKey.success, false);
+      assert.match(
+        invalidSubmitKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
     });
 
     it('releases held modifiers when the main key press fails', async () => {
@@ -1865,7 +1931,7 @@ describe('input', () => {
             pressKey(args).handler(
               {
                 params: {
-                  key: 'Control+Shift+C',
+                  key: ['C', 'Control', 'Shift'],
                 },
                 page: context.getSelectedMcpPage(),
               },

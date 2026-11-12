@@ -12,6 +12,7 @@ import sinon from 'sinon';
 import {UncaughtError} from '../src/collectors/PageCollector.js';
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
+import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {
   DevTools,
@@ -286,6 +287,109 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
+  describe('network overrides', () => {
+    it('rejects changing overrides during recording and allows clearing after stopping', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*://*:*/*.js',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      page.setIsRunningPerformanceTrace(true);
+      await assert.rejects(
+        page.mockNetwork({
+          urlPattern: '*://*:*/*.js',
+          kind: 'file',
+          responseFilePath: '/tmp/app.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /trace is running/,
+      );
+      await assert.rejects(page.removeNetworkMocks({}), /trace is running/);
+      page.setIsRunningPerformanceTrace(false);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
+      page.dispose();
+    });
+    it('initializes interception and releases it when overrides are cleared', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const overrides = await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*://*:*/*.js',
+        responseFilePath: '/tmp/replacement.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(page.listNetworkMocks(), [overrides]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
+      sinon.assert.calledWithExactly(
+        pptrPage.setRequestInterception.secondCall,
+        false,
+      );
+      sinon.assert.calledWithExactly(pptrPage.setCacheEnabled.secondCall, true);
+      page.dispose();
+    });
+
+    it('rejects setting overrides after disposal', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      page.dispose();
+      await assert.rejects(
+        page.mockNetwork({
+          kind: 'file',
+          urlPattern: '*://*:*/*.js',
+          responseFilePath: '/tmp/replacement.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /already been disposed/,
+      );
+      sinon.assert.notCalled(pptrPage.setRequestInterception);
+    });
+
+    it('filters and removes network mocks without clearing unrelated routes', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const script = await page.mockNetwork({
+        urlPattern: '*://*:*/*app.js',
+        resourceType: 'script',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      await page.mockNetwork({
+        resourceType: 'image',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(page.listNetworkMocks({resourceType: 'script'}), [
+        script,
+      ]);
+      assert.equal(await page.removeNetworkMocks({resourceType: 'image'}), 1);
+      assert.deepStrictEqual(page.listNetworkMocks(), [script]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      page.dispose();
+    });
+  });
+
   async function createMcpPage(options: {config?: ReadonlyServerConfig} = {}) {
     const pptrPage = createMockPuppeteerPage();
     pptrPage.emulateFocusedPage.resolves();
@@ -1380,40 +1484,38 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.commentBridge, undefined);
     });
 
-    it('creates and attaches commentBridge when openDevTools is called', async () => {
+    it('waits for the DevTools universe when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage({
         config: createMockServerConfig({devtoolsComments: true}),
       });
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      assert.strictEqual(mcpPage.commentBridge, undefined);
-
       const result = await mcpPage.openDevTools();
+
       assert.strictEqual(result, devtoolsPage);
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-    });
-
-    it('does not attach commentBridge in openDevTools() when devtoolsComments is disabled', async () => {
-      const config = createMockServerConfig({devtoolsComments: true});
-      const {mcpPage, pptrPage} = await createMcpPage({config});
-      const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
-      pptrPage.openDevTools.resolves(devtoolsPage);
-
-      await mcpPage.openDevTools();
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-
-      config.commit(createMockServerConfig());
-      mcpPage.disposeCommentBridge();
-      devtoolsPage.exposeFunction.resetHistory();
-
-      const result = await mcpPage.openDevTools();
-      assert.strictEqual(result, devtoolsPage);
+      sinon.assert.calledOnceWithMatch(
+        devtoolsPage.waitForFunction,
+        sinon.match.func,
+        {timeout: 5_000},
+      );
+      sinon.assert.callOrder(
+        pptrPage.openDevTools,
+        devtoolsPage.waitForFunction,
+      );
       assert.strictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.notCalled(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the DevTools page when the DevTools universe wait times out', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.waitForFunction.rejects(new Error('Timed out'));
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      const result = await mcpPage.openDevTools();
+
+      assert.strictEqual(result, devtoolsPage);
     });
 
     it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
@@ -1445,7 +1547,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1488,7 +1590,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1507,7 +1609,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
 
       config.commit(createMockServerConfig());
@@ -1539,7 +1641,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       mcpPage.disposeCommentBridge();
       assert.strictEqual(mcpPage.commentBridge, undefined);
 
@@ -2639,5 +2741,68 @@ describe('McpPage', () => {
         createMockAuthenticatorId('auth-2'),
       );
     });
+  });
+});
+
+describe('McpPage logpoints', () => {
+  async function createMcpPageWithUniverse() {
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.emulateFocusedPage.resolves();
+    const target = createMockPuppeteerTarget({page: pptrPage});
+    const mcpPage = new McpPage(target, 1, {
+      config: createMockServerConfig(),
+      locatorClass: Locator,
+    });
+    const universe = sinon.createStubInstance(
+      DevTools.Foundation.Universe.Universe,
+    );
+    sinon.stub(mcpPage, 'devtoolsUniverse').get((): TargetUniverse => ({
+      universe,
+      target: sinon.createStubInstance(DevTools.Target),
+      session: createMockCDPSession(),
+    }));
+    await mcpPage.init();
+    return mcpPage;
+  }
+
+  it('setLogpoints with an empty list creates no LogpointManager', async () => {
+    const setLogpoints = sinon.stub(LogpointManager.prototype, 'setLogpoints');
+    const mcpPage = await createMcpPageWithUniverse();
+
+    assert.deepStrictEqual(await mcpPage.setLogpoints([]), []);
+
+    sinon.assert.notCalled(setLogpoints);
+  });
+
+  it('setLogpoints creates one LogpointManager and forwards the list', async () => {
+    const setLogpoints = sinon
+      .stub(LogpointManager.prototype, 'setLogpoints')
+      .resolves([]);
+    const mcpPage = await createMcpPageWithUniverse();
+    const logpoints = [{url: 'app.js', lineNumber: 2, expression: `'x'`}];
+
+    await mcpPage.setLogpoints(logpoints);
+    await mcpPage.setLogpoints([]);
+
+    sinon.assert.calledTwice(setLogpoints);
+    sinon.assert.calledWithExactly(setLogpoints.firstCall, logpoints);
+    sinon.assert.calledWithExactly(setLogpoints.secondCall, []);
+    assert.strictEqual(
+      setLogpoints.firstCall.thisValue,
+      setLogpoints.secondCall.thisValue,
+    );
+  });
+
+  it('dispose releases the LogpointManager', async () => {
+    sinon.stub(LogpointManager.prototype, 'setLogpoints').resolves([]);
+    const dispose = sinon.stub(LogpointManager.prototype, 'dispose');
+    const mcpPage = await createMcpPageWithUniverse();
+    await mcpPage.setLogpoints([
+      {url: 'app.js', lineNumber: 2, expression: `'x'`},
+    ]);
+
+    mcpPage.dispose();
+
+    sinon.assert.calledOnce(dispose);
   });
 });

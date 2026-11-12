@@ -5,7 +5,10 @@
  */
 
 import assert from 'node:assert';
+import os from 'node:os';
 import {describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import {
   isAllowedUrl,
@@ -51,6 +54,50 @@ describe('isLocalBrowserEndpoint', () => {
     assert.strictEqual(isLocalBrowserEndpoint('file://0.0.0.0/x'), false);
     assert.strictEqual(isLocalBrowserEndpoint(''), false);
     assert.strictEqual(isLocalBrowserEndpoint('not a url'), false);
+  });
+
+  it('returns true for endpoints on a local network interface address', () => {
+    const ipv4: os.NetworkInterfaceInfoIPv4 = {
+      address: '192.168.1.20',
+      netmask: '255.255.255.0',
+      family: 'IPv4',
+      mac: '00:00:00:00:00:01',
+      internal: false,
+      cidr: '192.168.1.20/24',
+    };
+    const ipv6: os.NetworkInterfaceInfoIPv6 = {
+      address: '2001:db8::20',
+      netmask: 'ffff:ffff:ffff:ffff::',
+      family: 'IPv6',
+      mac: '00:00:00:00:00:01',
+      internal: false,
+      cidr: '2001:db8::20/64',
+      scopeid: 0,
+    };
+    sinon.stub(os, 'networkInterfaces').returns({eth0: [ipv4, ipv6]});
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.20:9222'), true);
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://[2001:db8:0::20]:9222'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.21:9222'), false);
+  });
+
+  it('returns true for endpoints on the local host name', () => {
+    sinon.stub(os, 'hostname').returns('My-Host');
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://my-host:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://MY-HOST.:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://other-host:9222'), false);
+  });
+
+  it('treats an endpoint as remote when network interfaces cannot be read', () => {
+    sinon.stub(os, 'hostname').returns('my-host');
+    sinon.stub(os, 'networkInterfaces').throws(new Error('uv error'));
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.20:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://localhost:9222'), true);
   });
 });
 
@@ -435,6 +482,104 @@ describe('validateUrl', () => {
           noFileNavigations,
         ),
       /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should reject view-source nesting deeper than the unwrap limit', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    const notValid = /The view-source: wrapped content is not a valid URL\./;
+    // Past the unwrap limit the target can no longer be inspected, so the
+    // validator must fail closed instead of checking the outer wrapper.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(6) + 'file:///etc/passwd',
+          noFileNavigations,
+        ),
+      notValid,
+    );
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(6) + 'chrome://settings',
+          noFileNavigations,
+        ),
+      notValid,
+    );
+    // Exactly at the limit still unwraps to the real target.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:'.repeat(5) + 'file:///etc/passwd',
+          noFileNavigations,
+        ),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should reject view-source URLs whose wrapped content is not a valid URL', () => {
+    assert.throws(
+      () =>
+        validateUrl('view-source:example.com', {
+          javascriptEvaluation: undefined,
+          categoryExtensions: undefined,
+          fileNavigations: false,
+        }),
+      /The view-source: wrapped content is not a valid URL\./,
+    );
+  });
+
+  it('should reject view-source URLs that target devtools:, chrome:, chrome-untrusted:, and chrome-extension:', () => {
+    // These previously bypassed validateUrl entirely: the devtools:/chrome:
+    // checks were evaluated against the outer `view-source:` protocol
+    // instead of the wrapped target, even though Chrome strips the
+    // `view-source:` prefix at navigation time and loads the page under
+    // the wrapped URL's own origin.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('view-source:chrome://settings', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    // chrome://inspect is intentionally allowlisted by isAllowedUrl, so
+    // unwrapping view-source: and reaching chrome://inspect is expected
+    // to succeed, matching the direct chrome://inspect behavior above.
+    assert.strictEqual(
+      validateUrl('view-source:chrome://inspect', defaultOptions).protocol,
+      'view-source:',
+    );
+    assert.throws(
+      () =>
+        validateUrl('view-source:chrome-untrusted://terminal', defaultOptions),
+      /Navigating to chrome-untrusted: URLs is not allowed\./,
+    );
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:chrome-extension://abcdef/popup.html',
+          defaultOptions,
+        ),
+      /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
+    );
+    // Still rejected even with categoryExtensions enabled, mirroring the
+    // bare chrome-extension: behavior being unaffected by the unwrap.
+    assert.strictEqual(
+      validateUrl('view-source:chrome-extension://abcdef/popup.html', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: true,
+        fileNavigations: undefined,
+      }).protocol,
+      'view-source:',
     );
   });
 
