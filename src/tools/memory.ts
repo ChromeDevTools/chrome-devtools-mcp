@@ -581,7 +581,9 @@ export const queryHeapSnapshotObjects: BrowserlessToolFactory =
       className: zod
         .string()
         .optional()
-        .describe('Optional case-insensitive regex matching object class name. Escape special characters to match them literally.'),
+        .describe(
+          'Optional case-insensitive regex matching object class name. Escape special characters to match them literally.',
+        ),
       propertyName: zod
         .string()
         .optional()
