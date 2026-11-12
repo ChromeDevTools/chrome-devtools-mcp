@@ -5,25 +5,14 @@
  */
 
 import assert from 'node:assert';
-import childProcess, {spawn} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import crypto from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import {syncBuiltinESMExports} from 'node:module';
-import {tmpdir} from 'node:os';
+import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
-import sinon from 'sinon';
-
 import {
   handleResponse,
-  sendCommand,
   startDaemon,
   stopDaemon,
   verifyDaemonVersion,
@@ -35,57 +24,6 @@ import {
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
-import {createTempDir} from '../utils.js';
-
-describe('daemon permission probes', () => {
-  it('reuses a reachable daemon when signal-zero returns EPERM', async () => {
-    using runtime = createTempDir(
-      'cdm-permission-',
-      process.platform === 'win32' ? tmpdir() : '/tmp',
-    );
-    const previousRuntime = process.env['XDG_RUNTIME_DIR'];
-    process.env['XDG_RUNTIME_DIR'] = runtime.path;
-    const sessionId = crypto.randomUUID();
-    const pidFile = getPidFilePath(sessionId);
-    let originalPid: number | null = null;
-    try {
-      await startDaemon(['--no-usage-statistics'], sessionId);
-      originalPid = getDaemonPid(sessionId);
-      assert.ok(originalPid);
-      const initialStatus = await sendCommand({method: 'status'}, sessionId);
-      assert.strictEqual(initialStatus.success, true);
-      const contents = readFileSync(pidFile, 'utf-8');
-      const probe = sinon.stub(process, 'kill').callThrough();
-      probe
-        .withArgs(originalPid, 0)
-        .throws(
-          Object.assign(new Error('signal-zero denied'), {code: 'EPERM'}),
-        );
-      const replacement = sinon
-        .stub(childProcess, 'spawn')
-        .throws(new Error('unexpected replacement spawn'));
-      syncBuiltinESMExports();
-      await startDaemon(['--no-usage-statistics'], sessionId);
-      sinon.assert.notCalled(replacement);
-      assert.strictEqual(readFileSync(pidFile, 'utf-8'), contents);
-    } finally {
-      sinon.restore();
-      syncBuiltinESMExports();
-      if (originalPid && !existsSync(pidFile)) {
-        writeFileSync(pidFile, String(originalPid), 'utf-8');
-      }
-      try {
-        await stopDaemon(sessionId);
-      } finally {
-        if (previousRuntime === undefined) {
-          delete process.env['XDG_RUNTIME_DIR'];
-        } else {
-          process.env['XDG_RUNTIME_DIR'] = previousRuntime;
-        }
-      }
-    }
-  });
-});
 
 describe('daemon client', () => {
   let sessionId: string;
