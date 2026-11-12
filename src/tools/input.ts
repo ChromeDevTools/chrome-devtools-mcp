@@ -17,6 +17,7 @@ import {raceWithSignal} from '../utils/raceWithSignal.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
+import {actionOutputSchema, typeTextOutputSchema} from './replSchema.js';
 import {
   definePageTool,
   zodTransform,
@@ -102,6 +103,9 @@ async function selectNativeSelectOption(
 
     return select;
   });
+  if (!selectHandle) {
+    return false;
+  }
 
   using select = selectHandle.asElement() as ElementHandle<Element> | null;
   if (!select) {
@@ -114,9 +118,44 @@ async function selectNativeSelectOption(
   if (typeof value !== 'string') {
     return false;
   }
-  await select.asLocator().fill(value, {signal});
+  await applySelectOptionValue(select, value, signal);
 
   return true;
+}
+
+async function applySelectOptionValue(
+  handle: ElementHandle,
+  optionValue: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const applied = await raceWithSignal(
+    handle.evaluate((el, nextValue) => {
+      const win = el.ownerDocument?.defaultView;
+      const SelectCtor: typeof HTMLSelectElement =
+        win?.HTMLSelectElement ?? HTMLSelectElement;
+      if (!(el instanceof SelectCtor)) {
+        return false;
+      }
+      el.focus();
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        SelectCtor.prototype,
+        'value',
+      )?.set;
+      if (nativeSetter) {
+        nativeSetter.call(el, nextValue);
+      } else {
+        el.value = nextValue;
+      }
+      const EventCtor: typeof Event = win?.Event ?? Event;
+      el.dispatchEvent(new EventCtor('input', {bubbles: true, composed: true}));
+      el.dispatchEvent(new EventCtor('change', {bubbles: true}));
+      return true;
+    }, optionValue),
+    signal,
+  );
+  if (!applied) {
+    await handle.asLocator().fill(optionValue, {signal});
+  }
 }
 
 export const click: PageToolFactory = definePageTool(() => ({
@@ -135,6 +174,7 @@ export const click: PageToolFactory = definePageTool(() => ({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -143,7 +183,8 @@ export const click: PageToolFactory = definePageTool(() => ({
     using handle = await request.page.getElementByUid(uid);
     const aXNode = request.page.getAXNodeByUid(uid);
     const shouldSelectNativeOption =
-      !request.params.dblClick && aXNode?.role === 'option';
+      !request.params.dblClick &&
+      (aXNode ? aXNode.role === 'option' : uid.startsWith('__repl_el_'));
     try {
       const result = await request.page.waitForEventsAfterAction(
         async signal => {
@@ -194,6 +235,7 @@ export const clickAt: PageToolFactory = definePageTool(() => ({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -231,6 +273,7 @@ export const hover: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -283,7 +326,7 @@ async function selectOption(
           signal,
         );
         if (typeof childValue === 'string') {
-          await handle.asLocator().fill(childValue, {signal});
+          await applySelectOptionValue(handle, childValue, signal);
         }
 
         break;
@@ -334,20 +377,121 @@ async function fillFormElements(
             signal,
           );
         } else {
-          const isToggle = await raceWithSignal(
-            handle.evaluate(el => {
-              if (el instanceof HTMLInputElement) {
-                return el.type === 'checkbox' || el.type === 'radio';
+          const fillDispatchOutcome = await raceWithSignal(
+            handle.evaluate((el, requestedValue) => {
+              const win = el.ownerDocument?.defaultView;
+              const InputCtor: typeof HTMLInputElement =
+                win?.HTMLInputElement ?? HTMLInputElement;
+              const TextAreaCtor: typeof HTMLTextAreaElement =
+                win?.HTMLTextAreaElement ?? HTMLTextAreaElement;
+              const SelectCtor: typeof HTMLSelectElement =
+                win?.HTMLSelectElement ?? HTMLSelectElement;
+              const EventCtor: typeof Event = win?.Event ?? Event;
+              const InputEventCtor: typeof InputEvent =
+                win?.InputEvent ?? InputEvent;
+
+              if (el instanceof InputCtor) {
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                  return 'toggle';
+                }
+              } else {
+                const role = el.getAttribute('role');
+                if (
+                  role === 'checkbox' ||
+                  role === 'radio' ||
+                  role === 'switch'
+                ) {
+                  return 'toggle';
+                }
               }
-              const role = el.getAttribute('role');
-              return (
-                role === 'checkbox' || role === 'radio' || role === 'switch'
-              );
-            }),
+
+              if (el instanceof SelectCtor) {
+                let matchedValue: string | undefined;
+                for (let i = 0; i < el.options.length; i++) {
+                  const opt = el.options.item(i);
+                  if (!opt || opt.disabled) {
+                    continue;
+                  }
+                  if (
+                    opt.value === requestedValue ||
+                    opt.text.trim() === requestedValue ||
+                    opt.label === requestedValue
+                  ) {
+                    matchedValue = opt.value;
+                    break;
+                  }
+                }
+                if (matchedValue === undefined) {
+                  return 'select-missing';
+                }
+                el.focus();
+                const nativeSetter = Object.getOwnPropertyDescriptor(
+                  SelectCtor.prototype,
+                  'value',
+                )?.set;
+                if (nativeSetter) {
+                  nativeSetter.call(el, matchedValue);
+                } else {
+                  el.value = matchedValue;
+                }
+                el.dispatchEvent(
+                  new EventCtor('input', {bubbles: true, composed: true}),
+                );
+                el.dispatchEvent(new EventCtor('change', {bubbles: true}));
+                return 'filled-directly';
+              }
+
+              const directInputTypes = new Set([
+                'date',
+                'time',
+                'datetime-local',
+                'month',
+                'week',
+                'range',
+                'color',
+              ]);
+              const needsDirectPrototypeFill =
+                (el instanceof InputCtor || el instanceof TextAreaCtor) &&
+                (requestedValue === '' ||
+                  requestedValue.length >= 100 ||
+                  (el instanceof InputCtor && directInputTypes.has(el.type)));
+
+              if (needsDirectPrototypeFill) {
+                el.focus();
+                const proto =
+                  el instanceof InputCtor
+                    ? InputCtor.prototype
+                    : TextAreaCtor.prototype;
+                const nativeSetter = Object.getOwnPropertyDescriptor(
+                  proto,
+                  'value',
+                )?.set;
+                if (nativeSetter) {
+                  nativeSetter.call(el, requestedValue);
+                } else {
+                  el.value = requestedValue;
+                }
+                el.dispatchEvent(
+                  new InputEventCtor('input', {
+                    bubbles: true,
+                    composed: true,
+                    inputType:
+                      requestedValue === ''
+                        ? 'deleteContentBackward'
+                        : 'insertText',
+                    data: requestedValue === '' ? null : requestedValue,
+                  }),
+                );
+                el.dispatchEvent(new EventCtor('change', {bubbles: true}));
+                return 'filled-directly';
+              }
+
+              return 'locator';
+            }, value),
             signal,
           );
 
-          if (isToggle) {
+          if (fillDispatchOutcome === 'toggle') {
             if (['true', 'false'].includes(value)) {
               await handle.asLocator().fill(value === 'true', {signal});
             } else {
@@ -355,7 +499,9 @@ async function fillFormElements(
                 `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
               );
             }
-          } else {
+          } else if (fillDispatchOutcome === 'select-missing') {
+            throw new Error(`Could not find option with text "${value}"`);
+          } else if (fillDispatchOutcome !== 'filled-directly') {
             // Increase timeout for longer input values.
             const timeoutPerChar = 10; // ms
             const fillTimeout =
@@ -399,6 +545,7 @@ export const fill: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -432,6 +579,7 @@ export const typeText: PageToolFactory = definePageTool(() => ({
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
+  outputSchema: typeTextOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -463,6 +611,7 @@ export const drag: PageToolFactory = definePageTool(() => ({
     to_uid: zod.string().describe('The uid of the element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -511,6 +660,7 @@ export const fillForm: PageToolFactory = definePageTool(() => ({
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -626,6 +776,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},

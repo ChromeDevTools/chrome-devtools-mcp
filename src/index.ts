@@ -30,6 +30,7 @@ import {
   type Root,
   type Transport,
   puppeteer,
+  zod,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
@@ -415,16 +416,31 @@ export class McpServer {
 
   #registerTool(tool: AnyToolDefinition): void {
     const handler = this.#createToolHandler(tool);
+    const outputSchema =
+      this.#config.resolved.experimentalStructuredContent && tool.outputSchema
+        ? zod.object(tool.outputSchema).passthrough()
+        : undefined;
 
-    const registeredTool = this.server.registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        inputSchema: handler.registeredInputSchema,
-        annotations: tool.annotations,
-      },
-      args => handler.handle(args),
-    );
+    const registeredTool = outputSchema
+      ? this.server.registerTool(
+          tool.name,
+          {
+            description: tool.description,
+            inputSchema: handler.registeredInputSchema,
+            outputSchema,
+            annotations: tool.annotations,
+          },
+          args => handler.handle(args),
+        )
+      : this.server.registerTool(
+          tool.name,
+          {
+            description: tool.description,
+            inputSchema: handler.registeredInputSchema,
+            annotations: tool.annotations,
+          },
+          args => handler.handle(args),
+        );
 
     if (handler.disabled) {
       registeredTool.disable();

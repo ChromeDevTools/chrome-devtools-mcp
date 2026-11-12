@@ -7,6 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {cssStylesOutputSchema} from './replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export const getCssStyles: PageToolFactory = definePageTool(() => ({
@@ -42,6 +43,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
         'Page number to return (0-based). Defaults to 0 (the first page).',
       ),
   },
+  outputSchema: cssStylesOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},

@@ -28,6 +28,7 @@ import {
 import {
   type Locator,
   PredefinedNetworkConditions,
+  type CDPSession,
   type Dialog,
   type ElementHandle,
   type Frame,
@@ -181,6 +182,101 @@ function isBackendNodeId(
   return typeof id === 'number';
 }
 
+function isPlainObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isImplicitFaviconConsoleError(event: ConsoleMessage): boolean {
+  if (
+    typeof event.type !== 'function' ||
+    typeof event.text !== 'function' ||
+    typeof event.location !== 'function'
+  ) {
+    return false;
+  }
+  if (
+    event.type() !== 'error' ||
+    !event.text().startsWith('Failed to load resource:')
+  ) {
+    return false;
+  }
+  const url = event.location()?.url;
+  if (typeof url !== 'string' || url.length === 0) {
+    return false;
+  }
+  try {
+    return new URL(url).pathname === '/favicon.ico';
+  } catch {
+    return url.endsWith('/favicon.ico');
+  }
+}
+
+interface AdoptableHandle {
+  dispose(): Promise<void>;
+}
+
+interface AdoptableFrame {
+  _id: string;
+  mainRealm(): {
+    adoptBackendNode(backendNodeId?: number): Promise<AdoptableHandle>;
+  };
+}
+
+function isAdoptableFrame(frame: unknown): frame is AdoptableFrame {
+  return (
+    typeof frame === 'object' &&
+    frame !== null &&
+    '_id' in frame &&
+    typeof frame._id === 'string' &&
+    'mainRealm' in frame &&
+    typeof frame.mainRealm === 'function'
+  );
+}
+
+function isElementHandleInstance(
+  handle: unknown,
+): handle is ElementHandle<Element> {
+  return (
+    typeof handle === 'object' &&
+    handle !== null &&
+    'asLocator' in handle &&
+    typeof handle.asLocator === 'function' &&
+    'evaluate' in handle &&
+    typeof handle.evaluate === 'function'
+  );
+}
+
+function isLocatorConstructorWithRace(ctor: unknown): ctor is {
+  race(locators: ReadonlyArray<Locator<Element>>): Locator<Element>;
+} {
+  return (
+    typeof ctor === 'function' &&
+    'race' in ctor &&
+    typeof ctor.race === 'function'
+  );
+}
+
+function raceLocators(
+  candidates: Array<Locator<Element>>,
+  fallbackLocatorClass: typeof Locator,
+): Locator<Element> {
+  const first = candidates[0];
+  if (!first || first instanceof fallbackLocatorClass) {
+    return fallbackLocatorClass.race(candidates);
+  }
+  if (typeof first === 'object') {
+    let proto: unknown = Object.getPrototypeOf(first);
+    while (proto && typeof proto === 'object') {
+      const ctor: unknown = Reflect.get(proto, 'constructor');
+      if (isLocatorConstructorWithRace(ctor)) {
+        return ctor.race(candidates);
+      }
+      proto = Object.getPrototypeOf(proto);
+    }
+  }
+  return fallbackLocatorClass.race(candidates);
+}
+
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
  * and metadata that were previously scattered across Maps in McpContext.
@@ -219,6 +315,23 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
+  #replDialogAction?: DialogAction;
+  #activeWaitForHelperCount = 0;
+
+  // REPL isolated world & ephemeral DOM bridge
+  #replSession?: CDPSession;
+  #replSessionPromise?: Promise<CDPSession>;
+  #replMainWorldContexts = new Map<string, number>();
+  #replIsolatedWorld?: {
+    frameId: string;
+    loaderId: string;
+    contextId: number;
+  };
+  #ephemeralNodes = new Map<
+    string,
+    {backendNodeId: number; frameId?: string}
+  >();
+  #nextEphemeralNodeId = 1;
 
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
@@ -252,6 +365,21 @@ export class McpPage implements ContextPage {
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
+      if (
+        this.#replDialogAction !== undefined &&
+        this.#activeWaitForHelperCount === 0
+      ) {
+        const action = this.#replDialogAction;
+        this.#dialog = undefined;
+        if (action === 'dismiss') {
+          void dialog.dismiss();
+        } else if (action === 'accept') {
+          void dialog.accept();
+        } else {
+          void dialog.accept(action);
+        }
+        return;
+      }
       this.#dialog = dialog;
     };
   }
@@ -388,6 +516,9 @@ export class McpPage implements ContextPage {
         collect => {
           return {
             console: event => {
+              if (isImplicitFaviconConsoleError(event)) {
+                return;
+              }
               collect(event);
             },
             uncaughtError: event => {
@@ -903,7 +1034,7 @@ export class McpPage implements ContextPage {
     return new WaitForHelper(this.pptrPage, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(
+  async waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
@@ -917,7 +1048,24 @@ export class McpPage implements ContextPage {
       this.cpuThrottlingRate,
       getNetworkMultiplierFromString(this.networkConditions),
     );
-    return helper.waitForEventsAfterAction(action, options);
+    const effectiveOptions =
+      this.#replDialogAction !== undefined &&
+      options?.handleDialog === undefined
+        ? {...options, handleDialog: this.#replDialogAction}
+        : options;
+    this.#activeWaitForHelperCount++;
+    try {
+      const result = await helper.waitForEventsAfterAction(
+        action,
+        effectiveOptions,
+      );
+      if (result.dialogHandled) {
+        this.clearDialog();
+      }
+      return result;
+    } finally {
+      this.#activeWaitForHelperCount--;
+    }
   }
 
   dispose(): void {
@@ -937,6 +1085,16 @@ export class McpPage implements ContextPage {
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
     this.#logpointManager = undefined;
+    const replSession = this.#replSession;
+    this.#replSession = undefined;
+    this.#replSessionPromise = undefined;
+    this.#replMainWorldContexts.clear();
+    this.#replIsolatedWorld = undefined;
+    this.#ephemeralNodes.clear();
+    this.#replDialogAction = undefined;
+    void replSession?.detach().catch(e => {
+      logger?.('Failed to detach REPL session', e);
+    });
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     this.#webAuthnAuthenticator = undefined;
@@ -1215,7 +1373,202 @@ export class McpPage implements ContextPage {
     }
   }
 
+  setReplDialogAction(action: DialogAction | undefined): void {
+    this.#replDialogAction = action;
+  }
+
+  registerEphemeralBackendNode(entry: {
+    backendNodeId: number;
+    frameId?: string;
+  }): {uid: string} & Disposable {
+    const uid = `__repl_el_${this.#nextEphemeralNodeId++}`;
+    this.#ephemeralNodes.set(uid, entry);
+    return {
+      uid,
+      [Symbol.dispose]: (): void => {
+        this.#ephemeralNodes.delete(uid);
+      },
+    };
+  }
+
+  async #getReplCdpSession(): Promise<CDPSession> {
+    if (this.#replSession && !this.#replSession.detached) {
+      return this.#replSession;
+    }
+    this.#replSession = undefined;
+    if (!this.#replSessionPromise) {
+      this.#replSessionPromise = (async () => {
+        const session = await this.pptrPage.createCDPSession();
+        this.#replMainWorldContexts.clear();
+        this.#replIsolatedWorld = undefined;
+        session.on('Runtime.executionContextCreated', event => {
+          const auxData: unknown = event.context.auxData;
+          if (
+            isPlainObjectRecord(auxData) &&
+            auxData.isDefault === true &&
+            typeof auxData.frameId === 'string'
+          ) {
+            this.#replMainWorldContexts.set(auxData.frameId, event.context.id);
+          }
+        });
+        session.on('Runtime.executionContextDestroyed', event => {
+          for (const [frameId, ctxId] of this.#replMainWorldContexts) {
+            if (ctxId === event.executionContextId) {
+              this.#replMainWorldContexts.delete(frameId);
+            }
+          }
+          if (this.#replIsolatedWorld?.contextId === event.executionContextId) {
+            this.#replIsolatedWorld = undefined;
+          }
+        });
+        session.on('Runtime.executionContextsCleared', () => {
+          this.#replMainWorldContexts.clear();
+          this.#replIsolatedWorld = undefined;
+        });
+        session.on('Page.frameNavigated', event => {
+          if (!event.frame.parentId) {
+            this.#replIsolatedWorld = undefined;
+          }
+        });
+        await Promise.all([
+          session.send('Page.enable'),
+          session.send('Runtime.enable'),
+          session.send('DOM.enable'),
+        ]);
+        this.#replSession = session;
+        return session;
+      })().finally(() => {
+        this.#replSessionPromise = undefined;
+      });
+    }
+    return await this.#replSessionPromise;
+  }
+
+  async getReplExecutionContext(options: {mainWorld: boolean}): Promise<{
+    session: CDPSession;
+    contextId: number;
+    frameId: string;
+    loaderId: string;
+  }> {
+    const session = await this.#getReplCdpSession();
+    const {frameTree} = await session.send('Page.getFrameTree');
+    const frameId = frameTree.frame.id;
+    const loaderId = frameTree.frame.loaderId;
+
+    if (options.mainWorld) {
+      let contextId = this.#replMainWorldContexts.get(frameId);
+      if (contextId === undefined) {
+        await this.pptrPage.mainFrame().evaluate(() => undefined);
+        contextId = this.#replMainWorldContexts.get(frameId);
+      }
+      if (contextId === undefined) {
+        throw new Error(
+          `Cannot find default execution context for frame ${frameId}.`,
+        );
+      }
+      return {session, contextId, frameId, loaderId};
+    }
+
+    if (
+      this.#replIsolatedWorld &&
+      this.#replIsolatedWorld.frameId === frameId &&
+      this.#replIsolatedWorld.loaderId === loaderId
+    ) {
+      return {
+        session,
+        contextId: this.#replIsolatedWorld.contextId,
+        frameId,
+        loaderId,
+      };
+    }
+
+    const {executionContextId} = await session.send(
+      'Page.createIsolatedWorld',
+      {
+        frameId,
+        worldName: 'cd4a_repl',
+        grantUniveralAccess: false,
+      },
+    );
+    this.#replIsolatedWorld = {
+      frameId,
+      loaderId,
+      contextId: executionContextId,
+    };
+    return {
+      session,
+      contextId: executionContextId,
+      frameId,
+      loaderId,
+    };
+  }
+
+  async getElementByBackendNodeId(
+    backendNodeId: number,
+    frameId?: string,
+  ): Promise<ElementHandle<Element>> {
+    const frames: AdoptableFrame[] = [];
+    for (const frame of this.pptrPage.frames()) {
+      if (isAdoptableFrame(frame)) {
+        frames.push(frame);
+      }
+    }
+    const candidateFrames: AdoptableFrame[] = [];
+    const pushUniqueFrame = (frame: AdoptableFrame | undefined): void => {
+      if (frame && !candidateFrames.includes(frame)) {
+        candidateFrames.push(frame);
+      }
+    };
+    if (frameId !== undefined) {
+      pushUniqueFrame(frames.find(frame => frame._id === frameId));
+    }
+    const rawMainFrame: unknown = this.pptrPage.mainFrame();
+    if (isAdoptableFrame(rawMainFrame)) {
+      pushUniqueFrame(rawMainFrame);
+    }
+    for (const frame of frames) {
+      pushUniqueFrame(frame);
+    }
+    if (candidateFrames.length === 0) {
+      throw new Error('Failed to resolve frame for target DOM element.');
+    }
+
+    for (const candidateFrame of candidateFrames) {
+      let adopted: AdoptableHandle | undefined;
+      try {
+        adopted = await candidateFrame
+          .mainRealm()
+          .adoptBackendNode(backendNodeId);
+        if (isElementHandleInstance(adopted)) {
+          const belongsToCandidateFrame = await adopted.evaluate(
+            (node: Element) =>
+              node.nodeType === 1 &&
+              (node.ownerDocument?.defaultView === window ||
+                node.ownerDocument?.defaultView === null),
+          );
+          if (belongsToCandidateFrame) {
+            return adopted;
+          }
+        }
+      } catch {
+        // Detached frame or cross-world resolution failure; continue searching other frames.
+      }
+      if (adopted) {
+        await adopted.dispose().catch(() => undefined);
+      }
+    }
+
+    throw new Error('Target node is not a DOM Element or is detached.');
+  }
+
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return await this.getElementByBackendNodeId(
+        ephemeral.backendNodeId,
+        ephemeral.frameId,
+      );
+    }
     if (!this.textSnapshot) {
       throw new Error(
         `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
@@ -1280,6 +1633,10 @@ export class McpPage implements ContextPage {
       typeof target._targetId === 'string'
         ? target._targetId
         : undefined;
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return {backendNodeId: ephemeral.backendNodeId, targetId};
+    }
     const node = this.getAXNodeByUid(uid);
     if (node?.backendNodeId !== undefined) {
       return {backendNodeId: node.backendNodeId, targetId};
@@ -1293,21 +1650,13 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
-    if (!this.textSnapshot) {
-      throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
-      );
-    }
-    const node = this.textSnapshot.idToNode.get(uid);
-    if (!node) {
-      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
-    }
-
-    const backendNodeId = node.backendNodeId;
+  async getMatchedStylesForBackendNodeId(
+    backendNodeId: number,
+    elementLabel = `backendNodeId=${backendNodeId}`,
+  ): Promise<MatchedStyles> {
     if (!isBackendNodeId(backendNodeId)) {
       throw new Error(
-        `Failed to resolve backend node ID for element with uid "${uid}".`,
+        `Failed to resolve backend node ID for element with ${elementLabel}.`,
       );
     }
 
@@ -1337,25 +1686,57 @@ export class McpPage implements ContextPage {
 
     if (!domNode || !cssModel) {
       throw new Error(
-        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
+        `Element with ${elementLabel} was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
       );
     }
 
     const targetElement = domNode.enclosingElementOrSelf();
     if (!targetElement) {
       throw new Error(
-        `Element with uid "${uid}" is not an element node and has no parent element.`,
+        `Element with ${elementLabel} is not an element node and has no parent element.`,
       );
     }
 
     const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
     if (!matchedStyles) {
       throw new Error(
-        `Could not retrieve matched styles for element with uid "${uid}".`,
+        `Could not retrieve matched styles for element with ${elementLabel}.`,
       );
     }
 
     return matchedStyles;
+  }
+
+  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return await this.getMatchedStylesForBackendNodeId(
+        ephemeral.backendNodeId,
+        `uid "${uid}"`,
+      );
+    }
+
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+
+    const backendNodeId = node.backendNodeId;
+    if (!isBackendNodeId(backendNodeId)) {
+      throw new Error(
+        `Failed to resolve backend node ID for element with uid "${uid}".`,
+      );
+    }
+
+    return await this.getMatchedStylesForBackendNodeId(
+      backendNodeId,
+      `uid "${uid}"`,
+    );
   }
 
   async getDevToolsData(): Promise<DevToolsData> {
@@ -1613,20 +1994,20 @@ export class McpPage implements ContextPage {
     const observedFrames = new Set(initialFrames);
     const controller = new AbortController();
 
-    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
-      this.#locatorClass.race(
-        frames.flatMap(frame =>
-          text.flatMap(value => {
-            const locators = [
-              frame.locator(`aria/${value}`),
-              frame.locator(`text/${value}`),
-            ];
-            return visible
-              ? locators.map(locator => locator.setVisibility('visible'))
-              : locators;
-          }),
-        ),
+    const locatorForFrames = (frames: Frame[]): Locator<Element> => {
+      const candidates = frames.flatMap(frame =>
+        text.flatMap(value => {
+          const locators = [
+            frame.locator(`aria/${value}`),
+            frame.locator(`text/${value}`),
+          ];
+          return visible
+            ? locators.map(locator => locator.setVisibility('visible'))
+            : locators;
+        }),
       );
+      return raceLocators(candidates, this.#locatorClass);
+    };
 
     let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {

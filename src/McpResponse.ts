@@ -951,6 +951,8 @@ export class McpResponse implements Response {
       matchedStyles?: object;
       webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
+      ok?: boolean;
+      dialogHandled?: boolean;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
     } = {};
@@ -993,7 +995,20 @@ export class McpResponse implements Response {
       response.push(...this.#textResponseLines);
     }
 
+    if (
+      !data.errorMessage &&
+      this.#textResponseLines.length > 0 &&
+      (this.#attachedWaitForResult !== undefined ||
+        this.#snapshotParams !== undefined ||
+        (this.#page?.getDialog() !== undefined && !this.#includePages))
+    ) {
+      structuredContent.ok = true;
+    }
+
     if (this.#attachedWaitForResult) {
+      if (this.#attachedWaitForResult.dialogHandled) {
+        structuredContent.dialogHandled = true;
+      }
       if (this.#attachedWaitForResult.navigatedToUrl) {
         response.push(
           `Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`,
@@ -1697,6 +1712,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
           );
         }
       } else {
+        structuredContent.networkRequests = [];
         response.push('No requests found.');
       }
     }
@@ -1731,6 +1747,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
           );
         }
       } else {
+        structuredContent.consoleMessages = [];
         response.push('<no console messages found>');
       }
     }

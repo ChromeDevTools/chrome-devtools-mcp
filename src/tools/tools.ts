@@ -20,6 +20,8 @@ import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
 import * as pwaTools from './pwa.js';
+import {createReplEvaluateTool} from './repl.js';
+import {partitionToolsForRepl} from './replPartition.js';
 import * as screencastTools from './screencast.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
@@ -61,6 +63,17 @@ export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
   }
 
   tools.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (args.repl && !args.slim) {
+    const {outerTools, innerTools} = partitionToolsForRepl(tools, args);
+    const replTool = createReplEvaluateTool(args, innerTools, tools);
+    if (!replTool) {
+      return outerTools;
+    }
+    return outerTools.map(tool =>
+      tool.name === 'evaluate_script' ? replTool : tool,
+    );
+  }
 
   return tools;
 };

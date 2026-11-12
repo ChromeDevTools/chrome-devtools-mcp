@@ -498,5 +498,21 @@
   {
     "name": "category_network_mocks",
     "flagType": "boolean"
+  },
+  {
+    "name": "repl_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "repl",
+    "flagType": "boolean"
+  },
+  {
+    "name": "repl_main_world_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "repl_main_world",
+    "flagType": "boolean"
   }
 ]

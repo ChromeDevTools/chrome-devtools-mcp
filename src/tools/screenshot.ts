@@ -14,6 +14,7 @@ import {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {messageOutputSchema} from './replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
@@ -193,6 +194,7 @@ export const screenshot: PageToolFactory = definePageTool(
             'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
           ),
       },
+      outputSchema: messageOutputSchema,
       blockedByDialog: true,
       concurrency: 'page',
       verifyFilesSchema: {
@@ -305,11 +307,42 @@ export const screenshot: PageToolFactory = definePageTool(
             `Saved screenshot to ${result.filename}.`,
           );
         } else if (screenshot.length >= 2_000_000) {
-          const {filepath} = await context.saveTemporaryFile(
-            screenshot,
-            `screenshot${extension}`,
-          );
-          response.appendResponseLine(`Saved screenshot to ${filepath}.`);
+          if (args.repl) {
+            const webpFallback = clip
+              ? await page.screenshot({
+                  type: 'webp',
+                  quality: 80,
+                  optimizeForSpeed: true,
+                  clip,
+                })
+              : element
+                ? await element.screenshot({
+                    type: 'webp',
+                    quality: 80,
+                    optimizeForSpeed: true,
+                  })
+                : await page.screenshot({
+                    type: 'webp',
+                    fullPage,
+                    quality: 80,
+                    optimizeForSpeed: true,
+                  });
+            if (webpFallback.length >= 2_000_000) {
+              throw new Error(
+                'Screenshot exceeds 2 MB inline limit in REPL mode. Pass format: "webp" with a lower quality, target a specific element, or configure --screenshot-max-width.',
+              );
+            }
+            response.attachImage({
+              mimeType: 'image/webp',
+              data: Buffer.from(webpFallback).toString('base64'),
+            });
+          } else {
+            const {filepath} = await context.saveTemporaryFile(
+              screenshot,
+              `screenshot${extension}`,
+            );
+            response.appendResponseLine(`Saved screenshot to ${filepath}.`);
+          }
         } else {
           response.attachImage({
             mimeType: `image/${format}`,

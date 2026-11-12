@@ -8,6 +8,10 @@ import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
+  listWebMcpToolsOutputSchema,
+  messageOutputSchema,
+} from './replSchema.js';
+import {
   definePageTool,
   jsonObjectTransform,
   zodTransform,
@@ -22,6 +26,7 @@ export const listWebMcpTools: PageToolFactory = definePageTool(() => ({
     readOnlyHint: true,
   },
   schema: {},
+  outputSchema: listWebMcpToolsOutputSchema,
   blockedByDialog: false,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -45,6 +50,7 @@ export const executeWebMcpTool: PageToolFactory = definePageTool(() => ({
       .optional()
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
+  outputSchema: messageOutputSchema,
   blockedByDialog: false,
   concurrency: 'page',
   verifyFilesSchema: {},

@@ -142,6 +142,7 @@ export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
     conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
+  outputSchema?: ToolSchema;
   blockedByDialog: boolean;
   /**
    * Which task queue the server holds while the tool runs. See
