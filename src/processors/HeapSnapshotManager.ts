@@ -535,15 +535,18 @@ export class HeapSnapshotManager {
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    for (const [parameter, pattern] of Object.entries({
-      className: options.className,
-      propertyName: options.propertyName,
-    })) {
-      if (pattern === undefined) {
+    const compiledOptions = {...options};
+    const parameters: Array<'className' | 'propertyName'> = [
+      'className',
+      'propertyName',
+    ];
+    for (const parameter of parameters) {
+      const pattern = options[parameter];
+      if (!pattern || pattern instanceof RegExp) {
         continue;
       }
       try {
-        new RegExp(pattern, 'i');
+        compiledOptions[parameter] = new RegExp(pattern, 'i');
       } catch (error) {
         if (error instanceof SyntaxError) {
           throw new Error(
@@ -555,7 +558,7 @@ export class HeapSnapshotManager {
     }
     using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
-    const provider = snapshot.proxy.queryObjects(options);
+    const provider = snapshot.proxy.queryObjects(compiledOptions);
     return await provider.serializeItemsRange(0, Infinity);
   }
 
