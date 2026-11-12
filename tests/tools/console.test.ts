@@ -473,8 +473,12 @@ describe('console', () => {
           response,
           context,
         );
-        // Only Puppeteer's session wraps this object, so the Error below gets
-        // a different objectId on each session.
+        // Object ids are numbered per session. So far Puppeteer's session and
+        // the DevTools universe's session have wrapped the same objects, so
+        // the Error below would get the same objectId on both, and a lookup
+        // on the wrong session would still find it. Wrapping this object on
+        // Puppeteer's session only makes the ids differ, as they do after any
+        // evaluate_script call.
         await page.pptrPage.evaluateHandle(() => ({}));
         await page.pptrPage.evaluate(() => {
           function logError() {
