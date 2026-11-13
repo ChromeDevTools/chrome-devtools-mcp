@@ -30,10 +30,19 @@ const DIVIDER =
   '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
 
 const DEVTOOLS_URL = 'https://github.com/ChromeDevTools/devtools-frontend';
-const DEVTOOLS_DIR = 'third_party/devtools-frontend';
-const DEVTOOLS_THIRD_PARTY_DIR = `${DEVTOOLS_DIR}/front_end/third_party`;
+const FRONT_END_THIRD_PARTY_SEGMENT = '/front_end/third_party/';
 
 const projectRoot = path.join(import.meta.dirname, '..');
+const standaloneDevToolsRoot = path.join(
+  projectRoot,
+  'third_party',
+  'devtools-frontend',
+);
+const devtoolsRoot = fs.existsSync(
+  path.join(standaloneDevToolsRoot, 'front_end'),
+)
+  ? standaloneDevToolsRoot
+  : path.join(projectRoot, '..');
 
 interface Notice {
   name: string;
@@ -121,9 +130,29 @@ function isVirtualModule(modulePath: string): boolean {
   );
 }
 
+function resolveMetafileInputPath(
+  metafilePath: string,
+  inputPath: string,
+): string {
+  const fromCwd = path.resolve(inputPath);
+  if (fs.existsSync(fromCwd)) {
+    return fromCwd.replaceAll('\\', '/');
+  }
+  const normalizedMeta = path.resolve(metafilePath).replaceAll('\\', '/');
+  const genIndex = normalizedMeta.indexOf('/gen/');
+  if (genIndex > 0) {
+    const buildRoot = normalizedMeta.slice(0, genIndex);
+    const fromBuildRoot = path.resolve(buildRoot, inputPath);
+    if (fs.existsSync(fromBuildRoot)) {
+      return fromBuildRoot.replaceAll('\\', '/');
+    }
+  }
+  return fromCwd.replaceAll('\\', '/');
+}
+
 /**
- * Returns the non-tree-shaken input files of all bundles as paths relative to
- * the project root.
+ * Returns the non-tree-shaken input files of all bundles as absolute
+ * forward-slash normalized paths.
  */
 function readBundledFiles(metafiles: string[]): Set<string> {
   const files = new Set<string>();
@@ -146,18 +175,14 @@ function readBundledFiles(metafiles: string[]): Set<string> {
         if (bytesInOutput === undefined || bytesInOutput <= 0) {
           continue;
         }
-        const relativePath = path.relative(
-          projectRoot,
-          path.resolve(inputPath),
-        );
-        files.add(relativePath.replaceAll('\\', '/'));
+        files.add(resolveMetafileInputPath(metafilePath, inputPath));
       }
     }
   }
   return files;
 }
 
-/** Returns the directory of the npm package that contains `file`. */
+/** Returns the absolute directory of the npm package that contains `file`. */
 function getPackageDir(file: string): string | undefined {
   const segments = file.split('/');
   const index = segments.lastIndexOf('node_modules');
@@ -182,8 +207,7 @@ function findLicenseFile(directory: string): string | undefined {
 }
 
 function readPackageNotice(packageDir: string): Notice {
-  const directory = path.join(projectRoot, packageDir);
-  const pkg = readJson(path.join(directory, 'package.json'));
+  const pkg = readJson(path.join(packageDir, 'package.json'));
   const name = getString(pkg, 'name');
   const license = getString(pkg, 'license');
   if (!name) {
@@ -193,7 +217,7 @@ function readPackageNotice(packageDir: string): Notice {
     throw new Error(`Missing license in ${packageDir}/package.json`);
   }
   assertAllowedLicense(license, packageDir);
-  const licenseFile = findLicenseFile(directory);
+  const licenseFile = findLicenseFile(packageDir);
   return {
     name,
     url:
@@ -207,7 +231,7 @@ function readPackageNotice(packageDir: string): Notice {
 }
 
 function parseReadmeChromium(directory: string): Record<string, string> {
-  const readmePath = path.join(projectRoot, directory, 'README.chromium');
+  const readmePath = path.join(devtoolsRoot, directory, 'README.chromium');
   if (!fs.existsSync(readmePath)) {
     throw new Error(`Missing README.chromium in ${directory}`);
   }
@@ -234,7 +258,7 @@ function readDevToolsThirdPartyNotice(directory: string): Notice {
   }
   assertAllowedLicense(license, directory);
   const licenseFile = path.join(
-    projectRoot,
+    devtoolsRoot,
     directory,
     metadata['License File'] || 'LICENSE',
   );
@@ -254,8 +278,9 @@ function readDevToolsThirdPartyNotice(directory: string): Notice {
 function getDevToolsCommit(): string | undefined {
   try {
     return execSync('git rev-parse HEAD', {
-      cwd: path.join(projectRoot, DEVTOOLS_DIR),
+      cwd: devtoolsRoot,
       encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
     return undefined;
@@ -272,7 +297,7 @@ function writeBundledPackages(
     'devDependencies',
   );
   // Only puppeteer-core is bundled from the puppeteer package.
-  devDependencies['puppeteer-core'] = devDependencies['puppeteer'];
+  devDependencies['puppeteer-core'] ??= devDependencies['puppeteer'];
   const lockedPackages = getRecord(
     readJson(path.join(projectRoot, 'package-lock.json')),
     'packages',
@@ -322,12 +347,12 @@ function main(): void {
       continue;
     }
     // Generated files are in the build directory, under the same path.
-    const index = file.indexOf(`${DEVTOOLS_THIRD_PARTY_DIR}/`);
+    const index = file.lastIndexOf(FRONT_END_THIRD_PARTY_SEGMENT);
     if (index >= 0) {
       const name = file
-        .slice(index + DEVTOOLS_THIRD_PARTY_DIR.length + 1)
+        .slice(index + FRONT_END_THIRD_PARTY_SEGMENT.length)
         .split('/')[0];
-      devToolsThirdPartyDirs.add(`${DEVTOOLS_THIRD_PARTY_DIR}/${name}`);
+      devToolsThirdPartyDirs.add(`front_end/third_party/${name}`);
     }
   }
 
@@ -352,13 +377,15 @@ function main(): void {
       url: DEVTOOLS_URL,
       version: devToolsCommit,
       license: 'Apache-2.0',
-      licenseText: readText(path.join(projectRoot, DEVTOOLS_DIR, 'LICENSE')),
+      licenseText: readText(path.join(devtoolsRoot, 'LICENSE')),
     }),
     [
       'Name: lighthouse',
       'License: Apache-2.0',
       '',
-      readText(path.join(projectRoot, 'node_modules/lighthouse/LICENSE')),
+      readText(
+        path.join(devtoolsRoot, 'front_end/third_party/lighthouse/LICENSE'),
+      ),
     ].join('\n'),
   );
   for (const directory of Array.from(devToolsThirdPartyDirs).sort()) {

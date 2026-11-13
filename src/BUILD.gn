@@ -132,6 +132,8 @@ action("third_party_notices") {
     _script,
     "//package-lock.json",
     "//package.json",
+    "//third_party/devtools-frontend/LICENSE",
+    "//third_party/devtools-frontend/front_end/third_party/lighthouse/LICENSE",
     "third_party/LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES",
   ]
   deps = []

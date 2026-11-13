@@ -57,6 +57,9 @@ const SPARSE_CHECKOUT_PATTERNS = [
 ].join(' ');
 
 function ensureSubmodule(): void {
+  if (existsSync(resolve(projectRoot, '..', 'front_end'))) {
+    return;
+  }
   const devtoolsFrontendDir = resolve(
     projectRoot,
     'third_party',
