@@ -82,6 +82,60 @@ describe('truncateUrl', () => {
     assert.strictEqual(truncateUrl(url), url);
   });
 
+  it('drops a 4-byte character cut after its third byte', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(226) + '%F0%9F%98%80';
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(226) + '... <truncated>',
+    );
+  });
+
+  it('drops a 3-byte character cut after its second byte', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(229) + '%E9%A0%80';
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(229) + '... <truncated>',
+    );
+  });
+
+  it('drops a 3-byte character cut after its first byte', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(232) + '%E9%A0%80';
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(232) + '... <truncated>',
+    );
+  });
+
+  it('does not leave a partial percent-escape after %E', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(233) + '%E9%A0%80';
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(233) + '... <truncated>',
+    );
+  });
+
+  it('does not leave a lone % at the end', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(234) + '%E9%A0%80';
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(234) + '... <truncated>',
+    );
+  });
+
+  it('keeps a complete multi-byte character at the cut', () => {
+    const prefix = 'https://example.com/';
+    const url = prefix + 'a'.repeat(226) + '%E9%A0%80' + 'b'.repeat(20);
+    assert.strictEqual(
+      truncateUrl(url),
+      prefix + 'a'.repeat(226) + '%E9%A0%80' + '... <truncated>',
+    );
+  });
+
   it('cuts a long data URL at 255 characters', () => {
     const url = 'data:image/png;base64,' + 'A'.repeat(5000);
     assert.strictEqual(truncateUrl(url), url.slice(0, 255) + '... <truncated>');
