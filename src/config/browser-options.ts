@@ -39,10 +39,19 @@ export const browserOptions: BrowserOptions = {
       if (!url) {
         return;
       }
+      let parsed: URL;
       try {
-        new URL(url);
+        parsed = new URL(url);
       } catch {
         throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+      }
+      // `new URL('localhost:9222')` parses with the scheme `localhost:`, but
+      // the browser URL is fetched over HTTP to discover the WebSocket
+      // endpoint, so only http: and https: can work.
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(
+          `Provided browserUrl ${url} must use http:// or https:// protocol.`,
+        );
       }
       return url;
     },
