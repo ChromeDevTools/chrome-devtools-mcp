@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.14.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.13.0...chrome-devtools-mcp-v1.14.0) (2026-11-13)
+
+
+### 🎉 Features
+
+* add abort and allow-origin network mocks ([#3421](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3421)) ([eb4b53d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/eb4b53d1621b906c1c2a323d3460f0f988d169db))
+* add inspect-in-devtools skill and claude plugin command ([#2696](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2696)) ([aa977a6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/aa977a607be8a331ae5109f0b2875b5789b0b8c8))
+* list errors a page raises while a tool runs ([#3431](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3431)) ([d5d30bd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d5d30bd03956d645f9e0cd8d6bbbb15ff4710e13))
+* resolve CSS custom variable values inline in `get_css_styles` ([#3481](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3481)) ([8ba2ac9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8ba2ac945ebaf1adb92208c29f3a30e73a920956))
+
+
+### 🛠️ Fixes
+
+* align root plugin.json name with marketplace entry ([#3474](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3474)) ([1424980](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/142498080a6128a0b6389e9b33811182e6e050a6))
+* **cli:** reuse live daemons after EPERM ([#3452](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3452)) ([1417f93](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1417f93ee3f83b87270c910b0c0337de475f6f17))
+* keep temp files under the temp dir ([#3372](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3372)) ([d666acf](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d666acf7136b84a127f74b892dce055caa904f0e))
+* remove commands from claude plugin ([#3469](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3469)) ([e2f08b4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e2f08b4f611b18f7e62e2075f1e1ef0df1146583))
+* treat local host name and interface addresses as local browser endpoints ([#3463](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3463)) ([cf587b4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cf587b480a000e918ee00547a02fd7b6563168a3))
+* validate install_pwa and launch_pwa URLs against navigation policy ([#3464](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3464)) ([057a6aa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/057a6aaa93aa4528a2628f617a0b631d1c9e9988))
+
 ## [1.13.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.12.0...chrome-devtools-mcp-v1.13.0) (2026-11-11)
 
 
