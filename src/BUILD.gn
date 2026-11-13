@@ -1,6 +1,7 @@
 # Copyright 2026 Google LLC
 # SPDX-License-Identifier: Apache-2.0
 
+import("//third_party/devtools-frontend/scripts/build/ninja/bundle.gni")
 import("//third_party/devtools-frontend/scripts/build/ninja/copy.gni")
 import(
     "//third_party/devtools-frontend/scripts/build/typescript/typescript.gni")
@@ -31,12 +32,16 @@ action("issue_descriptions") {
 ts_library("third_party") {
   runs_in = "node"
 
+  # The bundles below replace the JavaScript that tsc emits.
+  no_js_emit = true
+
   sources = [
     "third_party/cli.ts",
     "third_party/devtools-formatter-worker.ts",
     "third_party/devtools-heap-snapshot-worker.ts",
     "third_party/index.ts",
     "third_party/lighthouse-devtools-mcp-bundle.d.ts",
+    "third_party/zod.ts",
   ]
 
   ts_deps = [
@@ -52,6 +57,107 @@ ts_library("third_party") {
   ]
 }
 
+# Bundles one src/third_party entrypoint with its npm and DevTools imports.
+template("third_party_bundle") {
+  bundle(target_name) {
+    entrypoint = "third_party/${invoker.entrypoint_name}.ts"
+    output_file_location =
+        "$target_gen_dir/third_party/${invoker.entrypoint_name}.js"
+    metafile = "$target_gen_dir/$target_name.meta.json"
+    bundle_all = true
+    platform = "node"
+    deps = [
+      ":third_party",
+      ":third_party_sources",
+    ]
+    forward_variables_from(invoker,
+                           [
+                             "external",
+                             "node_require_shim",
+                           ])
+  }
+}
+
+third_party_bundle("third_party_index_bundle") {
+  entrypoint_name = "index"
+  node_require_shim = true
+  external = [
+    # Puppeteer loads WebDriver BiDi support only on request. The path is
+    # relative to src/third_party, like every relative entry.
+    "../../node_modules/puppeteer-core/lib/puppeteer/bidi/bidi.js",
+
+    # Separate files in the same directory.
+    "./cli.js",
+    "./lighthouse-devtools-mcp-bundle.js",
+
+    # Optional peer dependencies.
+    "@blackwell-systems/gcf",
+    "@toon-format/toon",
+
+    # Imports of @puppeteer/browsers code paths that the server never runs.
+    "modern-tar",
+    "proxy-agent",
+    "yargs",
+    "yauzl",
+  ]
+}
+
+third_party_bundle("third_party_cli_bundle") {
+  entrypoint_name = "cli"
+  node_require_shim = true
+}
+
+third_party_bundle("third_party_formatter_worker_bundle") {
+  entrypoint_name = "devtools-formatter-worker"
+}
+
+third_party_bundle("third_party_heap_snapshot_worker_bundle") {
+  entrypoint_name = "devtools-heap-snapshot-worker"
+}
+
+# Lists the licenses of the files in the bundles. The files come from the
+# metafiles that the `bundle` template writes next to each target.
+action("third_party_notices") {
+  script = "//third_party/node/node.py"
+  _script = "//scripts/generate-third-party-notices.ts"
+  _third_party_gen_dir = "$target_gen_dir/third_party"
+  _bundles = [
+    "third_party_cli_bundle",
+    "third_party_formatter_worker_bundle",
+    "third_party_heap_snapshot_worker_bundle",
+    "third_party_index_bundle",
+  ]
+
+  inputs = [
+    _script,
+    "//package-lock.json",
+    "//package.json",
+    "third_party/LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES",
+  ]
+  deps = []
+  outputs = [
+    "$_third_party_gen_dir/THIRD_PARTY_NOTICES",
+    "$_third_party_gen_dir/bundled-packages.json",
+  ]
+
+  args = [ rebase_path(_script, root_build_dir) ]
+  foreach(_bundle, _bundles) {
+    _metafile = "$target_gen_dir/$_bundle.meta.json"
+    deps += [ ":$_bundle" ]
+    inputs += [ _metafile ]
+    args += [
+      "--metafile",
+      rebase_path(_metafile, root_build_dir),
+    ]
+  }
+  args += [
+    "--notices",
+    rebase_path(outputs[0], root_build_dir),
+    "--bundled-packages",
+    rebase_path(outputs[1], root_build_dir),
+  ]
+}
+
 ts_library("mcp_lib") {
   runs_in = "node"
 
@@ -62,6 +168,7 @@ ts_library("mcp_lib") {
     "McpPage.ts",
     "McpResponse.ts",
     "McpWorker.ts",
+    "NetworkOverrideManager.ts",
     "SlimMcpResponse.ts",
     "TextSnapshot.ts",
     "ToolHandler.ts",
@@ -95,6 +202,7 @@ ts_library("mcp_lib") {
     "formatters/IssueFormatter.ts",
     "formatters/LogpointFormatter.ts",
     "formatters/NetworkFormatter.ts",
+    "formatters/NetworkOverridesFormatter.ts",
     "formatters/RemoteObjectFormatter.ts",
     "formatters/SnapshotFormatter.ts",
     "formatters/WebAuthnFormatter.ts",
@@ -148,8 +256,10 @@ ts_library("mcp_lib") {
     "utils/id.ts",
     "utils/keyboard.ts",
     "utils/logger.ts",
+    "utils/network.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",
+    "utils/raceWithSignal.ts",
     "utils/resourceType.ts",
     "utils/text.ts",
     "utils/timeout.ts",
@@ -183,5 +293,10 @@ group("all") {
     ":lighthouse_bundle",
     ":mcp_lib",
     ":third_party",
+    ":third_party_cli_bundle",
+    ":third_party_formatter_worker_bundle",
+    ":third_party_heap_snapshot_worker_bundle",
+    ":third_party_index_bundle",
+    ":third_party_notices",
   ]
 }

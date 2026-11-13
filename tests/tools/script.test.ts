@@ -28,10 +28,7 @@ import {
   withMcpContext,
 } from '../utils.js';
 
-const EXTENSION_PATH = path.join(
-  import.meta.dirname,
-  '../../../../../tests/tools/fixtures/extension-sw',
-);
+const EXTENSION_PATH = path.resolve('tests/tools/fixtures/extension-sw');
 
 describe('script', () => {
   const server = serverHooks();

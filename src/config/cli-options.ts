@@ -1406,7 +1406,7 @@ export const commands: Commands = {
   },
   list_extensions: {
     description:
-      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
+      'Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {},
   },
@@ -1474,6 +1474,88 @@ export const commands: Commands = {
         description: 'Targets a specific page by ID.',
         required: true,
         positional: true,
+      },
+    },
+  },
+  mock_network: {
+    description:
+      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route matches any URL. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. allowOrigin requires a body or upstream source. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks. (requires flag: --categoryNetworkMocks=true)',
+    category: 'Network mocks',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      route: {
+        name: 'route',
+        type: 'string',
+        description:
+          'Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
+        required: false,
+        positional: false,
+      },
+      resourceType: {
+        name: 'resourceType',
+        type: 'string',
+        description:
+          'Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.',
+        required: false,
+        positional: false,
+        enum: [
+          'document',
+          'stylesheet',
+          'image',
+          'media',
+          'font',
+          'script',
+          'texttrack',
+          'xhr',
+          'fetch',
+          'prefetch',
+          'eventsource',
+          'manifest',
+          'signedexchange',
+          'ping',
+          'cspviolationreport',
+          'preflight',
+          'fedcm',
+          'other',
+        ],
+      },
+      abort: {
+        name: 'abort',
+        type: 'boolean',
+        description:
+          'Abort matching requests when true. When false, use the stored body or upstream source, or send the request to the network if neither is set. A mock without a source still wins over older matching mocks. Abortion takes precedence over body, upstream, and allowOrigin.',
+        required: false,
+        positional: false,
+      },
+      allowOrigin: {
+        name: 'allowOrigin',
+        type: 'string',
+        description:
+          'Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.',
+        required: false,
+        positional: false,
+      },
+      body: {
+        name: 'body',
+        type: 'string',
+        description:
+          'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
+        required: false,
+        positional: false,
+      },
+      upstream: {
+        name: 'upstream',
+        type: 'string',
+        description:
+          'Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.',
+        required: false,
+        positional: false,
       },
     },
   },
@@ -1641,7 +1723,7 @@ export const commands: Commands = {
         name: 'ignoreCache',
         type: 'boolean',
         description:
-          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network mocks always disable the page HTTP cache.',
         required: false,
         positional: false,
       },
@@ -1812,6 +1894,56 @@ export const commands: Commands = {
         description: 'ID of the extension to reload.',
         required: true,
         positional: true,
+      },
+    },
+  },
+  remove_network_mock: {
+    description:
+      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace. (requires flag: --categoryNetworkMocks=true)',
+    category: 'Network mocks',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      route: {
+        name: 'route',
+        type: 'string',
+        description:
+          'Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.',
+        required: false,
+        positional: false,
+      },
+      resourceType: {
+        name: 'resourceType',
+        type: 'string',
+        description:
+          'Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.',
+        required: false,
+        positional: false,
+        enum: [
+          'document',
+          'stylesheet',
+          'image',
+          'media',
+          'font',
+          'script',
+          'texttrack',
+          'xhr',
+          'fetch',
+          'prefetch',
+          'eventsource',
+          'manifest',
+          'signedexchange',
+          'ping',
+          'cspviolationreport',
+          'preflight',
+          'fedcm',
+          'other',
+        ],
       },
     },
   },

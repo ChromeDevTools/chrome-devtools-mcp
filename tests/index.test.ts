@@ -10,13 +10,11 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {executablePath} from 'puppeteer';
-
 import {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import type {TextContent} from '../src/third_party/index.js';
 
-import {createTempDir} from './utils.js';
+import {createTempDir, getExecutablePath} from './utils.js';
 
 // Each test starts its own server process, so the tests run in parallel. Most
 // of the test time is server start and waits, not CPU work.
@@ -41,7 +39,7 @@ describe('e2e', {concurrency: true}, () => {
           '--headless',
           '--isolated',
           '--executable-path',
-          await executablePath(),
+          await getExecutablePath(),
           ...extraArgs,
         ],
         env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},

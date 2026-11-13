@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {executablePath} from 'puppeteer';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
@@ -21,6 +20,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks} from './server.js';
+import {getExecutablePath} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -753,6 +753,43 @@ describe('browser', () => {
     });
   });
 
+  describe('missingDisplayLaunchError', () => {
+    const missingXServer = new Error(
+      'Missing X server to start the headful browser. Either set headless ' +
+        'to true or use xvfb-run to run your Puppeteer script.',
+    );
+
+    it('names --headless when a headed launch has no X server', () => {
+      const error = BrowserManager.missingDisplayLaunchError(
+        missingXServer,
+        false,
+      );
+      assert.ok(error);
+      assert.match(error.message, /--headless/);
+      assert.match(error.message, /Missing X server/);
+      assert.strictEqual(error.cause, missingXServer);
+    });
+
+    it('does not explain failures in headless mode', () => {
+      assert.strictEqual(
+        BrowserManager.missingDisplayLaunchError(missingXServer, true),
+        undefined,
+      );
+    });
+
+    it('does not explain unrelated failures', () => {
+      assert.strictEqual(
+        BrowserManager.missingDisplayLaunchError(
+          new Error(
+            'Protocol error (Target.setDiscoverTargets): Target closed',
+          ),
+          false,
+        ),
+        undefined,
+      );
+    });
+  });
+
   it('cannot launch multiple times with the same profile', async () => {
     await runWithRetry(async () => {
       const tmpDir = os.tmpdir();
@@ -765,7 +802,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
         }),
       );
       const browser1 = await manager1.ensureBrowser();
@@ -776,7 +813,7 @@ describe('browser', () => {
               headless: true,
               isolated: false,
               userDataDir: folderPath,
-              executablePath: await executablePath(),
+              executablePath: await getExecutablePath(),
             }),
           );
           const browser2 = await manager2.ensureBrowser();
@@ -807,7 +844,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
           viewport: {
             width: 1501,
             height: 801,
@@ -842,7 +879,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
-          executablePath: await executablePath(),
+          executablePath: await getExecutablePath(),
           chromeArg: ['--remote-debugging-port=0'],
         }),
       );
@@ -882,7 +919,7 @@ describe('browser', () => {
           createMockServerConfig({
             headless: true,
             isolated: true,
-            executablePath: await executablePath(),
+            executablePath: await getExecutablePath(),
             blockedUrlPattern: ['*://*:*/blocked.html'],
           }),
         );
@@ -927,7 +964,7 @@ describe('browser', () => {
           createMockServerConfig({
             headless: true,
             isolated: true,
-            executablePath: await executablePath(),
+            executablePath: await getExecutablePath(),
             allowedUrlPattern: ['*://*:*/allowed.html'],
           }),
         );

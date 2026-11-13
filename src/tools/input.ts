@@ -13,6 +13,7 @@ import {
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {raceWithSignal} from '../utils/raceWithSignal.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -255,31 +256,6 @@ export const hover: PageToolFactory = definePageTool(() => ({
     }
   },
 }));
-
-function raceWithSignal<T>(
-  promise: Promise<T>,
-  signal: AbortSignal,
-): Promise<T> {
-  if (signal.aborted) {
-    return Promise.reject(signal.reason);
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      reject(signal.reason);
-    };
-    signal.addEventListener('abort', onAbort, {once: true});
-    Promise.resolve(promise).then(
-      value => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      error => {
-        signal.removeEventListener('abort', onAbort);
-        reject(error);
-      },
-    );
-  });
-}
 
 // The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
 // If the form is a combobox, we need to find the correct option by its text value.

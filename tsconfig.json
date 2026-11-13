@@ -11,7 +11,7 @@
       "ESNext.Collection"
     ],
     "typeRoots": ["./node_modules/@types"],
-    "types": ["node", "filesystem"],
+    "types": ["node"],
     "moduleResolution": "bundler",
     "outDir": "./out/Default/gen",
     "rootDir": ".",

@@ -48,9 +48,10 @@ function main() {
   );
 
   console.log(`Copying notices from ${noticesPath} to ${DEST_DIR}...`);
-  fs.copyFileSync(
-    noticesPath,
+  const noticesContent = fs.readFileSync(noticesPath, 'utf8');
+  fs.writeFileSync(
     path.join(DEST_DIR, 'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES'),
+    noticesContent.endsWith('\n') ? noticesContent : `${noticesContent}\n`,
   );
 
   console.log('Done.');

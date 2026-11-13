@@ -15,7 +15,7 @@ import path from 'node:path';
 import type {TestContext} from 'node:test';
 
 import type {Browser} from 'puppeteer';
-import puppeteer, {Locator} from 'puppeteer';
+import puppeteer, {executablePath, Locator} from 'puppeteer';
 
 import type {
   Frame,
@@ -41,9 +41,9 @@ import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
   createMockParsedArguments,
+  createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockServerConfig,
-  mockListener,
   stripUndefined,
 } from './mocks.js';
 
@@ -83,6 +83,10 @@ export function extractExtensionId(response: McpResponse): string {
   const extensionId = match ? match[1] : null;
   assert.ok(extensionId, 'Response should contain a valid key');
   return extensionId;
+}
+
+export async function settle(): Promise<void> {
+  await new Promise(resolve => setImmediate(resolve));
 }
 
 const browsers = new Map<string, Browser>();
@@ -447,31 +451,15 @@ export function getMockBrowser(options?: {
   wsEndpoint?: string;
 }): Browser {
   const page = createMockPuppeteerPage();
-  const listener = mockListener();
-  page.on.callsFake((eventName, handler) => {
-    listener.on(eventName, handler);
-    return page;
-  });
-  page.off.callsFake((eventName, handler) => {
-    if (handler) {
-      listener.off(eventName, handler);
-    }
-    return page;
-  });
-  (page as unknown as {emit: typeof listener.emit}).emit = listener.emit;
-  const pages = [page as unknown as Page];
-  return {
-    process() {
-      return options?.process ?? null;
-    },
-    wsEndpoint() {
-      return options?.wsEndpoint ?? '';
-    },
-    pages() {
-      return Promise.resolve(pages);
-    },
-    ...mockListener(),
-  } as Browser;
+  const browser = createMockPuppeteerBrowser();
+  browser.process.returns(options?.process ?? null);
+  browser.wsEndpoint.returns(options?.wsEndpoint ?? '');
+  browser.pages.resolves([page]);
+  return browser;
+}
+
+export async function getExecutablePath(): Promise<string> {
+  return process.env['PUPPETEER_EXECUTABLE_PATH'] ?? (await executablePath());
 }
 
 export const CLI_PATH: string = path.resolve(
@@ -507,6 +495,20 @@ export async function runCli(
     child.on('close', status => resolve({status, stdout, stderr}));
     child.on('error', reject);
   });
+}
+
+/**
+ * Runs `chrome-devtools start` for tests that use the browser. Passes
+ * `PUPPETEER_EXECUTABLE_PATH` as `--executablePath` when it is set.
+ */
+export async function startCli(
+  sessionId: string,
+  args: string[] = [],
+  options?: {cwd?: string},
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  const chromePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+  const pathArgs = chromePath ? [`--executablePath=${chromePath}`] : [];
+  return await runCli(['start', ...args, ...pathArgs], sessionId, options);
 }
 
 export async function assertDaemonIsNotRunning(

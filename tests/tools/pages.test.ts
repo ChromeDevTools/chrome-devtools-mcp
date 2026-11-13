@@ -30,17 +30,10 @@ import {
 } from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
-const EXTENSION_SW_PATH = path.join(
-  import.meta.dirname,
-  '../../../../../tests/tools/fixtures/extension-sw',
-);
-const EXTENSION_PATH = path.join(
-  import.meta.dirname,
-  '../../../../../tests/tools/fixtures/extension',
-);
-const EXTENSION_SIDE_PANEL_PATH = path.join(
-  import.meta.dirname,
-  '../../../../../tests/tools/fixtures/extension-side-panel',
+const EXTENSION_SW_PATH = path.resolve('tests/tools/fixtures/extension-sw');
+const EXTENSION_PATH = path.resolve('tests/tools/fixtures/extension');
+const EXTENSION_SIDE_PANEL_PATH = path.resolve(
+  'tests/tools/fixtures/extension-side-panel',
 );
 
 describe('pages', () => {
