@@ -56,6 +56,7 @@ import {
   CdpExtension,
   CdpFrame,
   CdpHTTPRequest,
+  CdpJSHandle,
   CdpMouse,
   CdpPage,
   CDPSession,
@@ -463,6 +464,16 @@ export function createMockDialog(
   dialog.message.returns(options.message ?? '');
   sinon.stub(dialog, 'handled').get(() => options.handled ?? false);
   return dialog;
+}
+
+export function createMockCdpJSHandle(
+  remoteObject: Protocol.Runtime.RemoteObject,
+  session: CDPSession,
+): sinon.SinonStubbedInstance<CdpJSHandle> {
+  const handle = sinon.createStubInstance(CdpJSHandle);
+  handle.remoteObject.returns(remoteObject);
+  sinon.stub(handle, 'client').get(() => session);
+  return handle;
 }
 
 export function createMockElementHandle(): {
