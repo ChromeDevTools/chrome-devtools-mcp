@@ -63,6 +63,7 @@ template("third_party_bundle") {
     entrypoint = "third_party/${invoker.entrypoint_name}.ts"
     output_file_location =
         "$target_gen_dir/third_party/${invoker.entrypoint_name}.js"
+    metafile = "$target_gen_dir/$target_name.meta.json"
     bundle_all = true
     platform = "node"
     deps = [ ":third_party_sources" ]
@@ -112,7 +113,7 @@ third_party_bundle("third_party_heap_snapshot_worker_bundle") {
 }
 
 # Lists the licenses of the files in the bundles. The files come from the
-# depfiles that the `bundle` template writes next to each target.
+# metafiles that the `bundle` template writes next to each target.
 action("third_party_notices") {
   script = "//third_party/node/node.py"
   _script = "//scripts/generate-third-party-notices.ts"
@@ -124,15 +125,10 @@ action("third_party_notices") {
     "third_party_index_bundle",
   ]
 
-  # The bundles change when their depfiles do. GN cannot track the depfiles.
   inputs = [
     _script,
     "//package-lock.json",
     "//package.json",
-    "$_third_party_gen_dir/cli.js",
-    "$_third_party_gen_dir/devtools-formatter-worker.js",
-    "$_third_party_gen_dir/devtools-heap-snapshot-worker.js",
-    "$_third_party_gen_dir/index.js",
     "third_party/LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES",
   ]
   deps = []
@@ -143,10 +139,12 @@ action("third_party_notices") {
 
   args = [ rebase_path(_script, root_build_dir) ]
   foreach(_bundle, _bundles) {
+    _metafile = "$target_gen_dir/$_bundle.meta.json"
     deps += [ ":$_bundle" ]
+    inputs += [ _metafile ]
     args += [
-      "--depfile",
-      rebase_path("$target_gen_dir/$_bundle.d", root_build_dir),
+      "--metafile",
+      rebase_path(_metafile, root_build_dir),
     ]
   }
   args += [
