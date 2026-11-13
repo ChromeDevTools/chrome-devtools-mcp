@@ -612,6 +612,7 @@ describe('CssFormatter', () => {
       });
       const matchedStyles = createMockCSSMatchedStyles({
         functionRules: [funcRule],
+        cssVariables: {'--x': '10px'},
       });
 
       return new CssFormatter(matchedStyles, {uid: 'elem-func'});
@@ -640,6 +641,47 @@ describe('CssFormatter', () => {
       });
 
       return new CssFormatter(matchedStyles, {uid: 'elem-kf'});
+    },
+  );
+
+  formatterTest('resolves var() values inline', () => {
+    const style = createMockCSSInlineStyle([
+      createMockCSSProperty('color', 'var(--brand)'),
+      createMockCSSProperty('padding', 'calc(var(--gap) * 2)'),
+      createMockCSSProperty('margin', 'var(--missing, 12px)'),
+      createMockCSSProperty('background-color', 'var(--accent) !important', {
+        important: true,
+      }),
+      createMockCSSProperty('content', 'var(--note)'),
+    ]);
+    const matchedStyles = createMockCSSMatchedStyles({
+      nodeStyles: [style],
+      cssVariables: {
+        '--brand': '#ff0000',
+        '--gap': '8px',
+        '--accent': '#00ff88',
+        '--note': '"a */ b"',
+      },
+    });
+
+    return new CssFormatter(matchedStyles, {uid: 'elem-var'});
+  });
+
+  formatterTest(
+    'omits resolved value when var() is unresolved, disabled, or absent',
+    () => {
+      const style = createMockCSSInlineStyle([
+        createMockCSSProperty('color', 'var(--undefined)'),
+        createMockCSSProperty('padding', 'var(--gap) var(--undefined)'),
+        createMockCSSProperty('border-width', 'var(--gap)', {disabled: true}),
+        createMockCSSProperty('background', 'red /* brand */'),
+      ]);
+      const matchedStyles = createMockCSSMatchedStyles({
+        nodeStyles: [style],
+        cssVariables: {'--gap': '8px'},
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'elem-var-omitted'});
     },
   );
 });

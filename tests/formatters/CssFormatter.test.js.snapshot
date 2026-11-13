@@ -1179,6 +1179,54 @@ Styles for button (uid: "elem-diag"):
   }
 `;
 
+exports[`CssFormatter > omits resolved value when var() is unresolved, disabled, or absent toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-var-omitted",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "selector": "element.style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "var(--undefined)",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "var(--gap) var(--undefined)",
+          "status": "active"
+        },
+        {
+          "name": "border-width",
+          "value": "var(--gap)",
+          "status": "disabled"
+        },
+        {
+          "name": "background",
+          "value": "red /* brand */",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > omits resolved value when var() is unresolved, disabled, or absent toString 1`] = `
+Styles for button (uid: "elem-var-omitted"):
+
+  element.style {
+    color: var(--undefined);
+    padding: var(--gap) var(--undefined);
+    [disabled] border-width: var(--gap);
+    background: red /* brand */;
+  }
+`;
+
 exports[`CssFormatter > resolves container queries with node uid toJSON 1`] = `
 {
   "element": {
@@ -1221,6 +1269,66 @@ Styles for button (uid: "elem-widget"):
     .widget (<style>) {
       padding: 10px;
     }
+  }
+`;
+
+exports[`CssFormatter > resolves var() values inline toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-var",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "selector": "element.style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "var(--brand)",
+          "resolvedValue": "#ff0000",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "calc(var(--gap) * 2)",
+          "resolvedValue": "calc(8px * 2)",
+          "status": "active"
+        },
+        {
+          "name": "margin",
+          "value": "var(--missing, 12px)",
+          "resolvedValue": "12px",
+          "status": "active"
+        },
+        {
+          "name": "background-color",
+          "value": "var(--accent)",
+          "resolvedValue": "#00ff88",
+          "status": "active",
+          "important": true
+        },
+        {
+          "name": "content",
+          "value": "var(--note)",
+          "resolvedValue": "\\"a */ b\\"",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > resolves var() values inline toString 1`] = `
+Styles for button (uid: "elem-var"):
+
+  element.style {
+    color: var(--brand); /* #ff0000 */
+    padding: calc(var(--gap) * 2); /* calc(8px * 2) */
+    margin: var(--missing, 12px); /* 12px */
+    background-color: var(--accent) !important; /* #00ff88 */
+    content: var(--note); /* "a *\\/ b" */
   }
 `;
 
