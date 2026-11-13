@@ -51,6 +51,7 @@ import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
+  DomEventListenerSummary,
   MatchedStyles,
   Response,
   ScreenRecorderData,
@@ -200,6 +201,116 @@ function isElementHandle(handle: unknown): handle is ElementHandle<Element> {
       typeof handle.asElement === 'function' &&
       handle.asElement() !== null)
   );
+}
+
+function getFrameCdpClient(frame: unknown): CdpFrame['client'] | undefined {
+  if (!isCdpFrame(frame)) {
+    return undefined;
+  }
+  try {
+    return frame.client;
+  } catch {
+    return undefined;
+  }
+}
+
+function getHandleFrame(handle: ElementHandle<Element>): Frame | undefined {
+  try {
+    return handle.frame;
+  } catch {
+    return undefined;
+  }
+}
+
+async function probeBackendNodeInFrame(
+  frameClient: Pick<CDPSession, 'send'>,
+  frameId: string,
+  backendNodeId: number,
+): Promise<{belongs: boolean; isClobbered: boolean}> {
+  const {executionContextId} = await frameClient.send(
+    'Page.createIsolatedWorld',
+    {
+      frameId,
+      worldName: 'cd4a_dom_probe',
+      grantUniveralAccess: false,
+    },
+  );
+  const {object} = await frameClient.send('DOM.resolveNode', {
+    backendNodeId,
+    executionContextId,
+  });
+  if (!object.objectId) {
+    return {belongs: false, isClobbered: false};
+  }
+  try {
+    const callRes = await frameClient.send('Runtime.callFunctionOn', {
+      objectId: object.objectId,
+      functionDeclaration: `function() {
+        const nt = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeType')?.get?.call(this);
+        const od = Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this);
+        const dv = typeof od === 'object' && od !== null && 'defaultView' in od ? od.defaultView : undefined;
+        const belongs = nt === 1 && dv === window;
+        const isClobbered = belongs && (typeof Reflect.get(this, 'nodeType') !== 'number' || typeof Reflect.get(this, 'isConnected') !== 'boolean');
+        return { belongs, isClobbered };
+      }`,
+      returnByValue: true,
+    });
+    const val: unknown = callRes.result.value;
+    if (
+      isPlainRecord(val) &&
+      typeof val.belongs === 'boolean' &&
+      typeof val.isClobbered === 'boolean'
+    ) {
+      return {belongs: val.belongs, isClobbered: val.isClobbered};
+    }
+    return {belongs: false, isClobbered: false};
+  } finally {
+    await frameClient
+      .send('Runtime.releaseObject', {objectId: object.objectId})
+      .catch(() => undefined);
+  }
+}
+
+function patchDomClobberSafeElementHandle(
+  handle: ElementHandle<Element>,
+): void {
+  Object.defineProperty(handle, 'assertConnectedElement', {
+    configurable: true,
+    writable: true,
+    value: async function (this: ElementHandle<Element>): Promise<void> {
+      const error = await this.evaluate((element: Element) => {
+        if (typeof Node === 'function') {
+          const isConnectedGetter = Object.getOwnPropertyDescriptor(
+            Node.prototype,
+            'isConnected',
+          )?.get;
+          const nodeTypeGetter = Object.getOwnPropertyDescriptor(
+            Node.prototype,
+            'nodeType',
+          )?.get;
+          if (isConnectedGetter && nodeTypeGetter) {
+            if (!isConnectedGetter.call(element)) {
+              return 'Node is detached from document';
+            }
+            if (nodeTypeGetter.call(element) !== 1) {
+              return 'Node is not of type HTMLElement';
+            }
+            return undefined;
+          }
+        }
+        if (!element.isConnected) {
+          return 'Node is detached from document';
+        }
+        if (element.nodeType !== 1) {
+          return 'Node is not of type HTMLElement';
+        }
+        return undefined;
+      });
+      if (error) {
+        throw new Error(error);
+      }
+    },
+  });
 }
 
 /**
@@ -1440,11 +1551,18 @@ export class McpPage implements ContextPage {
     backendNodeId: number,
     frameId?: string,
   ): Promise<ElementHandle<Element>> {
+    const rawMainFrame = this.pptrPage.mainFrame();
+    const mainFrameClient = getFrameCdpClient(rawMainFrame);
     const frames: CdpFrame[] = [];
     for (const frame of this.pptrPage.frames()) {
-      if (isCdpFrame(frame)) {
-        frames.push(frame);
+      if (!isCdpFrame(frame)) {
+        continue;
       }
+      const frameClient = getFrameCdpClient(frame);
+      if (mainFrameClient && frameClient && frameClient !== mainFrameClient) {
+        continue;
+      }
+      frames.push(frame);
     }
     const candidateFrames: CdpFrame[] = [];
     const pushUniqueFrame = (frame: CdpFrame | undefined): void => {
@@ -1455,7 +1573,6 @@ export class McpPage implements ContextPage {
     if (frameId !== undefined) {
       pushUniqueFrame(frames.find(frame => frame._id === frameId));
     }
-    const rawMainFrame = this.pptrPage.mainFrame();
     if (isCdpFrame(rawMainFrame)) {
       pushUniqueFrame(rawMainFrame);
     }
@@ -1467,31 +1584,152 @@ export class McpPage implements ContextPage {
     }
 
     for (const candidateFrame of candidateFrames) {
-      let adopted: Awaited<
+      let isolatedAdopted: Awaited<
+        ReturnType<ReturnType<CdpFrame['mainRealm']>['adoptBackendNode']>
+      > | null = null;
+      let mainAdopted: Awaited<
         ReturnType<ReturnType<CdpFrame['mainRealm']>['adoptBackendNode']>
       > | null = null;
       try {
-        adopted = await candidateFrame
-          .mainRealm()
-          .adoptBackendNode(backendNodeId);
-        if (isElementHandle(adopted)) {
-          const belongsToCandidateFrame = await adopted.evaluate(
-            (node: Element) =>
-              node.nodeType === 1 && node.ownerDocument?.defaultView === window,
+        const frameClient = getFrameCdpClient(candidateFrame);
+        if (frameClient && typeof candidateFrame._id === 'string') {
+          const probe = await probeBackendNodeInFrame(
+            frameClient,
+            candidateFrame._id,
+            backendNodeId,
           );
-          if (belongsToCandidateFrame) {
-            return adopted;
+          if (probe.belongs) {
+            mainAdopted = await candidateFrame
+              .mainRealm()
+              .adoptBackendNode(backendNodeId);
+            if (isElementHandle(mainAdopted)) {
+              if (probe.isClobbered) {
+                const isolated =
+                  typeof candidateFrame.isolatedRealm === 'function'
+                    ? candidateFrame.isolatedRealm()
+                    : undefined;
+                if (isolated) {
+                  isolatedAdopted =
+                    await isolated.adoptBackendNode(backendNodeId);
+                  if (isElementHandle(isolatedAdopted)) {
+                    patchDomClobberSafeElementHandle(isolatedAdopted);
+                    Reflect.set(mainAdopted, 'isolatedHandle', isolatedAdopted);
+                    isolatedAdopted = null;
+                  }
+                }
+                patchDomClobberSafeElementHandle(mainAdopted);
+              }
+              return mainAdopted;
+            }
+          }
+        } else {
+          mainAdopted = await candidateFrame
+            .mainRealm()
+            .adoptBackendNode(backendNodeId);
+          if (isElementHandle(mainAdopted)) {
+            const belongsToCandidateFrame = await mainAdopted.evaluate(
+              (node: Element) =>
+                node.nodeType === 1 &&
+                node.ownerDocument?.defaultView === window,
+            );
+            if (belongsToCandidateFrame) {
+              return mainAdopted;
+            }
           }
         }
       } catch {
         // Detached frame or cross-world resolution failure; continue searching other frames.
       }
-      if (adopted) {
-        await adopted.dispose().catch(() => undefined);
+      if (isolatedAdopted) {
+        await isolatedAdopted.dispose().catch(() => undefined);
+      }
+      if (mainAdopted) {
+        await mainAdopted.dispose().catch(() => undefined);
       }
     }
 
     throw new Error('Target node is not a DOM Element or is detached.');
+  }
+
+  async resolveUidInReplContext(
+    uid: string,
+    contextId: number,
+  ): Promise<string | null> {
+    try {
+      using handle = await this.getElementByUid(uid);
+      const handleFrame = getHandleFrame(handle);
+      const mainFrameClient = getFrameCdpClient(this.pptrPage.mainFrame());
+      const handleFrameClient = getFrameCdpClient(handleFrame);
+      if (
+        mainFrameClient &&
+        handleFrameClient &&
+        handleFrameClient !== mainFrameClient
+      ) {
+        return null;
+      }
+      const backendNodeId = await handle.backendNodeId();
+      if (!backendNodeId) {
+        return null;
+      }
+      const session = await this.#getReplCdpSession();
+      const {object} = await session.send('DOM.resolveNode', {
+        backendNodeId,
+        executionContextId: contextId,
+      });
+      return object.objectId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getDomEventListenersForUid(
+    uid: string,
+    options: {mainWorld: boolean},
+  ): Promise<DomEventListenerSummary[]> {
+    using handle = await this.getElementByUid(uid);
+    const mainFrame = this.pptrPage.mainFrame();
+    const handleFrame = getHandleFrame(handle);
+    if (options.mainWorld && handleFrame && handleFrame !== mainFrame) {
+      try {
+        if (
+          new URL(handleFrame.url()).origin !== new URL(mainFrame.url()).origin
+        ) {
+          return [];
+        }
+      } catch {
+        return [];
+      }
+    }
+    const backendNodeId = await handle.backendNodeId();
+    if (!backendNodeId) {
+      return [];
+    }
+    const targetSession: Pick<CDPSession, 'send'> =
+      getFrameCdpClient(handleFrame) ?? (await this.#getReplCdpSession());
+    const {object} = await targetSession.send('DOM.resolveNode', {
+      backendNodeId,
+    });
+    if (!object.objectId) {
+      return [];
+    }
+    try {
+      const {listeners} = await targetSession.send(
+        'DOMDebugger.getEventListeners',
+        {objectId: object.objectId},
+      );
+      return listeners.map(listener => ({
+        type: listener.type,
+        useCapture: listener.useCapture,
+        passive: listener.passive,
+        once: listener.once,
+        lineNumber: listener.lineNumber,
+        columnNumber: listener.columnNumber,
+      }));
+    } finally {
+      await targetSession
+        .send('Runtime.releaseObject', {objectId: object.objectId})
+        .catch(() => undefined);
+    }
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {

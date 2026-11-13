@@ -514,6 +514,15 @@ export interface WebAuthnAuthenticatorState {
   }>;
 }
 
+export interface DomEventListenerSummary {
+  type: string;
+  useCapture: boolean;
+  passive: boolean;
+  once: boolean;
+  lineNumber: number;
+  columnNumber: number;
+}
+
 /**
  * Only add methods used by tools/*.
  */
@@ -533,6 +542,14 @@ export type ContextPage = Readonly<{
     frameId: string;
     loaderId: string;
   }>;
+  resolveUidInReplContext(
+    uid: string,
+    contextId: number,
+  ): Promise<string | null>;
+  getDomEventListenersForUid(
+    uid: string,
+    options: {mainWorld: boolean},
+  ): Promise<DomEventListenerSummary[]>;
   setReplDialogAction(action: DialogAction | undefined): void;
   registerEphemeralBackendNode(entry: {
     backendNodeId: number;

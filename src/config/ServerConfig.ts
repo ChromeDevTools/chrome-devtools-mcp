@@ -146,8 +146,18 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
   }
 
-  static validateImplications(explicitArgs: Partial<ParsedArguments>): void {
+  static validateImplications(
+    explicitArgs: Partial<ParsedArguments>,
+    options?: {relaxReplJavaScriptEvaluation?: boolean},
+  ): void {
     for (const [key, implied] of IMPLICATIONS) {
+      if (
+        options?.relaxReplJavaScriptEvaluation &&
+        implied === 'javascriptEvaluation' &&
+        (key === 'repl' || key === 'replMainWorld')
+      ) {
+        continue;
+      }
       const isKeySet =
         explicitArgs[key] !== undefined && explicitArgs[key] !== false;
       const defaultVal =
@@ -260,13 +270,23 @@ export class ServerConfig implements ReadonlyServerConfig {
    * validates conflicts and implications, and applies defaults.
    */
   static create(options: ServerConfigCreateOptions): ServerConfig {
+    return ServerConfig.#createInternal(options);
+  }
+
+  static #createInternal(
+    options: ServerConfigCreateOptions & {
+      relaxReplReloadImplications?: boolean;
+    },
+  ): ServerConfig {
     const explicitArgs: Partial<ParsedArguments> = {
       ...options.fileArgs,
       ...options.cliArgs,
       ...(options.configPath ? {config: options.configPath} : {}),
     };
     ServerConfig.validateConflicts(explicitArgs);
-    ServerConfig.validateImplications(explicitArgs);
+    ServerConfig.validateImplications(explicitArgs, {
+      relaxReplJavaScriptEvaluation: options.relaxReplReloadImplications,
+    });
     const resolved = ServerConfig.applyDefaults(explicitArgs, {
       env: options.env,
       suppressUsageStatisticsNotice: options.suppressUsageStatisticsNotice,
@@ -301,12 +321,22 @@ export class ServerConfig implements ReadonlyServerConfig {
    * preserving this config's CLI arguments, config path, and environment.
    */
   withFileArgs(fileArgs: Partial<ParsedArguments>): ServerConfig {
-    return ServerConfig.create({
+    const cliHasRepl =
+      this.#cliArgs.repl === true || this.#cliArgs.replMainWorld === true;
+    const effectiveFileArgs =
+      cliHasRepl && fileArgs.slim === true
+        ? {...fileArgs, slim: undefined}
+        : fileArgs;
+    if (cliHasRepl && fileArgs.slim === true) {
+      delete effectiveFileArgs.slim;
+    }
+    return ServerConfig.#createInternal({
       cliArgs: {...this.#cliArgs},
-      fileArgs,
+      fileArgs: effectiveFileArgs,
       configPath: this.#configPath,
       env: this.#env,
       suppressUsageStatisticsNotice: true,
+      relaxReplReloadImplications: cliHasRepl,
     });
   }
 
@@ -321,12 +351,17 @@ export class ServerConfig implements ReadonlyServerConfig {
   ): ServerConfig {
     const mergedFileArgs = mergeLayer(this.#fileArgs, next.#fileArgs);
     const mergedCliArgs = mergeLayer(this.#cliArgs, next.#cliArgs);
-    return ServerConfig.create({
+    if (this.#resolved.repl) {
+      copyOption(mergedFileArgs, this.#fileArgs, 'slim');
+      copyOption(mergedCliArgs, this.#cliArgs, 'slim');
+    }
+    return ServerConfig.#createInternal({
       cliArgs: mergedCliArgs,
       fileArgs: mergedFileArgs,
       configPath: this.#configPath,
       env: options?.env ?? this.#env,
       suppressUsageStatisticsNotice: true,
+      relaxReplReloadImplications: this.#resolved.repl,
     });
   }
 
@@ -346,6 +381,13 @@ export class ServerConfig implements ReadonlyServerConfig {
       ) {
         changed.push(name);
       }
+    }
+    if (
+      this.#resolved.repl &&
+      Boolean(this.#resolved.slim) !== Boolean(next.#resolved.slim) &&
+      !changed.includes('slim')
+    ) {
+      changed.push('slim');
     }
     return changed;
   }

@@ -356,6 +356,35 @@ describe('ServerConfig', () => {
       assert.strictEqual(mergedWithCi.usageStatistics, false);
       assert.strictEqual(mergedWithoutCi.usageStatistics, true);
     });
+
+    it('allows mergeReloadable to disable javascriptEvaluation and ignore slim when started with repl=true', () => {
+      const initial = ServerConfig.create({
+        cliArgs: {repl: true},
+        fileArgs: {},
+        env: {CI: '1'},
+        suppressUsageStatisticsNotice: true,
+      });
+      const reloaded = ServerConfig.create({
+        cliArgs: {},
+        fileArgs: {
+          repl: false,
+          javascriptEvaluation: false,
+          slim: true,
+          blockedUrlPattern: ['*://blocked.example/*'],
+        },
+        env: {CI: '1'},
+        suppressUsageStatisticsNotice: true,
+      });
+
+      const merged = initial.mergeReloadable(reloaded, {env: {CI: '1'}});
+
+      assert.strictEqual(merged.resolved.repl, true);
+      assert.strictEqual(merged.resolved.slim, false);
+      assert.strictEqual(merged.resolved.javascriptEvaluation, false);
+      assert.deepStrictEqual(merged.resolved.blockedUrlPattern, [
+        '*://blocked.example/*',
+      ]);
+    });
   });
 
   describe('ServerConfig.commit()', () => {

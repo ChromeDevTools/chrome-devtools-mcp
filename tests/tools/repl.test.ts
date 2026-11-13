@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import http from 'node:http';
 import {describe, it} from 'node:test';
 
 import {Client, InMemoryTransport} from '@modelcontextprotocol/client';
@@ -1448,5 +1449,584 @@ describe('repl mode (evaluate_script with --repl)', () => {
         await mcpServer.close();
       }
     });
+  });
+
+  it('does not return colliding main-frame elements or listeners when given a cross-site OOPIF snapshot uid', async () => {
+    const oopifServer = http.createServer((_req, res) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.statusCode = 200;
+      res.end(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <title>Cross-Site Child</title>
+  </head>
+  <body>
+    <button id="oopif-btn">OOPIF Action</button>
+    <script>
+      document
+        .getElementById('oopif-btn')
+        .addEventListener('oopif-only-listener', () => {});
+      window.parent.postMessage('oopif-ready', '*');
+    </script>
+  </body>
+</html>`);
+    });
+    await new Promise<void>(resolve => {
+      oopifServer.listen(0, () => resolve());
+    });
+
+    try {
+      const address = oopifServer.address();
+      assert.ok(address && typeof address === 'object');
+      const childUrl = `http://localhost:${address.port}/oopif-child`;
+
+      httpServer.addHtmlRoute(
+        '/oopif-host',
+        `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <title>OOPIF Host</title>
+  </head>
+  <body>
+    <div id="main-filler"></div>
+    <script>
+      window.__oopifReady = false;
+      window.addEventListener('message', event => {
+        if (event.data === 'oopif-ready') {
+          window.__oopifReady = true;
+        }
+      });
+      const container = document.getElementById('main-filler');
+      for (let i = 0; i < 25; i++) {
+        const div = document.createElement('div');
+        div.textContent = 'Main Filler ' + i;
+        div.addEventListener('main-only-listener', () => {});
+        container.appendChild(div);
+      }
+    </script>
+    <iframe src="${childUrl}"></iframe>
+  </body>
+</html>`,
+      );
+
+      await withMcpContext(
+        async (response, context, args) => {
+          const mcpPage = context.getSelectedMcpPage();
+          await mcpPage.pptrPage.goto(httpServer.getRoute('/oopif-host'));
+          await mcpPage.pptrPage.waitForFunction(() =>
+            Boolean(Reflect.get(window, '__oopifReady')),
+          );
+
+          await runReplEvaluate(
+            args,
+            {
+              pageId: mcpPage.id,
+              function: `async (mcp) => {
+                const { snapshot } = await mcp.take_snapshot();
+                function findUid(node) {
+                  if (!node || typeof node !== 'object') {
+                    return undefined;
+                  }
+                  if (
+                    node.role === 'button' &&
+                    node.name === 'OOPIF Action' &&
+                    typeof node.id === 'string'
+                  ) {
+                    return node.id;
+                  }
+                  if (Array.isArray(node.children)) {
+                    for (const child of node.children) {
+                      const found = findUid(child);
+                      if (found) {
+                        return found;
+                      }
+                    }
+                  }
+                  return undefined;
+                }
+                const uid = findUid(snapshot);
+                const el = uid ? await mcp.getElement(uid) : 'missing-uid';
+                const listeners = uid
+                  ? await mcp.getEventListeners({ uid })
+                  : [];
+                return {
+                  uidFound: typeof uid === 'string',
+                  elIsNull: el === null,
+                  elTag:
+                    el && typeof el === 'object' && 'tagName' in el
+                      ? el.tagName
+                      : null,
+                  listenerTypes: listeners.map(entry => entry.type),
+                };
+              }`,
+            },
+            response,
+            context,
+          );
+
+          const result = parseEvaluatedJson(response);
+          assert.strictEqual(result.uidFound, true);
+          assert.strictEqual(result.elIsNull, true);
+          assert.strictEqual(result.elTag, null);
+          assert.deepStrictEqual(result.listenerTypes, ['oopif-only-listener']);
+        },
+        {},
+        {repl: true},
+      );
+    } finally {
+      await new Promise<void>(resolve => {
+        oopifServer.close(() => resolve());
+      });
+    }
+  });
+
+  it('does not trigger main-world Node.prototype getters, handles DOM-clobbered forms, and passes plain { nodeType: 1 } JSON objects', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(html`
+          <script>
+            window.__getterHits = 0;
+            const origOwnerDoc = Object.getOwnPropertyDescriptor(
+              Node.prototype,
+              'ownerDocument',
+            );
+            Object.defineProperty(Node.prototype, 'ownerDocument', {
+              configurable: true,
+              enumerable: origOwnerDoc.enumerable,
+              get() {
+                window.__getterHits++;
+                return origOwnerDoc.get.call(this);
+              },
+            });
+          </script>
+          <form
+            id="clobbered-form"
+            aria-label="Clobbered Form"
+          >
+            <input
+              name="nodeType"
+              value="clobbered"
+            />
+            <input
+              name="ownerDocument"
+              value="clobbered"
+            />
+          </form>
+          <button id="clean-btn">Clean</button>
+        `);
+
+        const hitsBefore = await mcpPage.pptrPage.evaluate(() =>
+          Number(Reflect.get(window, '__getterHits')),
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const cleanBtn = document.getElementById('clean-btn');
+              const hoverClean = await mcp.hover({ element: cleanBtn });
+
+              const clobberedForm = document.getElementById('clobbered-form');
+              let hoverFormOk = false;
+              let hoverFormError = '';
+              try {
+                const res = await mcp.hover({ element: clobberedForm });
+                hoverFormOk = res.ok === true;
+              } catch (err) {
+                hoverFormError = err instanceof Error ? err.message : String(err);
+              }
+
+              const { snapshot } = await mcp.take_snapshot();
+              function findFormUid(node) {
+                if (!node || typeof node !== 'object') {
+                  return undefined;
+                }
+                if (
+                  node.role === 'form' &&
+                  node.name === 'Clobbered Form' &&
+                  typeof node.id === 'string'
+                ) {
+                  return node.id;
+                }
+                if (Array.isArray(node.children)) {
+                  for (const child of node.children) {
+                    const found = findFormUid(child);
+                    if (found) {
+                      return found;
+                    }
+                  }
+                }
+                return undefined;
+              }
+              const formUid = findFormUid(snapshot);
+              const resolvedForm = formUid ? await mcp.getElement(formUid) : null;
+
+              let plainObjError = '';
+              try {
+                await mcp.execute_3p_developer_tool({
+                  toolName: 'noop',
+                  params: { item: { nodeType: 1, label: 'plain' } },
+                });
+              } catch (err) {
+                plainObjError = err instanceof Error ? err.message : String(err);
+              }
+
+              return {
+                hoverCleanOk: hoverClean.ok === true,
+                hoverFormOk,
+                hoverFormError,
+                formUidFound: typeof formUid === 'string',
+                resolvedFormMatches: resolvedForm === clobberedForm,
+                plainObjError,
+              };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const hitsAfter = await mcpPage.pptrPage.evaluate(() =>
+          Number(Reflect.get(window, '__getterHits')),
+        );
+        const result = parseEvaluatedJson(response);
+
+        assert.strictEqual(
+          hitsAfter,
+          hitsBefore,
+          `Expected 0 main-world Node.prototype.ownerDocument getter hits, got ${hitsAfter - hitsBefore}`,
+        );
+        assert.strictEqual(result.hoverCleanOk, true);
+        assert.strictEqual(
+          result.hoverFormOk,
+          true,
+          `Expected hover on DOM-clobbered form to succeed, got error: ${String(result.hoverFormError)}`,
+        );
+        assert.strictEqual(result.formUidFound, true);
+        assert.strictEqual(result.resolvedFormMatches, true);
+        assert.ok(typeof result.plainObjError === 'string');
+        assert.doesNotMatch(
+          result.plainObjError,
+          /reference a Node|DOM\.describeNode|Invalid "element"|Expected a DOM Element/i,
+        );
+        assert.match(
+          result.plainObjError,
+          /No tools found on the page|Tool noop not found|Invalid arguments for mcp\.execute_3p_developer_tool/i,
+        );
+      },
+      {},
+      {
+        repl: true,
+        replMainWorld: false,
+        categoryExperimentalThirdParty: true,
+      },
+    );
+  });
+
+  it('isolates bootstrap internals from userFn lexical scope, leaves zero global binding residue on SyntaxError, and accepts trailing comments after semicolons', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Main World SyntaxError Check</h1></main>`,
+        );
+
+        await assert.rejects(
+          runReplEvaluate(
+            args,
+            {
+              pageId: mcpPage.id,
+              function: 'syntax ((( error',
+            },
+            response,
+            context,
+          ),
+        );
+
+        const residualBindings = await mcpPage.pptrPage.evaluate(() =>
+          Object.getOwnPropertyNames(window).filter(key =>
+            key.startsWith('__mcpCallTool'),
+          ),
+        );
+        assert.deepStrictEqual(residualBindings, []);
+      },
+      {},
+      {repl: true, replMainWorld: true},
+    );
+
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Lexical Scope & Trailing Comment Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              return {
+                rawType: typeof rawBinding,
+                mapType: typeof elementMap,
+                pendingType: typeof pendingCalls,
+                ok: (await mcp.take_snapshot()).ok,
+              };
+            };
+            // trailing file comment`,
+          },
+          response,
+          context,
+        );
+
+        const result = parseEvaluatedJson(response);
+        assert.strictEqual(result.rawType, 'undefined');
+        assert.strictEqual(result.mapType, 'undefined');
+        assert.strictEqual(result.pendingType, 'undefined');
+        assert.strictEqual(result.ok, true);
+      },
+      {},
+      {repl: true, replMainWorld: false},
+    );
+  });
+
+  it('rejects __proto__ keys in mcp.* arguments and fails fast on circular objects without leaking element handles', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(html`
+          <input
+            id="proto-input"
+            type="text"
+            aria-label="Proto Target"
+          />
+        `);
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const { snapshot } = await mcp.take_snapshot();
+              function findInputUid(node) {
+                if (!node || typeof node !== 'object') {
+                  return undefined;
+                }
+                if (
+                  node.role === 'textbox' &&
+                  typeof node.id === 'string'
+                ) {
+                  return node.id;
+                }
+                if (Array.isArray(node.children)) {
+                  for (const child of node.children) {
+                    const found = findInputUid(child);
+                    if (found) {
+                      return found;
+                    }
+                  }
+                }
+                return undefined;
+              }
+              const uid = findInputUid(snapshot) ?? '1_1';
+
+              let protoError = '';
+              try {
+                const poisoned = JSON.parse(
+                  '{"uid":' +
+                    JSON.stringify(uid) +
+                    ',"value":"x","__proto__":{"polluted":1}}',
+                );
+                await mcp.fill_form({ elements: [poisoned] });
+              } catch (err) {
+                protoError = err instanceof Error ? err.message : String(err);
+              }
+
+              let circularError = '';
+              try {
+                const el = document.getElementById('proto-input');
+                const cyc = { el };
+                cyc.self = cyc;
+                await mcp.execute_3p_developer_tool({
+                  toolName: 't',
+                  params: cyc,
+                });
+              } catch (err) {
+                circularError = err instanceof Error ? err.message : String(err);
+              }
+
+              return { protoError, circularError };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const result = parseEvaluatedJson(response);
+        assert.ok(typeof result.protoError === 'string');
+        assert.match(result.protoError, /__proto__|Invalid/i);
+
+        assert.ok(typeof result.circularError === 'string');
+        assert.match(result.circularError, /Circular reference/i);
+        assert.doesNotMatch(result.circularError, /Maximum call stack/i);
+      },
+      {},
+      {repl: true, categoryExperimentalThirdParty: true},
+    );
+  });
+
+  it('aborts queued un-awaited inner mcp.* calls immediately when the script throws and caps concurrent pending binding floods', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Flood & Timeout Check</h1></main>`,
+        );
+
+        const startedAt = performance.now();
+        await assert.rejects(
+          runReplEvaluate(
+            args,
+            {
+              pageId: mcpPage.id,
+              function: `async (mcp) => {
+                for (let i = 0; i < 5; i++) {
+                  void mcp.wait_for({
+                    text: ['__never_present__'],
+                    timeout: 2000,
+                  });
+                }
+                throw new Error('boom');
+              }`,
+            },
+            response,
+            context,
+          ),
+          /boom/,
+        );
+        const elapsedMs = performance.now() - startedAt;
+        assert.ok(
+          elapsedMs < 2500,
+          `Expected script throw to abort queued inner calls in < 2500ms, took ${elapsedMs.toFixed(0)}ms`,
+        );
+
+        response.resetResponseLineForTesting();
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const promises = [];
+              for (let i = 0; i < 40; i++) {
+                promises.push(
+                  mcp.take_snapshot().then(
+                    () => ({ ok: true }),
+                    err => ({
+                      ok: false,
+                      error: err instanceof Error ? err.message : String(err),
+                    }),
+                  ),
+                );
+              }
+              const outcomes = await Promise.all(promises);
+              const rejected = outcomes.filter(item => !item.ok);
+              return {
+                rejectedCount: rejected.length,
+                firstError: rejected[0]?.error ?? '',
+              };
+            }`,
+          },
+          response,
+          context,
+        );
+        const floodResult = parseEvaluatedJson(response);
+        assert.strictEqual(floodResult.rejectedCount, 8);
+        assert.match(
+          String(floodResult.firstError),
+          /pending|concurrent|in-flight|limit|32/i,
+        );
+
+        response.resetResponseLineForTesting();
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              let timeoutError = '';
+              try {
+                await mcp.wait_for({
+                  text: ['Flood & Timeout Check'],
+                  timeout: 120000,
+                });
+              } catch (err) {
+                timeoutError = err instanceof Error ? err.message : String(err);
+              }
+              return { timeoutError };
+            }`,
+          },
+          response,
+          context,
+        );
+        const timeoutResult = parseEvaluatedJson(response);
+        assert.ok(typeof timeoutResult.timeoutError === 'string');
+        assert.match(
+          timeoutResult.timeoutError,
+          /30000|30_000|timeout|at most|less than or equal|<= ?30000/i,
+        );
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('rejects non-file URL schemes and remote-host file URLs on sourcePath without leaking cwd', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>SourcePath URL Guard</h1></main>`,
+        );
+
+        const cwd = process.cwd();
+        for (const badSourcePath of [
+          'data:text/javascript,async()=>1',
+          'file://remote-host/share/evil.js',
+        ]) {
+          let caughtMessage = '';
+          try {
+            await runReplEvaluate(
+              args,
+              {
+                pageId: mcpPage.id,
+                sourcePath: badSourcePath,
+              },
+              response,
+              context,
+            );
+          } catch (err) {
+            caughtMessage = err instanceof Error ? err.message : String(err);
+          }
+
+          assert.notStrictEqual(
+            caughtMessage,
+            '',
+            `Expected sourcePath "${badSourcePath}" to be rejected`,
+          );
+          assert.match(caughtMessage, /file path, not a URL|local file/i);
+          assert.strictEqual(
+            caughtMessage.includes(cwd),
+            false,
+            `Expected error for "${badSourcePath}" not to leak process.cwd(), got: ${caughtMessage}`,
+          );
+        }
+      },
+      {},
+      {repl: true},
+    );
   });
 });

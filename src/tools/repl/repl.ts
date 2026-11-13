@@ -5,7 +5,7 @@
  */
 
 import crypto from 'node:crypto';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import type {ParsedArguments} from '../../config/mcp-options.js';
 import {
@@ -26,6 +26,7 @@ import {
   type Context,
   type ContextPage,
   type DefinedPageTool,
+  type DomEventListenerSummary,
   type Response,
   type ToolSchema,
 } from '../ToolDefinition.js';
@@ -41,6 +42,15 @@ import {
 } from './replSchema.js';
 
 const MAX_REPL_IMAGES = 4;
+const MAX_REPL_WAIT_TIMEOUT_MS = 30_000;
+const MAX_PENDING_BINDING_CALLS = 32;
+const MAX_BINDING_PAYLOAD_BYTES = 1_048_576;
+const MAX_ARG_NESTING_DEPTH = 64;
+const FORBIDDEN_PARAM_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
 
 interface CompletedReplStep {
   tool: string;
@@ -60,7 +70,7 @@ function isElementHandleToken(
 ): value is {mcpElementHandle: number} {
   return (
     isPlainRecord(value) &&
-    'mcpElementHandle' in value &&
+    Object.hasOwn(value, 'mcpElementHandle') &&
     typeof value.mcpElementHandle === 'number' &&
     Object.keys(value).length === 1
   );
@@ -74,6 +84,111 @@ function isReplBindingMessage(value: unknown): value is ReplBindingMessage {
       value.kind === 'getElement' ||
       value.kind === 'getEventListeners')
   );
+}
+
+function stripTrailingSemicolonsAndComments(source: string): string {
+  let i = 0;
+  let lastSignificantEnd = 0;
+  const templateBraceDepths: number[] = [];
+
+  const scanTemplateTail = (): void => {
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+      if (ch === '`') {
+        i++;
+        lastSignificantEnd = i;
+        return;
+      }
+      if (ch === '$' && source[i + 1] === '{') {
+        i += 2;
+        templateBraceDepths.push(0);
+        lastSignificantEnd = i;
+        return;
+      }
+      i++;
+    }
+    lastSignificantEnd = source.length;
+  };
+
+  while (i < source.length) {
+    const ch = source[i];
+    if (
+      ch === ' ' ||
+      ch === '\t' ||
+      ch === '\n' ||
+      ch === '\r' ||
+      ch === '\f' ||
+      ch === '\v' ||
+      ch === ';'
+    ) {
+      i++;
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '/') {
+      i += 2;
+      while (i < source.length && source[i] !== '\n' && source[i] !== '\r') {
+        i++;
+      }
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      const closeIdx = source.indexOf('*/', i + 2);
+      if (closeIdx === -1) {
+        lastSignificantEnd = source.length;
+        break;
+      }
+      i = closeIdx + 2;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      const quote = ch;
+      i++;
+      while (i < source.length) {
+        if (source[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (source[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      lastSignificantEnd = i;
+      continue;
+    }
+    if (ch === '`') {
+      i++;
+      scanTemplateTail();
+      continue;
+    }
+    if (templateBraceDepths.length > 0) {
+      const topIdx = templateBraceDepths.length - 1;
+      const currentDepth = templateBraceDepths[topIdx] ?? 0;
+      if (ch === '{') {
+        templateBraceDepths[topIdx] = currentDepth + 1;
+      } else if (ch === '}') {
+        if (currentDepth === 0) {
+          templateBraceDepths.pop();
+          i++;
+          lastSignificantEnd = i;
+          scanTemplateTail();
+          continue;
+        }
+        templateBraceDepths[topIdx] = currentDepth - 1;
+      }
+    }
+    i++;
+    lastSignificantEnd = i;
+  }
+
+  return lastSignificantEnd > 0
+    ? source.slice(0, lastSignificantEnd)
+    : source.trim();
 }
 
 function formatZodValidationError(
@@ -148,22 +263,36 @@ async function resolveReplScriptSource(
   } catch {
     parsedUrl = undefined;
   }
+  const protocol = parsedUrl?.protocol.toLowerCase();
+  if (parsedUrl && protocol !== 'file:' && !/^[a-z]:$/.test(protocol ?? '')) {
+    throw new Error(
+      'This parameter expects a local file path, not a URL. Inline scripts must be passed via "function".',
+    );
+  }
   if (
     parsedUrl &&
-    ['http:', 'https:', 'ws:', 'wss:'].includes(parsedUrl.protocol)
+    protocol === 'file:' &&
+    parsedUrl.hostname !== '' &&
+    parsedUrl.hostname.toLowerCase() !== 'localhost'
   ) {
     throw new Error(
-      'This parameter expects a file path, not a URL. Inline scripts must be passed via "function".',
+      'This parameter expects a local file path, not a URL. Inline scripts must be passed via "function".',
     );
   }
 
-  const validatedPath =
-    parsedUrl?.protocol === 'file:'
-      ? sourcePath
-      : await context.validatePath(sourcePath);
-  const resourceUrl = validatedPath.startsWith('file:')
-    ? validatedPath
-    : pathToFileURL(validatedPath).href;
+  let localCandidatePath = sourcePath;
+  if (parsedUrl && protocol === 'file:') {
+    try {
+      localCandidatePath = fileURLToPath(parsedUrl);
+    } catch {
+      throw new Error(
+        'This parameter expects a local file path, not a URL. Inline scripts must be passed via "function".',
+      );
+    }
+  }
+
+  const validatedPath = await context.validatePath(localCandidatePath);
+  const resourceUrl = pathToFileURL(validatedPath).href;
 
   try {
     return await context.loadResource(resourceUrl);
@@ -199,175 +328,12 @@ async function writeReplOutput(
   response.appendResponseLine('```');
 }
 
-function buildBootstrapExpression(options: {
-  bindingName: string;
-  enabledToolNames: readonly string[];
-  outerOnlyToolNames: readonly string[];
-  disabledInnerToolNames: readonly string[];
-  functionSource: string;
-}): string {
-  const {
-    bindingName,
-    enabledToolNames,
-    outerOnlyToolNames,
-    disabledInnerToolNames,
-    functionSource,
-  } = options;
+function buildUserFunctionExpression(functionSource: string): string {
   return `((
   $, $$, $x, getAccessibleName, getAccessibleRole, monitorEvents, unmonitorEvents, $0
-) => {
-  const JSON_parse = JSON.parse;
-  const JSON_stringify = JSON.stringify;
-  const MapCtor = Map;
-  const PromiseCtor = Promise;
-  const ErrorCtor = Error;
-  const Reflect_get = Reflect.get;
-  const Object_create = Object.create;
-  const Object_entries = Object.entries;
-  const Object_freeze = Object.freeze;
-  const Array_isArray = Array.isArray;
-
-  const rawBinding = globalThis[${JSON.stringify(bindingName)}];
-  delete globalThis[${JSON.stringify(bindingName)}];
-
-  const elementMap = new MapCtor();
-  const pendingCalls = new MapCtor();
-  let nextHandleId = 0;
-  let nextSeq = 0;
-
-  function encodeArgValue(value, allocatedIds) {
-    if (typeof value === 'object' && value !== null) {
-      if (Reflect_get(value, 'nodeType') === 1) {
-        const id = ++nextHandleId;
-        elementMap.set(id, value);
-        allocatedIds.push(id);
-        return { mcpElementHandle: id };
-      }
-      if (Array_isArray(value)) {
-        const mapped = [];
-        for (const item of value) {
-          mapped.push(encodeArgValue(item, allocatedIds));
-        }
-        return mapped;
-      }
-      const out = Object_create(null);
-      for (const [k, v] of Object_entries(value)) {
-        out[k] = encodeArgValue(v, allocatedIds);
-      }
-      return out;
-    }
-    return value;
-  }
-
-  async function invokeHost(kind, name, rawParams) {
-    if (typeof rawBinding !== 'function') {
-      throw new ErrorCtor('REPL host binding is unavailable.');
-    }
-    const allocatedIds = [];
-    const encodedParams = encodeArgValue(rawParams, allocatedIds);
-    const seq = ++nextSeq;
-    const resultPromise = new PromiseCtor((resolve, reject) => {
-      pendingCalls.set(seq, { resolve, reject });
-    });
-    rawBinding(JSON_stringify({
-      seq,
-      kind,
-      name,
-      params: encodedParams,
-    }));
-    try {
-      return await resultPromise;
-    } finally {
-      for (const id of allocatedIds) {
-        elementMap.delete(id);
-      }
-    }
-  }
-
-  const mcp = Object_create(null);
-  for (const toolName of ${JSON.stringify(enabledToolNames)}) {
-    mcp[toolName] = (params) => invokeHost('tool', toolName, params === undefined ? {} : params);
-  }
-  mcp.getElement = (uid) => invokeHost('getElement', 'getElement', { uid });
-  mcp.getEventListeners = (target) => invokeHost('getEventListeners', 'getEventListeners', target === undefined ? {} : target);
-
-  for (const outerName of ${JSON.stringify(outerOnlyToolNames)}) {
-    mcp[outerName] = async () => {
-      throw new ErrorCtor(
-        "Tool '" + outerName + "' is an outer MCP tool and cannot be called via mcp.* inside evaluate_script; return from evaluate_script and call '" + outerName + "' directly."
-      );
-    };
-  }
-
-  for (const disabledName of ${JSON.stringify(disabledInnerToolNames)}) {
-    mcp[disabledName] = async () => {
-      throw new ErrorCtor(
-        "Tool '" + disabledName + "' is currently disabled on this server."
-      );
-    };
-  }
-
-  Object_freeze(mcp);
-
-  const userFn = (
+) => (
 ${functionSource}
-  );
-  if (typeof userFn !== 'function') {
-    throw new ErrorCtor('REPL evaluate_script expects a function (e.g. async (mcp) => { ... }).');
-  }
-
-  return {
-    getElementByHandleId(id) {
-      return elementMap.get(id);
-    },
-    resolveCall(seq, resultJson) {
-      const pending = pendingCalls.get(seq);
-      if (pending) {
-        pendingCalls.delete(seq);
-        pending.resolve(JSON_parse(resultJson));
-      }
-    },
-    resolveElementCall(seq, node) {
-      const pending = pendingCalls.get(seq);
-      if (pending) {
-        pendingCalls.delete(seq);
-        const isElement = typeof node === 'object' && node !== null && Reflect_get(node, 'nodeType') === 1;
-        pending.resolve(isElement ? node : null);
-      }
-    },
-    rejectCall(seq, errorMessage) {
-      const pending = pendingCalls.get(seq);
-      if (pending) {
-        pendingCalls.delete(seq);
-        pending.reject(new ErrorCtor(errorMessage));
-      }
-    },
-    async run() {
-      try {
-        const result = await userFn(mcp);
-        const serialized = JSON_stringify(result);
-        return serialized === undefined ? 'undefined' : serialized;
-      } catch (err) {
-        if (
-          err instanceof ErrorCtor ||
-          (typeof err === 'object' &&
-            err !== null &&
-            'message' in err &&
-            typeof Reflect_get(err, 'message') === 'string')
-        ) {
-          throw err;
-        }
-        let msg;
-        try {
-          msg = typeof err === 'object' && err !== null ? JSON_stringify(err) : String(err);
-        } catch {
-          msg = String(err);
-        }
-        throw new ErrorCtor(msg);
-      }
-    },
-  };
-})(
+))(
   typeof $ === 'function' ? $ : undefined,
   typeof $$ === 'function' ? $$ : undefined,
   typeof $x === 'function' ? $x : undefined,
@@ -379,6 +345,250 @@ ${functionSource}
 )`;
 }
 
+function buildBootstrapExpression(options: {
+  bindingName: string;
+  enabledToolNames: readonly string[];
+  outerOnlyToolNames: readonly string[];
+  disabledInnerToolNames: readonly string[];
+}): string {
+  const {
+    bindingName,
+    enabledToolNames,
+    outerOnlyToolNames,
+    disabledInnerToolNames,
+  } = options;
+  return `(() => {
+  const JSON_parse = JSON.parse;
+  const JSON_stringify = JSON.stringify;
+  const MapCtor = Map;
+  const Map_get = Map.prototype.get;
+  const Map_set = Map.prototype.set;
+  const Map_delete = Map.prototype.delete;
+  const SetCtor = Set;
+  const Set_has = Set.prototype.has;
+  const Set_add = Set.prototype.add;
+  const Set_delete = Set.prototype.delete;
+  const Function_call = Function.prototype.call;
+  const PromiseCtor = Promise;
+  const ErrorCtor = Error;
+  const TypeErrorCtor = TypeError;
+  const Reflect_get = Reflect.get;
+  const Object_create = Object.create;
+  const Object_keys = Object.keys;
+  const Object_defineProperty = Object.defineProperty;
+  const Object_getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  const Object_freeze = Object.freeze;
+  const Array_isArray = Array.isArray;
+  const Array_push = Array.prototype.push;
+  const Node_nodeType_get =
+    typeof Node === 'function'
+      ? Object_getOwnPropertyDescriptor(Node.prototype, 'nodeType')?.get
+      : undefined;
+
+  const rawBinding = globalThis[${JSON.stringify(bindingName)}];
+  delete globalThis[${JSON.stringify(bindingName)}];
+
+  const elementMap = new MapCtor();
+  const pendingCalls = new MapCtor();
+  let nextHandleId = 0;
+  let nextSeq = 0;
+
+  function isDomElement(val) {
+    if ((typeof val !== 'object' && typeof val !== 'function') || val === null) {
+      return false;
+    }
+    if (typeof Node_nodeType_get === 'function') {
+      try {
+        return Function_call.call(Node_nodeType_get, val) === 1;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function setDataProp(target, key, val) {
+    Object_defineProperty(target, key, {
+      value: val,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  function encodeArgValue(value, allocatedIds, seen, depth) {
+    if (depth > ${MAX_ARG_NESTING_DEPTH}) {
+      throw new TypeErrorCtor('Maximum argument nesting depth exceeded in mcp.* call.');
+    }
+    if (isDomElement(value)) {
+      const id = ++nextHandleId;
+      Function_call.call(Map_set, elementMap, id, value);
+      Function_call.call(Array_push, allocatedIds, id);
+      const token = Object_create(null);
+      setDataProp(token, 'mcpElementHandle', id);
+      return token;
+    }
+    if (typeof value === 'object' && value !== null) {
+      if (Function_call.call(Set_has, seen, value)) {
+        throw new TypeErrorCtor('Circular reference in mcp.* arguments.');
+      }
+      Function_call.call(Set_add, seen, value);
+      try {
+        if (Array_isArray(value)) {
+          const mapped = [];
+          for (let i = 0; i < value.length; i++) {
+            Function_call.call(
+              Array_push,
+              mapped,
+              encodeArgValue(value[i], allocatedIds, seen, depth + 1),
+            );
+          }
+          return mapped;
+        }
+        const out = Object_create(null);
+        const keys = Object_keys(value);
+        for (let i = 0; i < keys.length; i++) {
+          const k = keys[i];
+          if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+            throw new TypeErrorCtor('Forbidden property key "' + k + '" in mcp.* arguments.');
+          }
+          setDataProp(
+            out,
+            k,
+            encodeArgValue(value[k], allocatedIds, seen, depth + 1),
+          );
+        }
+        return out;
+      } finally {
+        Function_call.call(Set_delete, seen, value);
+      }
+    }
+    return value;
+  }
+
+  async function invokeHost(kind, name, rawParams) {
+    if (typeof rawBinding !== 'function') {
+      throw new ErrorCtor('REPL host binding is unavailable.');
+    }
+    const allocatedIds = [];
+    let seq = 0;
+    try {
+      const seen = new SetCtor();
+      const encodedParams = encodeArgValue(rawParams, allocatedIds, seen, 0);
+      seq = ++nextSeq;
+      const resultPromise = new PromiseCtor((resolve, reject) => {
+        const entry = Object_create(null);
+        setDataProp(entry, 'resolve', resolve);
+        setDataProp(entry, 'reject', reject);
+        Function_call.call(Map_set, pendingCalls, seq, entry);
+      });
+      const msg = Object_create(null);
+      setDataProp(msg, 'seq', seq);
+      setDataProp(msg, 'kind', kind);
+      setDataProp(msg, 'name', name);
+      setDataProp(msg, 'params', encodedParams);
+      rawBinding(JSON_stringify(msg));
+      return await resultPromise;
+    } finally {
+      if (seq !== 0) {
+        Function_call.call(Map_delete, pendingCalls, seq);
+      }
+      for (let i = 0; i < allocatedIds.length; i++) {
+        Function_call.call(Map_delete, elementMap, allocatedIds[i]);
+      }
+    }
+  }
+
+  const mcp = Object_create(null);
+  for (const toolName of ${JSON.stringify(enabledToolNames)}) {
+    setDataProp(
+      mcp,
+      toolName,
+      (params) => invokeHost('tool', toolName, params === undefined ? Object_create(null) : params),
+    );
+  }
+  setDataProp(mcp, 'getElement', (uid) => {
+    const arg = Object_create(null);
+    setDataProp(arg, 'uid', uid);
+    return invokeHost('getElement', 'getElement', arg);
+  });
+  setDataProp(
+    mcp,
+    'getEventListeners',
+    (target) => invokeHost('getEventListeners', 'getEventListeners', target === undefined ? Object_create(null) : target),
+  );
+
+  for (const outerName of ${JSON.stringify(outerOnlyToolNames)}) {
+    setDataProp(mcp, outerName, async () => {
+      throw new ErrorCtor(
+        "Tool '" + outerName + "' is an outer MCP tool and cannot be called via mcp.* inside evaluate_script; return from evaluate_script and call '" + outerName + "' directly."
+      );
+    });
+  }
+
+  for (const disabledName of ${JSON.stringify(disabledInnerToolNames)}) {
+    setDataProp(mcp, disabledName, async () => {
+      throw new ErrorCtor(
+        "Tool '" + disabledName + "' is currently disabled on this server."
+      );
+    });
+  }
+
+  Object_freeze(mcp);
+
+  const harness = Object_create(null);
+  setDataProp(harness, 'getElementByHandleId', function(id) {
+    return Function_call.call(Map_get, elementMap, id);
+  });
+  setDataProp(harness, 'resolveCall', function(seq, resultJson) {
+    const pending = Function_call.call(Map_get, pendingCalls, seq);
+    if (pending) {
+      Function_call.call(Map_delete, pendingCalls, seq);
+      pending.resolve(JSON_parse(resultJson));
+    }
+  });
+  setDataProp(harness, 'resolveElementCall', function(seq, node) {
+    const pending = Function_call.call(Map_get, pendingCalls, seq);
+    if (pending) {
+      Function_call.call(Map_delete, pendingCalls, seq);
+      pending.resolve(isDomElement(node) ? node : null);
+    }
+  });
+  setDataProp(harness, 'rejectCall', function(seq, errorMessage) {
+    const pending = Function_call.call(Map_get, pendingCalls, seq);
+    if (pending) {
+      Function_call.call(Map_delete, pendingCalls, seq);
+      pending.reject(new ErrorCtor(errorMessage));
+    }
+  });
+  setDataProp(harness, 'run', async function(userFn) {
+    try {
+      const result = await userFn(mcp);
+      const serialized = JSON_stringify(result);
+      return serialized === undefined ? 'undefined' : serialized;
+    } catch (err) {
+      if (
+        err instanceof ErrorCtor ||
+        (typeof err === 'object' &&
+          err !== null &&
+          'message' in err &&
+          typeof Reflect_get(err, 'message') === 'string')
+      ) {
+        throw err;
+      }
+      let msg;
+      try {
+        msg = typeof err === 'object' && err !== null ? JSON_stringify(err) : String(err);
+      } catch {
+        msg = String(err);
+      }
+      throw new ErrorCtor(msg);
+    }
+  });
+  return harness;
+})()`;
+}
+
 /* eslint-disable @local/enforce-zod-schema -- strict runtime input validation for inner REPL tools. */
 function buildStrictInnerSchema(
   schema: ToolSchema,
@@ -386,6 +596,19 @@ function buildStrictInnerSchema(
   return zod.object(stripReplToolParams(schema, {stripPageId: true})).strict();
 }
 /* eslint-enable @local/enforce-zod-schema */
+
+function setOwnProperty(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
 
 class ReplToolDispatcher {
   readonly completedSteps: CompletedReplStep[] = [];
@@ -401,6 +624,7 @@ class ReplToolDispatcher {
   #session: CDPSession;
   #contextId: number;
   #objectGroup: string;
+  #mainWorld: boolean;
   #innerToolsByName: ReadonlyMap<string, AnyToolDefinition>;
   #schemasByName = new Map<
     string,
@@ -418,6 +642,7 @@ class ReplToolDispatcher {
     session: CDPSession;
     contextId: number;
     objectGroup: string;
+    mainWorld: boolean;
     innerToolsByName: ReadonlyMap<string, AnyToolDefinition>;
   }) {
     this.#page = options.page;
@@ -426,6 +651,7 @@ class ReplToolDispatcher {
     this.#session = options.session;
     this.#contextId = options.contextId;
     this.#objectGroup = options.objectGroup;
+    this.#mainWorld = options.mainWorld;
     this.#innerToolsByName = options.innerToolsByName;
   }
 
@@ -448,10 +674,13 @@ class ReplToolDispatcher {
   async #runExclusively<T>(work: () => Promise<T>): Promise<T> {
     using mutexGuard = await this.#innerMutex.acquire();
     void mutexGuard;
-    if (this.#aborted || this.#navigated) {
+    if (this.#navigated) {
       throw new Error(
         'REPL script execution ended due to full-page navigation.',
       );
+    }
+    if (this.#aborted) {
+      throw new Error('REPL script execution has already ended.');
     }
     const resolvers = Promise.withResolvers<void>();
     this.#inFlight = resolvers.promise;
@@ -505,10 +734,17 @@ class ReplToolDispatcher {
   }
 
   async #normalizeNestedValue(
+    toolName: string,
     value: unknown,
     holderObjectId: string,
     stack: DisposableStack,
+    depth: number,
   ): Promise<unknown> {
+    if (depth > MAX_ARG_NESTING_DEPTH) {
+      throw new Error(
+        `Invalid arguments for mcp.${toolName}: maximum nesting depth exceeded.`,
+      );
+    }
     if (isElementHandleToken(value)) {
       const resolved = await this.#describeElementHandle(
         value.mcpElementHandle,
@@ -522,7 +758,13 @@ class ReplToolDispatcher {
       const items: unknown[] = [];
       for (const entry of value) {
         items.push(
-          await this.#normalizeNestedValue(entry, holderObjectId, stack),
+          await this.#normalizeNestedValue(
+            toolName,
+            entry,
+            holderObjectId,
+            stack,
+            depth + 1,
+          ),
         );
       }
       return items;
@@ -530,7 +772,22 @@ class ReplToolDispatcher {
     if (isPlainRecord(value)) {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value)) {
-        out[k] = await this.#normalizeNestedValue(v, holderObjectId, stack);
+        if (FORBIDDEN_PARAM_KEYS.has(k)) {
+          throw new Error(
+            `Invalid arguments for mcp.${toolName}: forbidden key "${k}".`,
+          );
+        }
+        setOwnProperty(
+          out,
+          k,
+          await this.#normalizeNestedValue(
+            toolName,
+            v,
+            holderObjectId,
+            stack,
+            depth + 1,
+          ),
+        );
       }
       return out;
     }
@@ -553,6 +810,11 @@ class ReplToolDispatcher {
     }
 
     for (const key of Object.keys(rawParams)) {
+      if (FORBIDDEN_PARAM_KEYS.has(key)) {
+        throw new Error(
+          `Invalid arguments for mcp.${toolName}: forbidden key "${key}".`,
+        );
+      }
       if (STRIPPED_INNER_PARAMS.has(key)) {
         throw new Error(
           `Parameter "${key}" is disabled on inner mcp.${toolName} calls to prevent host-disk writes; omit "${key}" to receive inline output.`,
@@ -565,14 +827,14 @@ class ReplToolDispatcher {
       if (key === 'pageId') {
         continue;
       }
-      paramsCopy[key] = val;
+      setOwnProperty(paramsCopy, key, val);
     }
 
     const resolveSingleElementProp = async (
       sourceKey: string,
       targetKey: string,
     ): Promise<void> => {
-      if (!(sourceKey in paramsCopy)) {
+      if (!Object.hasOwn(paramsCopy, sourceKey)) {
         return;
       }
       const propVal = paramsCopy[sourceKey];
@@ -585,7 +847,10 @@ class ReplToolDispatcher {
           `Invalid "${sourceKey}" passed to mcp.${toolName}: expected a live DOM Element, got ${propVal === null ? 'null' : typeof propVal}.`,
         );
       }
-      if (paramsCopy[targetKey] !== undefined) {
+      if (
+        Object.hasOwn(paramsCopy, targetKey) &&
+        paramsCopy[targetKey] !== undefined
+      ) {
         throw new Error(
           `Specify either "${targetKey}" or "${sourceKey}" on mcp.${toolName}, not both.`,
         );
@@ -596,7 +861,7 @@ class ReplToolDispatcher {
       );
       const reg = this.#page.registerEphemeralBackendNode(resolved);
       stack.use(reg);
-      paramsCopy[targetKey] = reg.uid;
+      setOwnProperty(paramsCopy, targetKey, reg.uid);
     };
 
     await resolveSingleElementProp('element', 'uid');
@@ -612,8 +877,19 @@ class ReplToolDispatcher {
           normalizedElements.push(item);
           continue;
         }
-        const entryCopy: Record<string, unknown> = {...item};
-        if ('element' in entryCopy && entryCopy.element !== undefined) {
+        const entryCopy: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(item)) {
+          if (FORBIDDEN_PARAM_KEYS.has(k)) {
+            throw new Error(
+              `Invalid arguments for mcp.${toolName}: forbidden key "${k}".`,
+            );
+          }
+          setOwnProperty(entryCopy, k, v);
+        }
+        if (
+          Object.hasOwn(entryCopy, 'element') &&
+          entryCopy.element !== undefined
+        ) {
           const elToken = entryCopy.element;
           delete entryCopy.element;
           if (!isElementHandleToken(elToken)) {
@@ -621,7 +897,7 @@ class ReplToolDispatcher {
               `Invalid "element" in mcp.fill_form elements: expected a live DOM Element.`,
             );
           }
-          if (entryCopy.uid !== undefined) {
+          if (Object.hasOwn(entryCopy, 'uid') && entryCopy.uid !== undefined) {
             throw new Error(
               'Specify either "uid" or "element" in mcp.fill_form elements, not both.',
             );
@@ -632,19 +908,25 @@ class ReplToolDispatcher {
           );
           const reg = this.#page.registerEphemeralBackendNode(resolved);
           stack.use(reg);
-          entryCopy.uid = reg.uid;
+          setOwnProperty(entryCopy, 'uid', reg.uid);
         }
         normalizedElements.push(entryCopy);
       }
-      paramsCopy.elements = normalizedElements;
+      setOwnProperty(paramsCopy, 'elements', normalizedElements);
     }
 
     const finalParams: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(paramsCopy)) {
-      finalParams[key] = await this.#normalizeNestedValue(
-        val,
-        holderObjectId,
-        stack,
+      setOwnProperty(
+        finalParams,
+        key,
+        await this.#normalizeNestedValue(
+          toolName,
+          val,
+          holderObjectId,
+          stack,
+          1,
+        ),
       );
     }
     return finalParams;
@@ -680,6 +962,16 @@ class ReplToolDispatcher {
         throw new Error(formatZodValidationError(toolName, parseResult.error));
       }
       const parsedParams = parseResult.data;
+
+      if (
+        toolName === 'wait_for' &&
+        typeof parsedParams.timeout === 'number' &&
+        parsedParams.timeout > MAX_REPL_WAIT_TIMEOUT_MS
+      ) {
+        throw new Error(
+          `Invalid arguments for mcp.wait_for: timeout must not exceed ${MAX_REPL_WAIT_TIMEOUT_MS}ms inside evaluate_script.`,
+        );
+      }
 
       const {structuredContent, images} = await this.#context.runReplInnerTool(
         innerTool,
@@ -737,45 +1029,32 @@ class ReplToolDispatcher {
       if (typeof uid !== 'string' || uid.length === 0) {
         throw new Error('mcp.getElement(uid) requires a non-empty uid string.');
       }
-      const resolved = await this.#page.resolveUidToBackendNodeId(uid);
-      if (!resolved) {
-        return null;
-      }
-      try {
-        const {object} = await this.#session.send('DOM.resolveNode', {
-          backendNodeId: resolved.backendNodeId,
-          executionContextId: this.#contextId,
-        });
-        return object.objectId ?? null;
-      } catch {
-        // Cross-origin OOPIF or detached node cannot be resolved into main-frame world.
-        return null;
-      }
+      return await this.#page.resolveUidInReplContext(uid, this.#contextId);
     });
   }
 
   async getEventListeners(
     rawTarget: unknown,
     holderObjectId: string,
-  ): Promise<
-    Array<{
-      type: string;
-      useCapture: boolean;
-      passive: boolean;
-      once: boolean;
-      lineNumber: number;
-      columnNumber: number;
-    }>
-  > {
+  ): Promise<DomEventListenerSummary[]> {
     return await this.#runExclusively(async () => {
       if (!isPlainRecord(rawTarget)) {
         throw new Error(
           'mcp.getEventListeners requires { element } or { uid }.',
         );
       }
+      for (const key of Object.keys(rawTarget)) {
+        if (FORBIDDEN_PARAM_KEYS.has(key)) {
+          throw new Error(
+            `Invalid arguments for mcp.getEventListeners: forbidden key "${key}".`,
+          );
+        }
+      }
 
-      let backendNodeId: number | undefined;
-      if ('element' in rawTarget && rawTarget.element !== undefined) {
+      if (
+        Object.hasOwn(rawTarget, 'element') &&
+        rawTarget.element !== undefined
+      ) {
         if (!isElementHandleToken(rawTarget.element)) {
           throw new Error(
             'Invalid "element" passed to mcp.getEventListeners: expected a live DOM Element.',
@@ -785,52 +1064,43 @@ class ReplToolDispatcher {
           rawTarget.element.mcpElementHandle,
           holderObjectId,
         );
-        backendNodeId = desc.backendNodeId;
-      } else if (
-        typeof rawTarget.uid === 'string' &&
-        rawTarget.uid.length > 0
-      ) {
-        const resolved = await this.#page.resolveUidToBackendNodeId(
-          rawTarget.uid,
-        );
-        if (!resolved) {
-          throw new Error(
-            `Element uid "${rawTarget.uid}" not found on page ${this.#page.id}.`,
-          );
+        const {object} = await this.#session.send('DOM.resolveNode', {
+          backendNodeId: desc.backendNodeId,
+        });
+        if (!object.objectId) {
+          return [];
         }
-        backendNodeId = resolved.backendNodeId;
-      } else {
-        throw new Error(
-          'mcp.getEventListeners requires either { element } or { uid }.',
-        );
+        try {
+          const {listeners} = await this.#session.send(
+            'DOMDebugger.getEventListeners',
+            {
+              objectId: object.objectId,
+            },
+          );
+          return listeners.map(listener => ({
+            type: listener.type,
+            useCapture: listener.useCapture,
+            passive: listener.passive,
+            once: listener.once,
+            lineNumber: listener.lineNumber,
+            columnNumber: listener.columnNumber,
+          }));
+        } finally {
+          await this.#session
+            .send('Runtime.releaseObject', {objectId: object.objectId})
+            .catch(() => undefined);
+        }
       }
 
-      const {object} = await this.#session.send('DOM.resolveNode', {
-        backendNodeId,
-      });
-      if (!object.objectId) {
-        return [];
+      if (typeof rawTarget.uid === 'string' && rawTarget.uid.length > 0) {
+        return await this.#page.getDomEventListenersForUid(rawTarget.uid, {
+          mainWorld: this.#mainWorld,
+        });
       }
-      try {
-        const {listeners} = await this.#session.send(
-          'DOMDebugger.getEventListeners',
-          {
-            objectId: object.objectId,
-          },
-        );
-        return listeners.map(listener => ({
-          type: listener.type,
-          useCapture: listener.useCapture,
-          passive: listener.passive,
-          once: listener.once,
-          lineNumber: listener.lineNumber,
-          columnNumber: listener.columnNumber,
-        }));
-      } finally {
-        await this.#session
-          .send('Runtime.releaseObject', {objectId: object.objectId})
-          .catch(() => undefined);
-      }
+
+      throw new Error(
+        'mcp.getEventListeners requires either { element } or { uid }.',
+      );
     });
   }
 }
@@ -923,7 +1193,7 @@ export function createReplEvaluateTool(
         request.params.sourcePath,
         context,
       );
-      const functionSource = rawSource.trimEnd().replace(/;$/, '');
+      const functionSource = stripTrailingSemicolonsAndComments(rawSource);
 
       const {
         session,
@@ -944,6 +1214,7 @@ export function createReplEvaluateTool(
         session,
         contextId,
         objectGroup,
+        mainWorld: cliArgs.replMainWorld,
         innerToolsByName,
       });
 
@@ -1004,7 +1275,21 @@ export function createReplEvaluateTool(
       };
 
       let holderObjectId = '';
+      let bindingRegistered = false;
       const pendingBindingTasks = new Set<Promise<void>>();
+
+      const rejectBindingCall = (seq: number, message: string): void => {
+        void session
+          .send('Runtime.callFunctionOn', {
+            objectId: holderObjectId,
+            functionDeclaration:
+              'function(seq, msg) { this.rejectCall(seq, msg); }',
+            arguments: [{value: seq}, {value: message}],
+            returnByValue: true,
+          })
+          .catch(() => undefined);
+      };
+
       const onBindingCalled = (
         event: Protocol.Runtime.BindingCalledEvent,
       ): void => {
@@ -1015,17 +1300,43 @@ export function createReplEvaluateTool(
         ) {
           return;
         }
-        const task = (async () => {
-          let parsedPayload: unknown;
+        if (
+          Buffer.byteLength(event.payload, 'utf8') > MAX_BINDING_PAYLOAD_BYTES
+        ) {
           try {
-            parsedPayload = JSON.parse(event.payload);
+            const parsed: unknown = JSON.parse(event.payload);
+            if (isReplBindingMessage(parsed)) {
+              rejectBindingCall(
+                parsed.seq,
+                'REPL binding payload exceeded maximum size (1 MiB).',
+              );
+            }
           } catch {
-            return;
+            // Ignore malformed oversized payload.
           }
-          if (!isReplBindingMessage(parsedPayload)) {
-            return;
-          }
-          const {seq, kind, name, params} = parsedPayload;
+          return;
+        }
+
+        let parsedPayload: unknown;
+        try {
+          parsedPayload = JSON.parse(event.payload);
+        } catch {
+          return;
+        }
+        if (!isReplBindingMessage(parsedPayload)) {
+          return;
+        }
+
+        if (pendingBindingTasks.size >= MAX_PENDING_BINDING_CALLS) {
+          rejectBindingCall(
+            parsedPayload.seq,
+            `Too many concurrent pending mcp.* calls (limit: ${MAX_PENDING_BINDING_CALLS}). Await each mcp.* call before starting more.`,
+          );
+          return;
+        }
+
+        const {seq, kind, name, params} = parsedPayload;
+        const task = (async () => {
           try {
             if (kind === 'getElement') {
               const uidVal = isPlainRecord(params) ? params.uid : undefined;
@@ -1114,23 +1425,45 @@ export function createReplEvaluateTool(
       page.setReplDialogAction(request.params.dialogAction ?? 'accept');
 
       try {
+        const userFnRes = await session.send('Runtime.evaluate', {
+          expression: buildUserFunctionExpression(functionSource),
+          contextId,
+          includeCommandLineAPI: true,
+          objectGroup,
+          returnByValue: false,
+          awaitPromise: false,
+        });
+
+        if (userFnRes.exceptionDetails) {
+          throw new Error(extractExceptionMessage(userFnRes.exceptionDetails));
+        }
+        if (
+          userFnRes.result.type !== 'function' ||
+          !userFnRes.result.objectId
+        ) {
+          throw new Error(
+            'REPL evaluate_script expects a function (e.g. async (mcp) => { ... }).',
+          );
+        }
+        const userFnObjectId = userFnRes.result.objectId;
+
         await session.send('Runtime.addBinding', {
           name: bindingName,
           executionContextId: contextId,
         });
+        bindingRegistered = true;
 
         const bootstrapExpression = buildBootstrapExpression({
           bindingName,
           enabledToolNames,
           outerOnlyToolNames,
           disabledInnerToolNames,
-          functionSource,
         });
 
         const bootstrapRes = await session.send('Runtime.evaluate', {
           expression: bootstrapExpression,
           contextId,
-          includeCommandLineAPI: true,
+          includeCommandLineAPI: false,
           objectGroup,
           returnByValue: false,
           awaitPromise: false,
@@ -1150,15 +1483,17 @@ export function createReplEvaluateTool(
         try {
           const runRes = await session.send('Runtime.callFunctionOn', {
             objectId: holderObjectId,
-            functionDeclaration: 'function() { return this.run(); }',
+            functionDeclaration:
+              'function(userFn) { return this.run(userFn); }',
+            arguments: [{objectId: userFnObjectId}],
             awaitPromise: true,
             returnByValue: true,
           });
 
           if (runRes.exceptionDetails) {
-            await drainAllInFlight();
             dispatcher.abort();
-            if (await checkCrossDocumentNavigated()) {
+            await drainAllInFlight();
+            if (!page.isClosed() && (await checkCrossDocumentNavigated())) {
               await writeNavigationEarlyExit();
               return;
             }
@@ -1172,9 +1507,10 @@ export function createReplEvaluateTool(
           serializedOutput =
             typeof rawValue === 'string' ? rawValue : 'undefined';
         } catch (error) {
-          await drainAllInFlight();
           dispatcher.abort();
+          await drainAllInFlight();
           if (
+            !page.isClosed() &&
             isContextDestructionError(error) &&
             (await checkCrossDocumentNavigated())
           ) {
@@ -1197,9 +1533,18 @@ export function createReplEvaluateTool(
         page.setReplDialogAction(undefined);
         session.off('Runtime.bindingCalled', onBindingCalled);
         session.off('Page.frameNavigated', onFrameNavigated);
-        await session
-          .send('Runtime.removeBinding', {name: bindingName})
-          .catch(() => undefined);
+        if (bindingRegistered) {
+          await session
+            .send('Runtime.removeBinding', {name: bindingName})
+            .catch(() => undefined);
+          await session
+            .send('Runtime.evaluate', {
+              expression: `delete globalThis[${JSON.stringify(bindingName)}];`,
+              contextId,
+              silent: true,
+            })
+            .catch(() => undefined);
+        }
         await session
           .send('Runtime.releaseObjectGroup', {objectGroup})
           .catch(() => undefined);

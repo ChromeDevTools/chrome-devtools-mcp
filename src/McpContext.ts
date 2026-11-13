@@ -1302,6 +1302,12 @@ export class McpContext implements Context, BrowserlessContext {
       this.#selectedPage?.id === page.id
         ? this.#selectedPage
         : this.getPageById(page.id);
+    if (targetMcpPage.isClosed()) {
+      throw new Error(`Page ${page.id} has been closed.`);
+    }
+    if (isPageScopedTool(tool) && tool.blockedByDialog) {
+      targetMcpPage.throwIfDialogOpen();
+    }
     innerResponse.setPage(targetMcpPage);
     if (isPageScopedTool(tool)) {
       await tool.handler({params, page}, innerResponse, this);
