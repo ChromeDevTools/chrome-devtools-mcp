@@ -58,8 +58,12 @@ function discoverBundledPackages() {
       let match;
       while ((match = re.exec(content)) !== null) {
         const source = match[1];
-        // Skip relative imports and node_modules paths.
-        if (source.startsWith('.') || source.startsWith('/')) {
+        // Skip relative imports, node_modules paths, and Node built-ins.
+        if (
+          source.startsWith('.') ||
+          source.startsWith('/') ||
+          source.startsWith('node:')
+        ) {
           continue;
         }
         // Extract the bare package name (handle scoped packages like @foo/bar).

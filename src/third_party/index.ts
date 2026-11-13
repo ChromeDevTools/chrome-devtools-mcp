@@ -8,6 +8,11 @@ import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
 
+import fs from 'node:fs';
+import {createRequire} from 'node:module';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 
@@ -92,18 +97,96 @@ export {
   AsyncDisposableStack,
   SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
+export {PUPPETEER_REVISIONS} from 'puppeteer-core/internal/revisions.js';
 export {
+  computeExecutablePath,
   resolveDefaultUserDataDir,
   detectBrowserPlatform,
   Browser as BrowserEnum,
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isEncoder(value: unknown): value is (val: unknown) => string {
+  return typeof value === 'function';
+}
+
+function findForAgentsPackageJson(): string | undefined {
+  const normalizedDir = import.meta.dirname.replaceAll('\\', '/');
+  if (
+    normalizedDir.includes('/node_modules/') ||
+    !normalizedDir.includes('/for_agents/')
+  ) {
+    return undefined;
+  }
+  let dir = import.meta.dirname;
+  while (true) {
+    for (const rel of [
+      'for_agents/package.json',
+      'third_party/devtools-frontend/src/for_agents/package.json',
+    ]) {
+      const candidate = path.join(dir, rel);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
+  }
+}
+
+async function importOptionalPeer(
+  specifier: string,
+  loader: () => Promise<unknown>,
+): Promise<Record<string, unknown>> {
+  let mod: unknown;
+  try {
+    mod = await loader();
+  } catch (error) {
+    const pkgJson = findForAgentsPackageJson();
+    if (!pkgJson) {
+      throw error;
+    }
+    try {
+      const resolved = createRequire(pkgJson).resolve(specifier);
+      mod = await import(pathToFileURL(resolved).href);
+    } catch {
+      throw error;
+    }
+  }
+  if (!isRecord(mod)) {
+    throw new Error(`Invalid module export for ${specifier}`);
+  }
+  return isRecord(mod['default']) ? {...mod['default'], ...mod} : mod;
+}
+
 export async function getToonEncode(): Promise<(val: unknown) => string> {
-  const {encode} = await import('@toon-format/toon');
+  const mod = await importOptionalPeer(
+    '@toon-format/toon',
+    async () => await import('@toon-format/toon'),
+  );
+  const encode = mod['encode'];
+  if (!isEncoder(encode)) {
+    throw new Error('Missing encode export in @toon-format/toon');
+  }
   return encode;
 }
+
 export async function getGcfEncode(): Promise<(val: unknown) => string> {
-  const {encodeGeneric} = await import('@blackwell-systems/gcf');
+  const mod = await importOptionalPeer(
+    '@blackwell-systems/gcf',
+    async () => await import('@blackwell-systems/gcf'),
+  );
+  const encodeGeneric = mod['encodeGeneric'];
+  if (!isEncoder(encodeGeneric)) {
+    throw new Error('Missing encodeGeneric export in @blackwell-systems/gcf');
+  }
   return encodeGeneric;
 }
 
