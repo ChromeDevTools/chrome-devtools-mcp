@@ -99,10 +99,6 @@ async function waitForDaemonReady(
   let lastError: unknown;
 
   while (Date.now() < deadline) {
-    const startupError = getStartupError?.();
-    if (startupError) {
-      throw startupError;
-    }
     try {
       const response = await sendCommand(
         {method: 'status'},
@@ -115,6 +111,13 @@ async function waitForDaemonReady(
       lastError = new Error(String(response.error));
     } catch (error) {
       lastError = error;
+    }
+    // Checked after a failed status: when two callers start the same session,
+    // the second daemon exits because the first one is running, and the
+    // caller should connect to that one.
+    const startupError = getStartupError?.();
+    if (startupError) {
+      throw startupError;
     }
 
     const timeLeft = deadline - Date.now();
