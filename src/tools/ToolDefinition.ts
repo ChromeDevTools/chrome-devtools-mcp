@@ -29,6 +29,7 @@ import type {
 } from '../formatters/HeapSnapshotFormatter.js';
 import {
   zod,
+  type CDPSession,
   type Dialog,
   type ElementHandle,
   type Extension,
@@ -60,6 +61,7 @@ import type {
 import type {McpWorker} from '../McpWorker.js';
 import type {
   WaitForEventsResult,
+  WaitForHelper,
   DialogAction,
 } from '../utils/WaitForHelper.js';
 
@@ -398,6 +400,14 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
+  runReplInnerTool(
+    tool: AnyToolDefinition,
+    params: Record<string, unknown>,
+    page: ContextPage,
+  ): Promise<{
+    structuredContent: Record<string, unknown>;
+    images: ImageContentData[];
+  }>;
 }>;
 
 /**
@@ -514,8 +524,25 @@ export type ContextPage = Readonly<{
   readonly networkConditions: string | null;
   init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
+  isOptionUid(uid: string): boolean;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  getReplExecutionContext(options: {mainWorld: boolean}): Promise<{
+    session: CDPSession;
+    contextId: number;
+    frameId: string;
+    loaderId: string;
+  }>;
+  setReplDialogAction(action: DialogAction | undefined): void;
+  registerEphemeralBackendNode(entry: {
+    backendNodeId: number;
+    frameId?: string;
+    role?: string;
+  }): {uid: string} & Disposable;
+  createWaitForHelper(
+    cpuMultiplier: number,
+    networkMultiplier: number,
+  ): WaitForHelper;
   configureWebAuthn(
     config: WebAuthnAuthenticatorConfig,
   ): Promise<WebAuthnAuthenticatorState | undefined>;

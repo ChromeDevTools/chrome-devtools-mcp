@@ -14,7 +14,7 @@ import {
   buildReplApiDeclaration,
   formatReplToolMethodSignature,
   zodShapeToTs,
-} from '../../src/tools/replSchema.js';
+} from '../../src/tools/repl/replSchema.js';
 import {
   definePageTool,
   type AnyToolDefinition,
@@ -27,7 +27,7 @@ import {
   createMockServerConfig,
 } from '../mocks.js';
 
-const DEFAULT_INNER_REPL_TOOLS = [
+const DEFAULT_INNER_REPL_TOOLS: readonly string[] = [
   'click',
   'drag',
   'fill',
@@ -43,16 +43,16 @@ const DEFAULT_INNER_REPL_TOOLS = [
   'take_snapshot',
   'type_text',
   'wait_for',
-] as const;
+];
 
-const INNER_REPL_TOOLS = [
+const INNER_REPL_TOOLS: readonly string[] = [
   ...DEFAULT_INNER_REPL_TOOLS,
   'click_at',
   'execute_3p_developer_tool',
   'execute_webmcp_tool',
   'list_3p_developer_tools',
   'list_webmcp_tools',
-] as const;
+];
 
 function toFieldMap(structuredContent: object): Map<string, unknown> {
   return new Map<string, unknown>(Object.entries(structuredContent));
@@ -141,7 +141,6 @@ describe('replSchema', () => {
           filePath: zod.string().optional(),
         },
         outputSchema: {
-          ok: zod.boolean(),
           snapshot: zod.object({
             id: zod.string(),
             role: zod.string(),
@@ -177,7 +176,6 @@ describe('replSchema', () => {
           responseFilePath: zod.string().optional(),
         },
         outputSchema: {
-          ok: zod.boolean(),
           networkRequest: zod
             .object({
               url: zod.string(),
@@ -202,7 +200,7 @@ describe('replSchema', () => {
       assert.doesNotMatch(networkSig, /\bresponseFilePath\b/);
       assert.match(
         networkSig,
-        /:\s*Promise<\{[\s\S]*\bnetworkRequest\?:\s*\{[\s\S]*\burl:\s*string\b[\s\S]*\bstatus\?:\s*number\b[\s\S]*\}[\s\S]*\}>;?$/,
+        /:\s*Promise<\{[\s\S]*\bok:\s*boolean\b[\s\S]*\bnetworkRequest\?:\s*\{[\s\S]*\burl:\s*string\b[\s\S]*\bstatus\?:\s*number\b[\s\S]*\}[\s\S]*\}>;?$/,
       );
       assert.doesNotMatch(networkSig, /Promise<unknown>|ToolResult/);
     });
@@ -282,6 +280,29 @@ describe('replSchema', () => {
         'Expected handle_dialog to stay off McpTools',
       );
 
+      const trimmedLines = declaration.split('\n').map(line => line.trim());
+      const clickLine = trimmedLines.find(line => line.startsWith('click('));
+      assert.ok(clickLine, 'Expected click method line in McpTools');
+      assert.match(clickLine, /\belement\?:\s*Element\b/);
+      assert.doesNotMatch(
+        clickLine,
+        /\belement\?:\s*Element\b[\s\S]*\belement\?:\s*Element\b/,
+      );
+
+      const dragLine = trimmedLines.find(line => line.startsWith('drag('));
+      assert.ok(dragLine, 'Expected drag method line in McpTools');
+      assert.match(dragLine, /\bfromElement\?:\s*Element\b/);
+      assert.match(dragLine, /\btoElement\?:\s*Element\b/);
+
+      const fillFormLine = trimmedLines.find(line =>
+        line.startsWith('fill_form('),
+      );
+      assert.ok(fillFormLine, 'Expected fill_form method line in McpTools');
+      assert.match(
+        fillFormLine,
+        /\belements:\s*(?:\{|Array<\{)[\s\S]*\belement\?:\s*Element\b/,
+      );
+
       const byteLength = Buffer.byteLength(declaration, 'utf8');
       assert.ok(
         byteLength <= 4500,
@@ -291,7 +312,7 @@ describe('replSchema', () => {
   });
 
   describe('McpResponse structuredContent contracts', () => {
-    it('sets structuredContent.ok = true on non-error action responses and ok = false (or errorMessage) on error responses', async () => {
+    it('does not synthesize structuredContent.ok in McpResponse.handle() while preserving message, waitFor fields, and errorMessage', async () => {
       const page = createMockMcpPage();
       const context = createMockMcpContext({selectedPage: page});
 
@@ -305,22 +326,16 @@ describe('replSchema', () => {
 
       const okResult = await okResponse.handle(context);
       const okFields = toFieldMap(okResult.structuredContent);
-      assert.strictEqual(okFields.get('ok'), true);
+      assert.strictEqual(okFields.get('ok'), undefined);
+      assert.strictEqual(
+        okFields.get('message'),
+        'Successfully clicked on the element',
+      );
       assert.strictEqual(
         okFields.get('navigatedToUrl'),
         'https://example.com/dashboard',
       );
       assert.strictEqual(okFields.get('dialogHandled'), true);
-
-      const actionOutputSchema = zod.object({
-        ok: zod.boolean(),
-        navigatedToUrl: zod.string().optional(),
-        dialogHandled: zod.boolean().optional(),
-      });
-      assert.strictEqual(
-        actionOutputSchema.safeParse(okResult.structuredContent).success,
-        true,
-      );
 
       const errorResponse = new McpResponse(createMockServerConfig());
       errorResponse.setPage(page);
@@ -328,12 +343,7 @@ describe('replSchema', () => {
 
       const errorResult = await errorResponse.handle(context);
       const errorFields = toFieldMap(errorResult.structuredContent);
-      assert.notStrictEqual(errorFields.get('ok'), true);
-      assert.ok(
-        errorFields.get('ok') === false ||
-          errorFields.get('errorMessage') ===
-            'Element did not become interactive',
-      );
+      assert.strictEqual(errorFields.get('ok'), undefined);
       assert.strictEqual(
         errorFields.get('errorMessage'),
         'Element did not become interactive',

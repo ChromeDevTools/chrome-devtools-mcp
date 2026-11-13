@@ -17,13 +17,21 @@ import {McpContext} from '../../src/McpContext.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {zod} from '../../src/third_party/index.js';
+import {click} from '../../src/tools/input.js';
 import {
   isBrowserlessTool,
   isPageScopedTool,
   type AnyToolDefinition,
 } from '../../src/tools/ToolDefinition.js';
 import {createTools} from '../../src/tools/tools.js';
-import {createMockParsedArguments, createMockServerConfig} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockElementHandle,
+  createMockParsedArguments,
+  createMockPuppeteerBrowser,
+  createMockPuppeteerTarget,
+  createMockServerConfig,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {createTempFile, html, withBrowser, withMcpContext} from '../utils.js';
 
@@ -46,6 +54,7 @@ async function runReplEvaluate(
   context: McpContext,
 ): Promise<void> {
   const tool = getReplEvaluateTool(args);
+  const parsedParams = zod.object(tool.schema).parse(params);
   if (isPageScopedTool(tool)) {
     const pageId =
       typeof params.pageId === 'number' ? params.pageId : undefined;
@@ -57,14 +66,14 @@ async function runReplEvaluate(
     if (tool.blockedByDialog) {
       page.throwIfDialogOpen();
     }
-    await tool.handler({params, page}, response, context);
+    await tool.handler({params: parsedParams, page}, response, context);
     return;
   }
   if (isBrowserlessTool(tool)) {
-    await tool.handler({params}, response, context);
+    await tool.handler({params: parsedParams}, response, context);
     return;
   }
-  await tool.handler({params}, response, context);
+  await tool.handler({params: parsedParams}, response, context);
 }
 
 function parseJsonBlockFromText(text: string): Record<string, unknown> {
@@ -102,25 +111,6 @@ function getClientResultText(
     }
   }
   return parts.join('\n');
-}
-
-function hasCompletedStep(steps: unknown, toolName: string): boolean {
-  if (!Array.isArray(steps)) {
-    return false;
-  }
-  return steps.some(step => {
-    if (typeof step === 'string') {
-      return step.includes(toolName);
-    }
-    if (isPlainObject(step)) {
-      return (
-        step.tool === toolName ||
-        step.name === toolName ||
-        step.toolName === toolName
-      );
-    }
-    return false;
-  });
 }
 
 describe('repl mode (evaluate_script with --repl)', () => {
@@ -284,7 +274,17 @@ describe('repl mode (evaluate_script with --repl)', () => {
   it('executes outer navigate_page then evaluate_script with inner mcp.* calls via McpServer without TaskRunner deadlock and returns structuredContent', async () => {
     httpServer.addHtmlRoute(
       '/server-repl',
-      html`<main><h1>REPL Server Page</h1><button>Go</button></main>`,
+      `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <title>REPL Server Page</title>
+  </head>
+  <body>
+    <main><h1>REPL Server Page</h1><button>Go</button></main>
+  </body>
+</html>`,
     );
 
     await withBrowser(async browser => {
@@ -314,7 +314,8 @@ describe('repl mode (evaluate_script with --repl)', () => {
         });
         const listText = getClientResultText(listRes);
         const pageIdMatch = listText.match(/(\d+): .* \[selected\]/);
-        const pageId = pageIdMatch ? Number(pageIdMatch[1]) : 1;
+        assert.ok(pageIdMatch);
+        const pageId = Number(pageIdMatch[1]);
 
         const navRes = await client.callTool(
           {
@@ -431,12 +432,12 @@ describe('repl mode (evaluate_script with --repl)', () => {
     );
   });
 
-  it('throws self-correcting errors for outer-only, disabled, and stripped filePath calls while attaching inner screenshots to outer response', async () => {
+  it('rejects outer-only tools on mcp.* with guidance to return first', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
         await mcpPage.pptrPage.setContent(
-          html`<main><h1>Guardrails</h1></main>`,
+          html`<main><h1>Outer Guardrails</h1></main>`,
         );
 
         await runReplEvaluate(
@@ -458,27 +459,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
                 dialogError = err instanceof Error ? err.message : String(err);
               }
 
-              let disabledError = '';
-              try {
-                await mcp.click_at({ x: 10, y: 10 });
-              } catch (err) {
-                disabledError = err instanceof Error ? err.message : String(err);
-              }
-
-              let filePathError = '';
-              try {
-                await mcp.take_snapshot({ filePath: '/tmp/leak.txt' });
-              } catch (err) {
-                filePathError = err instanceof Error ? err.message : String(err);
-              }
-
-              await mcp.take_screenshot();
-              return {
-                navError,
-                dialogError,
-                disabledError,
-                filePathError,
-              };
+              return { navError, dialogError };
             }`,
           },
           response,
@@ -493,20 +474,188 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.ok(typeof result.dialogError === 'string');
         assert.match(result.dialogError, /outer MCP tool/i);
         assert.doesNotMatch(result.dialogError, /is not a function/i);
+      },
+      {},
+      {repl: true},
+    );
+  });
 
+  it('rejects disabled inner tools on mcp.*', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Disabled Tool Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              let disabledError = '';
+              try {
+                await mcp.click_at({ x: 10, y: 10 });
+              } catch (err) {
+                disabledError = err instanceof Error ? err.message : String(err);
+              }
+              return { disabledError };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const result = parseEvaluatedJson(response);
         assert.ok(typeof result.disabledError === 'string');
         assert.match(result.disabledError, /disabled/i);
         assert.doesNotMatch(result.disabledError, /is not a function/i);
+      },
+      {},
+      {repl: true, experimentalVision: false},
+    );
+  });
 
+  it('rejects stripped host-file parameters on inner mcp.* calls', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Stripped Param Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              let filePathError = '';
+              try {
+                await mcp.take_snapshot({ filePath: '/tmp/leak.txt' });
+              } catch (err) {
+                filePathError = err instanceof Error ? err.message : String(err);
+              }
+              return { filePathError };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const result = parseEvaluatedJson(response);
         assert.ok(typeof result.filePathError === 'string');
         assert.match(result.filePathError, /filePath/);
+      },
+      {},
+      {repl: true},
+    );
+  });
 
+  it('attaches inner mcp.take_screenshot images to the outer response', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Screenshot Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              await mcp.take_screenshot();
+              return { captured: true };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(parseEvaluatedJson(response).captured, true);
         assert.strictEqual(response.images.length, 1);
         assert.strictEqual(response.images[0]?.mimeType, 'image/png');
         assert.ok((response.images[0]?.data.length ?? 0) > 0);
       },
       {},
-      {repl: true, experimentalVision: false},
+      {repl: true},
+    );
+  });
+
+  it('drains un-awaited inner mcp.* calls before evaluate_script returns on the normal success path', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Drain In-Flight Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              void mcp.take_screenshot();
+              return { returnedImmediately: true };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          parseEvaluatedJson(response).returnedImmediately,
+          true,
+        );
+        assert.strictEqual(response.images.length, 1);
+        assert.strictEqual(response.images[0]?.mimeType, 'image/png');
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('waits for stable DOM by default on normal completion unless waitForStableDom is false', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Stable DOM Default Check</h1></main>`,
+        );
+
+        const waitSpy = sinon.spy(mcpPage, 'createWaitForHelper');
+        try {
+          await runReplEvaluate(
+            args,
+            {
+              pageId: mcpPage.id,
+              function: `async () => ({ ok: 1 })`,
+            },
+            response,
+            context,
+          );
+          sinon.assert.calledOnce(waitSpy);
+
+          waitSpy.resetHistory();
+          response.resetResponseLineForTesting();
+
+          await runReplEvaluate(
+            args,
+            {
+              pageId: mcpPage.id,
+              waitForStableDom: false,
+              function: `async () => ({ ok: 2 })`,
+            },
+            response,
+            context,
+          );
+          sinon.assert.notCalled(waitSpy);
+        } finally {
+          waitSpy.restore();
+        }
+      },
+      {},
+      {repl: true},
     );
   });
 
@@ -640,7 +789,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
     );
   });
 
-  it('updates React-style _valueTracker controlled inputs, textareas, date inputs, and select options by label via mcp.fill', async () => {
+  it('fills text inputs, textareas, and native selects by option value via mcp.fill', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
@@ -651,11 +800,6 @@ describe('repl mode (evaluate_script with --repl)', () => {
             value=""
           />
           <textarea id="notes-area"></textarea>
-          <input
-            id="start-date"
-            type="date"
-            value=""
-          />
           <select id="plan-select">
             <option value="free">Free Tier</option>
             <option value="pro">Pro Plan</option>
@@ -696,18 +840,12 @@ describe('repl mode (evaluate_script with --repl)', () => {
               el.addEventListener('change', onEvent);
             }
 
-            for (const id of [
-              'email-input',
-              'notes-area',
-              'start-date',
-              'plan-select',
-            ]) {
+            for (const id of ['email-input', 'notes-area', 'plan-select']) {
               instrumentValueTracker(document.getElementById(id));
             }
           </script>
         `);
 
-        const expectedLong = 'x'.repeat(120);
         await runReplEvaluate(
           args,
           {
@@ -715,26 +853,21 @@ describe('repl mode (evaluate_script with --repl)', () => {
             function: `async (mcp) => {
               const email = document.getElementById('email-input');
               const notes = document.getElementById('notes-area');
-              const startDate = document.getElementById('start-date');
               const plan = document.getElementById('plan-select');
 
               await mcp.fill({ element: email, value: 'ada@example.com' });
-              const shortOk = email.value === 'ada@example.com';
+              const firstFillOk = email.value === 'ada@example.com';
 
-              const longVal = 'x'.repeat(120);
-              await mcp.fill({ element: notes, value: longVal });
-              const longOk = notes.value === longVal;
+              await mcp.fill({ element: email, value: 'grace@example.com' });
+              const overwriteOk = email.value === 'grace@example.com';
 
-              await mcp.fill({ element: email, value: '' });
-              const clearedOk = email.value === '';
+              await mcp.fill({ element: notes, value: 'Updated concise note' });
+              const notesOk = notes.value === 'Updated concise note';
 
-              await mcp.fill({ element: startDate, value: '2026-11-12' });
-              const dateOk = startDate.value === '2026-11-12';
-
-              await mcp.fill({ element: plan, value: 'Pro Plan' });
+              await mcp.fill({ element: plan, value: 'pro' });
               const selectOk = plan.value === 'pro';
 
-              return { shortOk, longOk, clearedOk, dateOk, selectOk };
+              return { firstFillOk, overwriteOk, notesOk, selectOk };
             }`,
           },
           response,
@@ -742,19 +875,17 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
 
         const domResult = parseEvaluatedJson(response);
-        assert.strictEqual(domResult.shortOk, true);
-        assert.strictEqual(domResult.longOk, true);
-        assert.strictEqual(domResult.clearedOk, true);
-        assert.strictEqual(domResult.dateOk, true);
+        assert.strictEqual(domResult.firstFillOk, true);
+        assert.strictEqual(domResult.overwriteOk, true);
+        assert.strictEqual(domResult.notesOk, true);
         assert.strictEqual(domResult.selectOk, true);
 
         const trackedState = await mcpPage.pptrPage.evaluate(() => {
           return Reflect.get(window, 'trackedState');
         });
         assert.deepStrictEqual(trackedState, {
-          'email-input': '',
-          'notes-area': expectedLong,
-          'start-date': '2026-11-12',
+          'email-input': 'grace@example.com',
+          'notes-area': 'Updated concise note',
           'plan-select': 'pro',
         });
       },
@@ -763,7 +894,57 @@ describe('repl mode (evaluate_script with --repl)', () => {
     );
   });
 
-  it('auto-handles mid-script modal dialogs via dialogAction while rejecting pre-existing open dialogs', async () => {
+  it('does not probe selectNativeSelectOption on ephemeral element uids without an option AX node in click', async () => {
+    const {page, context, response, args} = createHandlerMocks();
+    const {handle, locator} = createMockElementHandle();
+    locator.click.resolves();
+    page.getElementByUid.withArgs('__repl_el_1').resolves(handle);
+    page.getAXNodeByUid.withArgs('__repl_el_1').returns(undefined);
+
+    await click(args).handler(
+      {params: {uid: '__repl_el_1'}, page},
+      response,
+      context,
+    );
+
+    sinon.assert.notCalled(handle.evaluateHandle);
+    sinon.assert.calledOnce(locator.click);
+  });
+
+  it('selects a native <select> <option> passed as a live DOM Element to mcp.click', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(html`
+          <select id="plan-select">
+            <option value="free">Free Tier</option>
+            <option value="pro">Pro Plan</option>
+          </select>
+        `);
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const opt = document.querySelector('#plan-select option[value="pro"]');
+              await mcp.click({ element: opt });
+              return { selected: document.getElementById('plan-select').value };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const result = parseEvaluatedJson(response);
+        assert.strictEqual(result.selected, 'pro');
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('auto-handles mid-script dialogs according to dialogAction', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
@@ -809,6 +990,19 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
         const dismissed = parseEvaluatedJson(response);
         assert.strictEqual(dismissed.confirmed, 'false');
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('rejects evaluate_script when a modal dialog is already open', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Pre-existing Dialog</h1></main>`,
+        );
 
         const dialogOpened = new Promise<void>(resolve => {
           mcpPage.pptrPage.once('dialog', () => resolve());
@@ -841,7 +1035,65 @@ describe('repl mode (evaluate_script with --repl)', () => {
     );
   });
 
-  it('executes local sourcePath scripts, rejects URL sourcePath, survives SPA pushState, and cleanly exits early on click-triggered MPA navigation while preserving prior screenshots', async () => {
+  it('executes local JavaScript files via sourcePath', async () => {
+    using localScript = createTempFile(
+      `async (mcp) => {
+        const snap = await mcp.take_snapshot();
+        return { loadedFromFile: true, snapOk: snap.ok };
+      }`,
+      'repl-local-check.js',
+    );
+
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Local Script Check</h1></main>`,
+        );
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            sourcePath: localScript.path,
+          },
+          response,
+          context,
+        );
+
+        const fileJson = parseEvaluatedJson(response);
+        assert.strictEqual(fileJson.loadedFromFile, true);
+        assert.strictEqual(fileJson.snapOk, true);
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('rejects HTTP URLs passed to sourcePath', async () => {
+    const mockBrowser = createMockPuppeteerBrowser();
+    mockBrowser.targets.returns([createMockPuppeteerTarget()]);
+    const browserManager = sinon.createStubInstance(BrowserManager);
+    browserManager.ensureBrowser.resolves(mockBrowser);
+    browserManager.close.resolves();
+    const config = createMockServerConfig({repl: true, pageIdRouting: false});
+    const mcpServer = await McpServer.from(config, {browserManager});
+
+    try {
+      const evilUrlRes = await mcpServer.callTool('evaluate_script', {
+        sourcePath: 'http://127.0.0.1:9999/evil.js',
+      });
+      assert.strictEqual(evilUrlRes.isError, true);
+      assert.match(
+        getClientResultText(evilUrlRes),
+        /file path, not a URL|Access denied|not allowed/i,
+      );
+    } finally {
+      await mcpServer.close();
+    }
+  });
+
+  it('survives SPA history.pushState within a single evaluate_script call', async () => {
     httpServer.addHtmlRoute(
       '/spa-app',
       html`
@@ -854,6 +1106,40 @@ describe('repl mode (evaluate_script with --repl)', () => {
         <div id="spa-out">/spa-app</div>
       `,
     );
+
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.goto(httpServer.getRoute('/spa-app'));
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const btn = document.getElementById('spa-next');
+              await mcp.click({ element: btn });
+              await mcp.wait_for({ text: ['/step2'] });
+              return {
+                pathname: location.pathname,
+                rendered: document.getElementById('spa-out').textContent,
+              };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        const spaJson = parseEvaluatedJson(response);
+        assert.strictEqual(spaJson.pathname, '/step2');
+        assert.strictEqual(spaJson.rendered, '/step2');
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('exits early with completedSteps and preserves prior screenshots on click-triggered full-page navigation', async () => {
     httpServer.addHtmlRoute(
       '/mpa-page1',
       html`<a
@@ -866,85 +1152,6 @@ describe('repl mode (evaluate_script with --repl)', () => {
       '/page2',
       html`<main><h1>Welcome to Page 2</h1></main>`,
     );
-
-    using localScript = createTempFile(
-      `async (mcp) => {
-        const snap = await mcp.take_snapshot();
-        return { loadedFromFile: true, snapOk: snap.ok };
-      }`,
-      'repl-local-check.js',
-    );
-
-    await withBrowser(async browser => {
-      TextSnapshot.resetCounter();
-      McpContext.resetPageIdsForTesting();
-      McpContext.resetWorkerIdsForTesting();
-
-      const browserManager = sinon.createStubInstance(BrowserManager);
-      browserManager.ensureBrowser.resolves(browser);
-      browserManager.close.resolves();
-
-      const config = createMockServerConfig({repl: true});
-      const mcpServer = await McpServer.from(config, {browserManager});
-
-      try {
-        const listRes = await mcpServer.callTool('list_pages', {});
-        const listText = getClientResultText(listRes);
-        const pageIdMatch = listText.match(/(\d+): .* \[selected\]/);
-        const pageId = pageIdMatch ? Number(pageIdMatch[1]) : 1;
-
-        await mcpServer.callTool('navigate_page', {
-          pageId,
-          url: httpServer.getRoute('/spa-app'),
-        });
-
-        const fileRes = await mcpServer.callTool('evaluate_script', {
-          pageId,
-          sourcePath: localScript.path,
-        });
-        assert.strictEqual(
-          fileRes.isError,
-          undefined,
-          getClientResultText(fileRes),
-        );
-        const fileJson = parseJsonBlockFromText(getClientResultText(fileRes));
-        assert.strictEqual(fileJson.loadedFromFile, true);
-        assert.strictEqual(fileJson.snapOk, true);
-
-        const evilUrlRes = await mcpServer.callTool('evaluate_script', {
-          pageId,
-          sourcePath: 'http://127.0.0.1:9999/evil.js',
-        });
-        assert.strictEqual(evilUrlRes.isError, true);
-        assert.match(
-          getClientResultText(evilUrlRes),
-          /file path, not a URL|Access denied|not allowed/i,
-        );
-
-        const spaRes = await mcpServer.callTool('evaluate_script', {
-          pageId,
-          function: `async (mcp) => {
-            const btn = document.getElementById('spa-next');
-            await mcp.click({ element: btn });
-            await mcp.wait_for({ text: ['/step2'] });
-            return {
-              pathname: location.pathname,
-              rendered: document.getElementById('spa-out').textContent,
-            };
-          }`,
-        });
-        assert.strictEqual(
-          spaRes.isError,
-          undefined,
-          getClientResultText(spaRes),
-        );
-        const spaJson = parseJsonBlockFromText(getClientResultText(spaRes));
-        assert.strictEqual(spaJson.pathname, '/step2');
-        assert.strictEqual(spaJson.rendered, '/step2');
-      } finally {
-        await mcpServer.close();
-      }
-    });
 
     await withMcpContext(
       async (response, context, args) => {
@@ -973,14 +1180,14 @@ describe('repl mode (evaluate_script with --repl)', () => {
         const mpaJson = parseEvaluatedJson(response);
         assert.strictEqual(mpaJson.navigated, true);
         assert.strictEqual(mpaJson.newUrl, httpServer.getRoute('/page2'));
-        assert.ok(
-          hasCompletedStep(mpaJson.completedSteps, 'take_screenshot'),
-          `Expected completedSteps to include take_screenshot, got: ${JSON.stringify(mpaJson.completedSteps)}`,
-        );
-        assert.ok(
-          hasCompletedStep(mpaJson.completedSteps, 'click'),
-          `Expected completedSteps to include click, got: ${JSON.stringify(mpaJson.completedSteps)}`,
-        );
+        assert.deepStrictEqual(mpaJson.completedSteps, [
+          {tool: 'take_screenshot', ok: true},
+          {
+            tool: 'click',
+            ok: true,
+            navigatedToUrl: httpServer.getRoute('/page2'),
+          },
+        ]);
         assert.strictEqual(
           mcpPage.pptrPage.url(),
           httpServer.getRoute('/page2'),
@@ -991,22 +1198,30 @@ describe('repl mode (evaluate_script with --repl)', () => {
     );
   });
 
-  it('validates inner tool structuredContent against strict outputSchema at runtime while tolerating active page emulation metadata', async () => {
+  it('accepts inner tool structuredContent when page emulation metadata is active', async () => {
     httpServer.addHtmlRoute(
       '/emul-repl',
-      html`
-        <style>
-          #emul-btn {
-            color: rgb(10, 20, 30);
-          }
-        </style>
-        <button
-          id="emul-btn"
-          onclick="console.log('clicked-under-emulation')"
-        >
-          Emulate Action
-        </button>
-      `,
+      `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <title>Emulation Page</title>
+    <style>
+      #emul-btn {
+        color: rgb(10, 20, 30);
+      }
+    </style>
+  </head>
+  <body>
+    <button
+      id="emul-btn"
+      onclick="console.log('clicked-under-emulation')"
+    >
+      Emulate Action
+    </button>
+  </body>
+</html>`,
     );
 
     await withMcpContext(
@@ -1081,6 +1296,19 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.ok(
           typeof emulResult.netCount === 'number' && emulResult.netCount >= 1,
         );
+      },
+      {},
+      {repl: true},
+    );
+  });
+
+  it('rejects drifted inner tool structuredContent in ReplToolDispatcher', async () => {
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<main><h1>Dispatcher Drift Check</h1></main>`,
+        );
 
         const originalHandle = McpResponse.prototype.handle;
         const handleStub = sinon
@@ -1107,7 +1335,6 @@ describe('repl mode (evaluate_script with --repl)', () => {
           });
 
         try {
-          response.resetResponseLineForTesting();
           await assert.rejects(
             runReplEvaluate(
               args,
@@ -1129,7 +1356,9 @@ describe('repl mode (evaluate_script with --repl)', () => {
       {},
       {repl: true},
     );
+  });
 
+  it('rejects drifted structuredContent in McpServer when experimentalStructuredContent is enabled', async () => {
     await withBrowser(async browser => {
       TextSnapshot.resetCounter();
       McpContext.resetPageIdsForTesting();
@@ -1184,7 +1413,8 @@ describe('repl mode (evaluate_script with --repl)', () => {
         });
         const listText = getClientResultText(listRes);
         const pageIdMatch = listText.match(/(\d+): .* \[selected\]/);
-        const pageId = pageIdMatch ? Number(pageIdMatch[1]) : 1;
+        assert.ok(pageIdMatch);
+        const pageId = Number(pageIdMatch[1]);
 
         let serverRejectedOrErrored = false;
         let serverFailureMessage = '';

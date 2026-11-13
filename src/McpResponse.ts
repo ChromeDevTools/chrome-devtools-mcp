@@ -68,7 +68,7 @@ import type {
   PaginationOutput,
   SnapshotJsonNode,
   WebMcpToolSummary,
-} from './tools/replSchema.js';
+} from './tools/repl/replSchema.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
@@ -963,7 +963,6 @@ export class McpResponse implements Response {
       matchedStyles?: StructuredCssStyles;
       webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
-      ok?: boolean;
       dialogHandled?: boolean;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1005,16 +1004,6 @@ export class McpResponse implements Response {
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
-    }
-
-    if (
-      !data.errorMessage &&
-      this.#textResponseLines.length > 0 &&
-      (this.#attachedWaitForResult !== undefined ||
-        this.#snapshotParams !== undefined ||
-        (this.#page?.getDialog() !== undefined && !this.#includePages))
-    ) {
-      structuredContent.ok = true;
     }
 
     if (this.#attachedWaitForResult) {

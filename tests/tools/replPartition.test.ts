@@ -21,7 +21,7 @@ import {
   INNER_REPL_TOOL_NAMES,
   partitionToolsForRepl,
   STRIPPED_INNER_PARAMS,
-} from '../../src/tools/replPartition.js';
+} from '../../src/tools/repl/replPartition.js';
 import type {AnyToolDefinition} from '../../src/tools/ToolDefinition.js';
 import {createTools} from '../../src/tools/tools.js';
 import {createMockParsedArguments} from '../mocks.js';

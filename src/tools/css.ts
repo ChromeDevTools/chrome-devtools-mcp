@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {cssStylesOutputSchema} from './replSchema.js';
+import {cssStylesOutputSchema} from './repl/replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export const getCssStyles: PageToolFactory = definePageTool(() => ({

@@ -14,7 +14,7 @@ import {
 import type {
   NetworkRequestConcise,
   NetworkRequestDetailed,
-} from '../tools/replSchema.js';
+} from '../tools/repl/replSchema.js';
 import {truncateText, truncateUrl} from '../utils/text.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;

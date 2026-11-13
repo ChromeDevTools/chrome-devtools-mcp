@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../../config/mcp-options.js';
 
 import {
-  isBrowserlessTool,
   isCapabilityEnabled,
-  isPageScopedTool,
   type AnyToolDefinition,
   type ToolSchema,
-} from './ToolDefinition.js';
+} from '../ToolDefinition.js';
 
 export const INNER_REPL_TOOL_NAMES: ReadonlySet<string> = new Set([
   'click',
@@ -53,12 +51,19 @@ export interface ReplToolPartition {
   innerTools: AnyToolDefinition[];
 }
 
-function stripInnerSchemaParams(schema: ToolSchema): ToolSchema {
+export function stripReplToolParams(
+  schema: ToolSchema,
+  options?: {stripPageId?: boolean},
+): ToolSchema {
   const stripped: ToolSchema = {};
   for (const [key, value] of Object.entries(schema)) {
-    if (!STRIPPED_INNER_PARAMS.has(key)) {
-      stripped[key] = value;
+    if (
+      (options?.stripPageId && key === 'pageId') ||
+      STRIPPED_INNER_PARAMS.has(key)
+    ) {
+      continue;
     }
+    stripped[key] = value;
   }
   return stripped;
 }
@@ -75,29 +80,13 @@ function stripInnerVerifyFilesParams(
   return stripped;
 }
 
-function cloneInnerToolWithStrippedParams(
-  tool: AnyToolDefinition,
-): AnyToolDefinition {
-  const schema = stripInnerSchemaParams(tool.schema);
-  const verifyFilesSchema = stripInnerVerifyFilesParams(tool.verifyFilesSchema);
-  if (isPageScopedTool(tool)) {
-    return {
-      ...tool,
-      schema,
-      verifyFilesSchema,
-    };
-  }
-  if (isBrowserlessTool(tool)) {
-    return {
-      ...tool,
-      schema,
-      verifyFilesSchema,
-    };
-  }
+function cloneInnerToolWithStrippedParams<T extends AnyToolDefinition>(
+  tool: T,
+): T {
   return {
     ...tool,
-    schema,
-    verifyFilesSchema,
+    schema: stripReplToolParams(tool.schema),
+    verifyFilesSchema: stripInnerVerifyFilesParams(tool.verifyFilesSchema),
   };
 }
 
@@ -105,13 +94,6 @@ export function partitionToolsForRepl(
   tools: readonly AnyToolDefinition[],
   args: ParsedArguments,
 ): ReplToolPartition {
-  if (!Array.isArray(tools)) {
-    return {
-      outerTools: [],
-      innerTools: [],
-    };
-  }
-
   const outerTools: AnyToolDefinition[] = [];
   const innerTools: AnyToolDefinition[] = [];
 

@@ -150,8 +150,16 @@ export class ServerConfig implements ReadonlyServerConfig {
     for (const [key, implied] of IMPLICATIONS) {
       const isKeySet =
         explicitArgs[key] !== undefined && explicitArgs[key] !== false;
+      const defaultVal =
+        'default' in mcpOptions[implied]
+          ? mcpOptions[implied].default
+          : undefined;
+      const effectiveImplied =
+        implied in explicitArgs && explicitArgs[implied] !== undefined
+          ? explicitArgs[implied]
+          : defaultVal;
       const isImpliedSet =
-        explicitArgs[implied] !== undefined && explicitArgs[implied] !== false;
+        effectiveImplied !== undefined && effectiveImplied !== false;
       if (isKeySet && !isImpliedSet) {
         throw new Error(
           `Implications failed:\n  ${String(key)} -> ${String(implied)}`,
@@ -160,12 +168,6 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
     if (explicitArgs.replMainWorld === true && explicitArgs.repl === false) {
       throw new Error('Implications failed:\n  replMainWorld -> repl');
-    }
-    if (
-      (explicitArgs.repl === true || explicitArgs.replMainWorld === true) &&
-      explicitArgs.javascriptEvaluation === false
-    ) {
-      throw new Error('Implications failed:\n  repl -> javascriptEvaluation');
     }
   }
 
@@ -269,12 +271,6 @@ export class ServerConfig implements ReadonlyServerConfig {
       env: options.env,
       suppressUsageStatisticsNotice: options.suppressUsageStatisticsNotice,
     });
-    if (
-      (resolved.repl || resolved.replMainWorld) &&
-      !resolved.javascriptEvaluation
-    ) {
-      throw new Error('Implications failed:\n  repl -> javascriptEvaluation');
-    }
     return new ServerConfig({
       cliArgs: options.cliArgs,
       fileArgs: options.fileArgs,

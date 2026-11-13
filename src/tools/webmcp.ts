@@ -10,7 +10,7 @@ import {ToolCategory} from './categories.js';
 import {
   listWebMcpToolsOutputSchema,
   messageOutputSchema,
-} from './replSchema.js';
+} from './repl/replSchema.js';
 import {
   definePageTool,
   jsonObjectTransform,

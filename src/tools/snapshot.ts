@@ -7,7 +7,10 @@
 import {TimeoutError, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {takeSnapshotOutputSchema, waitForOutputSchema} from './replSchema.js';
+import {
+  takeSnapshotOutputSchema,
+  waitForOutputSchema,
+} from './repl/replSchema.js';
 import {
   definePageTool,
   type PageToolFactory,

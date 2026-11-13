@@ -26,11 +26,12 @@ import {
   type NetworkMockInput,
 } from './NetworkOverrideManager.js';
 import {
+  CdpFrame,
+  ElementHandle,
   type Locator,
   PredefinedNetworkConditions,
   type CDPSession,
   type Dialog,
-  type ElementHandle,
   type Frame,
   type Viewport,
   type WebMCPTool,
@@ -66,6 +67,7 @@ import type {
 } from './types.js';
 import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
+import {isPlainRecord} from './utils/objects.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
@@ -182,99 +184,22 @@ function isBackendNodeId(
   return typeof id === 'number';
 }
 
-function isPlainObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isImplicitFaviconConsoleError(event: ConsoleMessage): boolean {
-  if (
-    typeof event.type !== 'function' ||
-    typeof event.text !== 'function' ||
-    typeof event.location !== 'function'
-  ) {
-    return false;
-  }
-  if (
-    event.type() !== 'error' ||
-    !event.text().startsWith('Failed to load resource:')
-  ) {
-    return false;
-  }
-  const url = event.location()?.url;
-  if (typeof url !== 'string' || url.length === 0) {
-    return false;
-  }
-  try {
-    return new URL(url).pathname === '/favicon.ico';
-  } catch {
-    return url.endsWith('/favicon.ico');
-  }
-}
-
-interface AdoptableHandle {
-  dispose(): Promise<void>;
-}
-
-interface AdoptableFrame {
-  _id: string;
-  mainRealm(): {
-    adoptBackendNode(backendNodeId?: number): Promise<AdoptableHandle>;
-  };
-}
-
-function isAdoptableFrame(frame: unknown): frame is AdoptableFrame {
+// Tests in `tests/utils.ts` launch unbundled `puppeteer` while `src/` bundles
+// `puppeteer-core`, so fall back when `instanceof` crosses the bundle boundary.
+function isCdpFrame(frame: unknown): frame is CdpFrame {
   return (
-    typeof frame === 'object' &&
-    frame !== null &&
-    '_id' in frame &&
-    typeof frame._id === 'string' &&
-    'mainRealm' in frame &&
-    typeof frame.mainRealm === 'function'
+    frame instanceof CdpFrame ||
+    (isPlainRecord(frame) && typeof frame.mainRealm === 'function')
   );
 }
 
-function isElementHandleInstance(
-  handle: unknown,
-): handle is ElementHandle<Element> {
+function isElementHandle(handle: unknown): handle is ElementHandle<Element> {
   return (
-    typeof handle === 'object' &&
-    handle !== null &&
-    'asLocator' in handle &&
-    typeof handle.asLocator === 'function' &&
-    'evaluate' in handle &&
-    typeof handle.evaluate === 'function'
+    handle instanceof ElementHandle ||
+    (isPlainRecord(handle) &&
+      typeof handle.asElement === 'function' &&
+      handle.asElement() !== null)
   );
-}
-
-function isLocatorConstructorWithRace(ctor: unknown): ctor is {
-  race(locators: ReadonlyArray<Locator<Element>>): Locator<Element>;
-} {
-  return (
-    typeof ctor === 'function' &&
-    'race' in ctor &&
-    typeof ctor.race === 'function'
-  );
-}
-
-function raceLocators(
-  candidates: Array<Locator<Element>>,
-  fallbackLocatorClass: typeof Locator,
-): Locator<Element> {
-  const first = candidates[0];
-  if (!first || first instanceof fallbackLocatorClass) {
-    return fallbackLocatorClass.race(candidates);
-  }
-  if (typeof first === 'object') {
-    let proto: unknown = Object.getPrototypeOf(first);
-    while (proto && typeof proto === 'object') {
-      const ctor: unknown = Reflect.get(proto, 'constructor');
-      if (isLocatorConstructorWithRace(ctor)) {
-        return ctor.race(candidates);
-      }
-      proto = Object.getPrototypeOf(proto);
-    }
-  }
-  return fallbackLocatorClass.race(candidates);
 }
 
 /**
@@ -329,7 +254,7 @@ export class McpPage implements ContextPage {
   };
   #ephemeralNodes = new Map<
     string,
-    {backendNodeId: number; frameId?: string}
+    {backendNodeId: number; frameId?: string; role?: string}
   >();
   #nextEphemeralNodeId = 1;
 
@@ -371,12 +296,15 @@ export class McpPage implements ContextPage {
       ) {
         const action = this.#replDialogAction;
         this.#dialog = undefined;
+        const onDialogError = (err: unknown): void => {
+          logger?.('Failed to handle REPL dialog', err);
+        };
         if (action === 'dismiss') {
-          void dialog.dismiss();
+          void dialog.dismiss().catch(onDialogError);
         } else if (action === 'accept') {
-          void dialog.accept();
+          void dialog.accept().catch(onDialogError);
         } else {
-          void dialog.accept(action);
+          void dialog.accept(action).catch(onDialogError);
         }
         return;
       }
@@ -516,9 +444,6 @@ export class McpPage implements ContextPage {
         collect => {
           return {
             console: event => {
-              if (isImplicitFaviconConsoleError(event)) {
-                return;
-              }
               collect(event);
             },
             uncaughtError: event => {
@@ -1380,6 +1305,7 @@ export class McpPage implements ContextPage {
   registerEphemeralBackendNode(entry: {
     backendNodeId: number;
     frameId?: string;
+    role?: string;
   }): {uid: string} & Disposable {
     const uid = `__repl_el_${this.#nextEphemeralNodeId++}`;
     this.#ephemeralNodes.set(uid, entry);
@@ -1389,6 +1315,13 @@ export class McpPage implements ContextPage {
         this.#ephemeralNodes.delete(uid);
       },
     };
+  }
+
+  isOptionUid(uid: string): boolean {
+    return (
+      (this.#ephemeralNodes.get(uid)?.role ??
+        this.getAXNodeByUid(uid)?.role) === 'option'
+    );
   }
 
   async #getReplCdpSession(): Promise<CDPSession> {
@@ -1404,7 +1337,7 @@ export class McpPage implements ContextPage {
         session.on('Runtime.executionContextCreated', event => {
           const auxData: unknown = event.context.auxData;
           if (
-            isPlainObjectRecord(auxData) &&
+            isPlainRecord(auxData) &&
             auxData.isDefault === true &&
             typeof auxData.frameId === 'string'
           ) {
@@ -1507,14 +1440,14 @@ export class McpPage implements ContextPage {
     backendNodeId: number,
     frameId?: string,
   ): Promise<ElementHandle<Element>> {
-    const frames: AdoptableFrame[] = [];
+    const frames: CdpFrame[] = [];
     for (const frame of this.pptrPage.frames()) {
-      if (isAdoptableFrame(frame)) {
+      if (isCdpFrame(frame)) {
         frames.push(frame);
       }
     }
-    const candidateFrames: AdoptableFrame[] = [];
-    const pushUniqueFrame = (frame: AdoptableFrame | undefined): void => {
+    const candidateFrames: CdpFrame[] = [];
+    const pushUniqueFrame = (frame: CdpFrame | undefined): void => {
       if (frame && !candidateFrames.includes(frame)) {
         candidateFrames.push(frame);
       }
@@ -1522,8 +1455,8 @@ export class McpPage implements ContextPage {
     if (frameId !== undefined) {
       pushUniqueFrame(frames.find(frame => frame._id === frameId));
     }
-    const rawMainFrame: unknown = this.pptrPage.mainFrame();
-    if (isAdoptableFrame(rawMainFrame)) {
+    const rawMainFrame = this.pptrPage.mainFrame();
+    if (isCdpFrame(rawMainFrame)) {
       pushUniqueFrame(rawMainFrame);
     }
     for (const frame of frames) {
@@ -1534,17 +1467,17 @@ export class McpPage implements ContextPage {
     }
 
     for (const candidateFrame of candidateFrames) {
-      let adopted: AdoptableHandle | undefined;
+      let adopted: Awaited<
+        ReturnType<ReturnType<CdpFrame['mainRealm']>['adoptBackendNode']>
+      > | null = null;
       try {
         adopted = await candidateFrame
           .mainRealm()
           .adoptBackendNode(backendNodeId);
-        if (isElementHandleInstance(adopted)) {
+        if (isElementHandle(adopted)) {
           const belongsToCandidateFrame = await adopted.evaluate(
             (node: Element) =>
-              node.nodeType === 1 &&
-              (node.ownerDocument?.defaultView === window ||
-                node.ownerDocument?.defaultView === null),
+              node.nodeType === 1 && node.ownerDocument?.defaultView === window,
           );
           if (belongsToCandidateFrame) {
             return adopted;
@@ -2006,7 +1939,7 @@ export class McpPage implements ContextPage {
             : locators;
         }),
       );
-      return raceLocators(candidates, this.#locatorClass);
+      return this.#locatorClass.race(candidates);
     };
 
     let initialLocator = locatorForFrames(initialFrames);

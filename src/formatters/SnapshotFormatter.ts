@@ -8,7 +8,7 @@ import type {TextSnapshot} from '../TextSnapshot.js';
 import type {
   SnapshotJsonNode,
   SnapshotPrimitiveAttribute,
-} from '../tools/replSchema.js';
+} from '../tools/repl/replSchema.js';
 import type {TextSnapshotNode} from '../types.js';
 import {truncateUrl} from '../utils/text.js';
 

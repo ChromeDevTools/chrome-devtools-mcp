@@ -14,7 +14,7 @@ import {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {messageOutputSchema} from './replSchema.js';
+import {messageOutputSchema} from './repl/replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
@@ -141,6 +141,42 @@ function computeDownscaleClip(
   };
 }
 
+async function captureScreenshotBytes(options: {
+  page: Page;
+  element: ElementHandle | undefined;
+  clip: ScreenshotClip | undefined;
+  fullPage: boolean;
+  type: ScreenshotFormat;
+  quality: number | undefined;
+}): Promise<Uint8Array> {
+  const {page, element, clip, fullPage, type, quality} = options;
+  if (clip) {
+    // page.screenshot with clip lets the CDP scale param downscale the
+    // capture for viewport, full-page and element shots alike. We rely on
+    // Puppeteer's default of captureBeyondViewport=true when a clip is
+    // present so element/full-page captures below the fold still work.
+    return await page.screenshot({
+      type,
+      quality,
+      optimizeForSpeed: true,
+      clip,
+    });
+  }
+  if (element) {
+    return await element.screenshot({
+      type,
+      quality,
+      optimizeForSpeed: true,
+    });
+  }
+  return await page.screenshot({
+    type,
+    fullPage,
+    quality,
+    optimizeForSpeed: true,
+  });
+}
+
 export const screenshot: PageToolFactory = definePageTool(
   (args: ParsedArguments) => {
     const {
@@ -219,11 +255,6 @@ export const screenshot: PageToolFactory = definePageTool(
             : (request.params.quality ?? screenshotQuality);
         const fullPage = request.params.fullPage ?? false;
 
-        // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
-        // once the capture is done to avoid leaking a remote object for the life
-        // of the page's execution context.
-        let screenshot: Uint8Array;
-
         // Compute a downscale clip when --screenshot-max-width or
         // --screenshot-max-height is set and the source exceeds either bound.
         // The smaller scale factor wins so both bounds are respected while
@@ -251,31 +282,14 @@ export const screenshot: PageToolFactory = definePageTool(
           );
         }
 
-        if (clip) {
-          // page.screenshot with clip lets the CDP scale param downscale the
-          // capture for viewport, full-page and element shots alike. We rely on
-          // Puppeteer's default of captureBeyondViewport=true when a clip is
-          // present so element/full-page captures below the fold still work.
-          screenshot = await page.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-            clip,
-          });
-        } else if (element) {
-          screenshot = await element.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-          });
-        } else {
-          screenshot = await page.screenshot({
-            type: format,
-            fullPage,
-            quality,
-            optimizeForSpeed: true,
-          });
-        }
+        const screenshot = await captureScreenshotBytes({
+          page,
+          element,
+          clip,
+          fullPage,
+          type: format,
+          quality,
+        });
 
         if (request.params.uid) {
           response.appendResponseLine(
@@ -308,25 +322,14 @@ export const screenshot: PageToolFactory = definePageTool(
           );
         } else if (screenshot.length >= 2_000_000) {
           if (args.repl) {
-            const webpFallback = clip
-              ? await page.screenshot({
-                  type: 'webp',
-                  quality: 80,
-                  optimizeForSpeed: true,
-                  clip,
-                })
-              : element
-                ? await element.screenshot({
-                    type: 'webp',
-                    quality: 80,
-                    optimizeForSpeed: true,
-                  })
-                : await page.screenshot({
-                    type: 'webp',
-                    fullPage,
-                    quality: 80,
-                    optimizeForSpeed: true,
-                  });
+            const webpFallback = await captureScreenshotBytes({
+              page,
+              element,
+              clip,
+              fullPage,
+              type: 'webp',
+              quality: 80,
+            });
             if (webpFallback.length >= 2_000_000) {
               throw new Error(
                 'Screenshot exceeds 2 MB inline limit in REPL mode. Pass format: "webp" with a lower quality, target a specific element, or configure --screenshot-max-width.',

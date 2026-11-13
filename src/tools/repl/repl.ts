@@ -7,40 +7,38 @@
 import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
-import type {ParsedArguments} from '../config/mcp-options.js';
-import {
-  ServerConfig,
-  type ReadonlyServerConfig,
-} from '../config/ServerConfig.js';
-import {McpContext} from '../McpContext.js';
-import {McpPage} from '../McpPage.js';
-import {McpResponse} from '../McpResponse.js';
+import type {ParsedArguments} from '../../config/mcp-options.js';
 import {
   DisposableStack,
   Mutex,
   zod,
   type CDPSession,
   type Protocol,
-} from '../third_party/index.js';
-import {getNetworkMultiplierFromString} from '../utils/WaitForHelper.js';
+} from '../../third_party/index.js';
+import {isPlainRecord} from '../../utils/objects.js';
+import {getNetworkMultiplierFromString} from '../../utils/WaitForHelper.js';
 
-import {ToolCategory} from './categories.js';
-import {INNER_REPL_TOOL_NAMES, STRIPPED_INNER_PARAMS} from './replPartition.js';
+import {ToolCategory} from '../categories.js';
+import {
+  definePageTool,
+  isSlimTool,
+  type AnyToolDefinition,
+  type Context,
+  type ContextPage,
+  type DefinedPageTool,
+  type Response,
+  type ToolSchema,
+} from '../ToolDefinition.js';
+import {
+  INNER_REPL_TOOL_NAMES,
+  STRIPPED_INNER_PARAMS,
+  stripReplToolParams,
+} from './replPartition.js';
 import {
   buildReplApiDeclaration,
   buildStrictRuntimeOutputSchema,
   formatZodOutputValidationError,
 } from './replSchema.js';
-import {
-  definePageTool,
-  isBrowserlessTool,
-  isPageScopedTool,
-  isSlimTool,
-  type AnyToolDefinition,
-  type Context,
-  type Response,
-  type ToolSchema,
-} from './ToolDefinition.js';
 
 const MAX_REPL_IMAGES = 4;
 
@@ -55,10 +53,6 @@ interface ReplBindingMessage {
   kind: 'tool' | 'getElement' | 'getEventListeners';
   name?: string;
   params?: unknown;
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isElementHandleToken(
@@ -80,17 +74,6 @@ function isReplBindingMessage(value: unknown): value is ReplBindingMessage {
       value.kind === 'getElement' ||
       value.kind === 'getEventListeners')
   );
-}
-
-function stripPageIdAndInnerParams(schema: ToolSchema): ToolSchema {
-  const stripped: ToolSchema = {};
-  for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (key === 'pageId' || STRIPPED_INNER_PARAMS.has(key)) {
-      continue;
-    }
-    stripped[key] = fieldSchema;
-  }
-  return stripped;
 }
 
 function formatZodValidationError(
@@ -400,7 +383,7 @@ ${functionSource}
 function buildStrictInnerSchema(
   schema: ToolSchema,
 ): zod.ZodObject<zod.ZodRawShape, zod.core.$strict> {
-  return zod.object(stripPageIdAndInnerParams(schema)).strict();
+  return zod.object(stripReplToolParams(schema, {stripPageId: true})).strict();
 }
 /* eslint-enable @local/enforce-zod-schema */
 
@@ -412,10 +395,9 @@ class ReplToolDispatcher {
   #aborted = false;
   #navigated = false;
   #imagesAttached = 0;
-  #mcpPage: McpPage;
-  #context: McpContext;
+  #page: ContextPage;
+  #context: Context;
   #outerResponse: Response;
-  #serverConfig: ReadonlyServerConfig;
   #session: CDPSession;
   #contextId: number;
   #objectGroup: string;
@@ -430,19 +412,17 @@ class ReplToolDispatcher {
   >();
 
   constructor(options: {
-    mcpPage: McpPage;
-    context: McpContext;
+    page: ContextPage;
+    context: Context;
     outerResponse: Response;
-    serverConfig: ReadonlyServerConfig;
     session: CDPSession;
     contextId: number;
     objectGroup: string;
     innerToolsByName: ReadonlyMap<string, AnyToolDefinition>;
   }) {
-    this.#mcpPage = options.mcpPage;
+    this.#page = options.page;
     this.#context = options.context;
     this.#outerResponse = options.outerResponse;
-    this.#serverConfig = options.serverConfig;
     this.#session = options.session;
     this.#contextId = options.contextId;
     this.#objectGroup = options.objectGroup;
@@ -461,6 +441,8 @@ class ReplToolDispatcher {
     if (this.#inFlight) {
       await this.#inFlight.catch(() => undefined);
     }
+    using guard = await this.#innerMutex.acquire();
+    void guard;
   }
 
   async #runExclusively<T>(work: () => Promise<T>): Promise<T> {
@@ -486,7 +468,7 @@ class ReplToolDispatcher {
   async #describeElementHandle(
     handleId: number,
     holderObjectId: string,
-  ): Promise<{backendNodeId: number; frameId?: string}> {
+  ): Promise<{backendNodeId: number; frameId?: string; role?: string}> {
     const callRes = await this.#session.send('Runtime.callFunctionOn', {
       objectId: holderObjectId,
       functionDeclaration:
@@ -513,6 +495,7 @@ class ReplToolDispatcher {
       return {
         backendNodeId: node.backendNodeId,
         frameId: node.frameId,
+        role: node.nodeName.toUpperCase() === 'OPTION' ? 'option' : undefined,
       };
     } finally {
       await this.#session
@@ -531,7 +514,7 @@ class ReplToolDispatcher {
         value.mcpElementHandle,
         holderObjectId,
       );
-      const reg = this.#mcpPage.registerEphemeralBackendNode(resolved);
+      const reg = this.#page.registerEphemeralBackendNode(resolved);
       stack.use(reg);
       return {uid: reg.uid};
     }
@@ -611,7 +594,7 @@ class ReplToolDispatcher {
         propVal.mcpElementHandle,
         holderObjectId,
       );
-      const reg = this.#mcpPage.registerEphemeralBackendNode(resolved);
+      const reg = this.#page.registerEphemeralBackendNode(resolved);
       stack.use(reg);
       paramsCopy[targetKey] = reg.uid;
     };
@@ -647,7 +630,7 @@ class ReplToolDispatcher {
             elToken.mcpElementHandle,
             holderObjectId,
           );
-          const reg = this.#mcpPage.registerEphemeralBackendNode(resolved);
+          const reg = this.#page.registerEphemeralBackendNode(resolved);
           stack.use(reg);
           entryCopy.uid = reg.uid;
         }
@@ -698,38 +681,13 @@ class ReplToolDispatcher {
       }
       const parsedParams = parseResult.data;
 
-      const innerResponse = new McpResponse(this.#serverConfig);
-      innerResponse.setPage(this.#mcpPage);
-
-      if (isPageScopedTool(innerTool)) {
-        await innerTool.handler(
-          {params: parsedParams, page: this.#mcpPage},
-          innerResponse,
-          this.#context,
-        );
-      } else if (isBrowserlessTool(innerTool)) {
-        await innerTool.handler(
-          {params: parsedParams},
-          innerResponse,
-          this.#context,
-        );
-      } else {
-        await innerTool.handler(
-          {params: parsedParams},
-          innerResponse,
-          this.#context,
-        );
-      }
-
-      const {structuredContent} = await innerResponse.handle(
-        this.#context,
-        'default',
+      const {structuredContent, images} = await this.#context.runReplInnerTool(
+        innerTool,
+        parsedParams,
+        this.#page,
       );
-      if (innerResponse.error) {
-        throw innerResponse.error;
-      }
 
-      for (const image of innerResponse.images) {
+      for (const image of images) {
         if (this.#imagesAttached >= MAX_REPL_IMAGES) {
           throw new Error(
             `Exceeded maximum of ${MAX_REPL_IMAGES} inline screenshots in a single evaluate_script call.`,
@@ -739,10 +697,10 @@ class ReplToolDispatcher {
         this.#outerResponse.attachImage(image);
       }
 
-      const structuredRecord: Record<string, unknown> = {ok: true};
-      for (const [k, v] of Object.entries(structuredContent)) {
-        structuredRecord[k] = v;
-      }
+      const structuredRecord: Record<string, unknown> = {
+        ok: true,
+        ...structuredContent,
+      };
 
       if (innerTool.outputSchema) {
         let strictOutputSchema = this.#outputSchemasByName.get(toolName);
@@ -779,7 +737,7 @@ class ReplToolDispatcher {
       if (typeof uid !== 'string' || uid.length === 0) {
         throw new Error('mcp.getElement(uid) requires a non-empty uid string.');
       }
-      const resolved = await this.#mcpPage.resolveUidToBackendNodeId(uid);
+      const resolved = await this.#page.resolveUidToBackendNodeId(uid);
       if (!resolved) {
         return null;
       }
@@ -832,12 +790,12 @@ class ReplToolDispatcher {
         typeof rawTarget.uid === 'string' &&
         rawTarget.uid.length > 0
       ) {
-        const resolved = await this.#mcpPage.resolveUidToBackendNodeId(
+        const resolved = await this.#page.resolveUidToBackendNodeId(
           rawTarget.uid,
         );
         if (!resolved) {
           throw new Error(
-            `Element uid "${rawTarget.uid}" not found on page ${this.#mcpPage.id}.`,
+            `Element uid "${rawTarget.uid}" not found on page ${this.#page.id}.`,
           );
         }
         backendNodeId = resolved.backendNodeId;
@@ -881,11 +839,7 @@ export function createReplEvaluateTool(
   cliArgs: ParsedArguments,
   innerTools: readonly AnyToolDefinition[],
   allTools: readonly AnyToolDefinition[],
-): AnyToolDefinition | undefined {
-  if (!Array.isArray(innerTools) || !Array.isArray(allTools)) {
-    return undefined;
-  }
-
+): DefinedPageTool {
   const innerToolsByName = new Map<string, AnyToolDefinition>();
   for (const tool of innerTools) {
     innerToolsByName.set(tool.name, tool);
@@ -913,12 +867,6 @@ export function createReplEvaluateTool(
   }
 
   const apiDeclaration = buildReplApiDeclaration(innerTools);
-  const serverConfig = new ServerConfig({
-    cliArgs: {},
-    fileArgs: {},
-    configPath: cliArgs.config,
-    resolved: cliArgs,
-  });
 
   const factory = definePageTool(() => ({
     name: 'evaluate_script',
@@ -955,7 +903,7 @@ export function createReplEvaluateTool(
         ),
       waitForStableDom: zod
         .boolean()
-        .optional()
+        .default(true)
         .describe(
           'Whether to wait for DOM stability on navigation/mutations. Defaults to true.',
         ),
@@ -967,17 +915,8 @@ export function createReplEvaluateTool(
       sourcePath: {local: true, remote: true},
     },
     handler: async (request, response, context) => {
-      if (!(request.page instanceof McpPage)) {
-        throw new Error('REPL evaluate_script requires an McpPage instance.');
-      }
-      if (!(context instanceof McpContext)) {
-        throw new Error(
-          'REPL evaluate_script requires an McpContext instance.',
-        );
-      }
-
-      const mcpPage = request.page;
-      mcpPage.throwIfDialogOpen();
+      const page = request.page;
+      page.throwIfDialogOpen();
 
       const rawSource = await resolveReplScriptSource(
         request.params.function,
@@ -990,7 +929,7 @@ export function createReplEvaluateTool(
         session,
         contextId,
         loaderId: initialLoaderId,
-      } = await mcpPage.getReplExecutionContext({
+      } = await page.getReplExecutionContext({
         mainWorld: cliArgs.replMainWorld,
       });
 
@@ -999,10 +938,9 @@ export function createReplEvaluateTool(
       const objectGroup = `cd4a_repl_turn_${turnId}`;
 
       const dispatcher = new ReplToolDispatcher({
-        mcpPage,
+        page,
         context,
         outerResponse: response,
-        serverConfig,
         session,
         contextId,
         objectGroup,
@@ -1036,7 +974,37 @@ export function createReplEvaluateTool(
         return mainFrameCrossDocNavigated;
       };
 
+      const waitForPageStableDom = async (): Promise<void> => {
+        await page
+          .createWaitForHelper(
+            page.cpuThrottlingRate,
+            getNetworkMultiplierFromString(page.networkConditions),
+          )
+          .waitForStableDom()
+          .catch(() => undefined);
+      };
+
+      const writeNavigationEarlyExit = async (): Promise<void> => {
+        if (
+          request.params.waitForStableDom !== false &&
+          dispatcher.completedSteps.every(s => !s.navigatedToUrl)
+        ) {
+          await waitForPageStableDom();
+        }
+        const earlyExitJson = JSON.stringify({
+          navigated: true,
+          newUrl: page.pptrPage.url(),
+          completedSteps: dispatcher.completedSteps,
+          note: 'Script ended early due to full-page navigation; call evaluate_script again on the new page.',
+        });
+        await writeReplOutput(earlyExitJson, response, {
+          context,
+          filePath: request.params.filePath,
+        });
+      };
+
       let holderObjectId = '';
+      const pendingBindingTasks = new Set<Promise<void>>();
       const onBindingCalled = (
         event: Protocol.Runtime.BindingCalledEvent,
       ): void => {
@@ -1047,7 +1015,7 @@ export function createReplEvaluateTool(
         ) {
           return;
         }
-        void (async () => {
+        const task = (async () => {
           let parsedPayload: unknown;
           try {
             parsedPayload = JSON.parse(event.payload);
@@ -1128,12 +1096,22 @@ export function createReplEvaluateTool(
               })
               .catch(() => undefined);
           }
-        })();
+        })().finally(() => {
+          pendingBindingTasks.delete(task);
+        });
+        pendingBindingTasks.add(task);
+      };
+
+      const drainAllInFlight = async (): Promise<void> => {
+        while (pendingBindingTasks.size > 0) {
+          await Promise.allSettled([...pendingBindingTasks]);
+        }
+        await dispatcher.drainInFlight();
       };
 
       session.on('Page.frameNavigated', onFrameNavigated);
       session.on('Runtime.bindingCalled', onBindingCalled);
-      mcpPage.setReplDialogAction(request.params.dialogAction ?? 'accept');
+      page.setReplDialogAction(request.params.dialogAction ?? 'accept');
 
       try {
         await session.send('Runtime.addBinding', {
@@ -1178,81 +1156,36 @@ export function createReplEvaluateTool(
           });
 
           if (runRes.exceptionDetails) {
-            await dispatcher.drainInFlight();
+            await drainAllInFlight();
             dispatcher.abort();
             if (await checkCrossDocumentNavigated()) {
-              if (
-                request.params.waitForStableDom !== false &&
-                dispatcher.completedSteps.every(s => !s.navigatedToUrl)
-              ) {
-                await mcpPage
-                  .createWaitForHelper(
-                    mcpPage.cpuThrottlingRate,
-                    getNetworkMultiplierFromString(mcpPage.networkConditions),
-                  )
-                  .waitForStableDom()
-                  .catch(() => undefined);
-              }
-              const earlyExitJson = JSON.stringify({
-                navigated: true,
-                newUrl: mcpPage.pptrPage.url(),
-                completedSteps: dispatcher.completedSteps,
-                note: 'Script ended early due to full-page navigation; call evaluate_script again on the new page.',
-              });
-              await writeReplOutput(earlyExitJson, response, {
-                context,
-                filePath: request.params.filePath,
-              });
+              await writeNavigationEarlyExit();
               return;
             }
             throw new Error(extractExceptionMessage(runRes.exceptionDetails));
           }
 
+          await drainAllInFlight();
+          dispatcher.abort();
+
           const rawValue: unknown = runRes.result.value;
           serializedOutput =
             typeof rawValue === 'string' ? rawValue : 'undefined';
         } catch (error) {
-          await dispatcher.drainInFlight();
+          await drainAllInFlight();
           dispatcher.abort();
           if (
             isContextDestructionError(error) &&
             (await checkCrossDocumentNavigated())
           ) {
-            if (
-              request.params.waitForStableDom !== false &&
-              dispatcher.completedSteps.every(s => !s.navigatedToUrl)
-            ) {
-              await mcpPage
-                .createWaitForHelper(
-                  mcpPage.cpuThrottlingRate,
-                  getNetworkMultiplierFromString(mcpPage.networkConditions),
-                )
-                .waitForStableDom()
-                .catch(() => undefined);
-            }
-            const earlyExitJson = JSON.stringify({
-              navigated: true,
-              newUrl: mcpPage.pptrPage.url(),
-              completedSteps: dispatcher.completedSteps,
-              note: 'Script ended early due to full-page navigation; call evaluate_script again on the new page.',
-            });
-            await writeReplOutput(earlyExitJson, response, {
-              context,
-              filePath: request.params.filePath,
-            });
+            await writeNavigationEarlyExit();
             return;
           }
           throw error;
         }
 
-        if (request.params.waitForStableDom === true) {
-          await mcpPage
-            .createWaitForHelper(
-              mcpPage.cpuThrottlingRate,
-              getNetworkMultiplierFromString(mcpPage.networkConditions),
-            )
-            .waitForStableDom()
-            .catch(() => undefined);
+        if (request.params.waitForStableDom !== false) {
+          await waitForPageStableDom();
         }
 
         await writeReplOutput(serializedOutput, response, {
@@ -1261,7 +1194,7 @@ export function createReplEvaluateTool(
         });
       } finally {
         dispatcher.abort();
-        mcpPage.setReplDialogAction(undefined);
+        page.setReplDialogAction(undefined);
         session.off('Runtime.bindingCalled', onBindingCalled);
         session.off('Page.frameNavigated', onFrameNavigated);
         await session

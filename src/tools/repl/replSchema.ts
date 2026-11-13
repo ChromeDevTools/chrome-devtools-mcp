@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {StructuredCssStyles} from '../formatters/CssFormatter.js';
-import {zod} from '../third_party/index.js';
+import type {StructuredCssStyles} from '../../formatters/CssFormatter.js';
+import {zod} from '../../third_party/index.js';
+import {isPlainRecord} from '../../utils/objects.js';
 
-import {STRIPPED_INNER_PARAMS} from './replPartition.js';
-import type {AnyToolDefinition, ToolSchema} from './ToolDefinition.js';
+import type {AnyToolDefinition, ToolSchema} from '../ToolDefinition.js';
+import {stripReplToolParams} from './replPartition.js';
 
 export type SnapshotPrimitiveAttribute = string | number | boolean;
 
@@ -58,20 +59,20 @@ export const snapshotNodeSchema: zod.ZodType<SnapshotJsonNode> = zod.lazy(() =>
 );
 
 export const actionOutputSchema: ToolSchema = {
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
   navigatedToUrl: zod.string().optional(),
   dialogHandled: zod.boolean().optional(),
   snapshot: snapshotNodeSchema.optional(),
 };
 
 export const typeTextOutputSchema: ToolSchema = {
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
   navigatedToUrl: zod.string().optional(),
   dialogHandled: zod.boolean().optional(),
 };
 
 export const waitForOutputSchema: ToolSchema = {
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
   snapshot: snapshotNodeSchema.optional(),
 };
 
@@ -613,9 +614,6 @@ export const ambientMcpResponseOutputSchema: ToolSchema = {
 export function buildStrictRuntimeOutputSchema(
   outputSchema: ToolSchema,
 ): zod.ZodObject<zod.ZodRawShape, zod.core.$strict> {
-  if (!isToolSchema(outputSchema)) {
-    return zod.object({}).strict();
-  }
   return zod
     .object({
       ...ambientMcpResponseOutputSchema,
@@ -623,15 +621,39 @@ export function buildStrictRuntimeOutputSchema(
     })
     .strict();
 }
+
+function withRequiredOk(outputSchema: ToolSchema | undefined): ToolSchema {
+  const merged: ToolSchema = {ok: zod.boolean()};
+  if (outputSchema) {
+    for (const [key, value] of Object.entries(outputSchema)) {
+      if (key !== 'ok') {
+        merged[key] = value;
+      }
+    }
+  }
+  return merged;
+}
+
+function toInputJsonSchema(shape: ToolSchema): Record<string, unknown> {
+  const root: unknown = zod.toJSONSchema(zod.object(shape), {
+    io: 'input',
+    unrepresentable: 'any',
+  });
+  return isPlainRecord(root) ? root : {};
+}
+
+function toOutputShapeJsonSchema(shape: ToolSchema): Record<string, unknown> {
+  const root: unknown = zod.toJSONSchema(zod.object(shape), {
+    unrepresentable: 'any',
+  });
+  return isPlainRecord(root) ? root : {};
+}
 /* eslint-enable @local/enforce-zod-schema */
 
 export function formatZodOutputValidationError(
   toolName: string,
   error: zod.ZodError,
 ): string {
-  if (typeof toolName !== 'string' || !error || !Array.isArray(error.issues)) {
-    return '';
-  }
   const details = error.issues
     .map(
       issue =>
@@ -641,33 +663,8 @@ export function formatZodOutputValidationError(
   return `Invalid output for ${toolName} (outputSchema mismatch): ${details}`;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isZodSchema(value: unknown): value is zod.ZodType {
-  return (
-    isPlainRecord(value) &&
-    '_zod' in value &&
-    isPlainRecord(value._zod) &&
-    'def' in value._zod &&
-    isPlainRecord(value._zod.def)
-  );
-}
-
-function isToolSchema(value: unknown): value is ToolSchema {
-  if (!isPlainRecord(value)) {
-    return false;
-  }
-  for (const entry of Object.values(value)) {
-    if (!isZodSchema(entry)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 const VALID_IDENTIFIER_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const REPL_TS_TYPE_KEY = 'x-repl-ts-type';
 
 function formatPropertyKey(key: string): string {
   return VALID_IDENTIFIER_REGEX.test(key) ? key : JSON.stringify(key);
@@ -690,210 +687,274 @@ function formatLiteralValue(value: unknown): string {
   return 'unknown';
 }
 
-function isFieldOptional(schema: zod.ZodType): boolean {
-  return (
-    schema._zod.optin !== undefined ||
-    schema._zod.optout !== undefined ||
-    schema._zod.def.type === 'optional' ||
-    schema._zod.def.type === 'default' ||
-    schema._zod.def.type === 'prefault'
-  );
+function extractJsonSchemaDefs(
+  root: Record<string, unknown>,
+): Record<string, unknown> {
+  return isPlainRecord(root.$defs) ? root.$defs : {};
 }
 
-function zodTypeToTs(schema: zod.ZodType, seen: Set<object>): string {
-  if (seen.has(schema)) {
-    return 'Record<string, unknown>';
-  }
-  const def = schema._zod.def;
-  switch (def.type) {
+function mapPrimitiveTypeName(typeName: unknown): string {
+  switch (typeName) {
     case 'string':
       return 'string';
     case 'number':
-    case 'int':
-    case 'nan':
+    case 'integer':
       return 'number';
     case 'boolean':
       return 'boolean';
-    case 'bigint':
-      return 'bigint';
     case 'null':
       return 'null';
-    case 'undefined':
-    case 'void':
-      return 'undefined';
-    case 'never':
-      return 'never';
-    case 'any':
-    case 'unknown':
+    default:
       return 'unknown';
-    case 'enum':
-    case 'literal': {
-      const values = schema._zod.values;
-      if (values && values.size > 0) {
-        const parts: string[] = [];
-        for (const item of values) {
-          parts.push(formatLiteralValue(item));
-        }
-        return parts.join(' | ');
+  }
+}
+
+function jsonSchemaNodeToTs(
+  node: unknown,
+  defs: Record<string, unknown>,
+  seenRefs: ReadonlySet<string>,
+): string {
+  if (!isPlainRecord(node)) {
+    return 'unknown';
+  }
+
+  const customTs = node[REPL_TS_TYPE_KEY];
+  if (typeof customTs === 'string') {
+    return customTs;
+  }
+
+  if (typeof node.$ref === 'string') {
+    const prefix = '#/$defs/';
+    if (node.$ref.startsWith(prefix)) {
+      const defName = node.$ref.slice(prefix.length);
+      if (seenRefs.has(defName)) {
+        return 'Record<string, unknown>';
       }
-      if ('entries' in def && isPlainRecord(def.entries)) {
-        const parts: string[] = [];
-        for (const item of Object.values(def.entries)) {
-          parts.push(formatLiteralValue(item));
-        }
-        if (parts.length > 0) {
-          return parts.join(' | ');
-        }
+      const target = defs[defName];
+      if (isPlainRecord(target)) {
+        const nextSeen = new Set(seenRefs);
+        nextSeen.add(defName);
+        return jsonSchemaNodeToTs(target, defs, nextSeen);
       }
-      return 'string';
     }
-    case 'optional':
-    case 'default':
-    case 'prefault':
-    case 'nonoptional':
-    case 'readonly':
-    case 'catch': {
-      if ('innerType' in def && isZodSchema(def.innerType)) {
-        return zodTypeToTs(def.innerType, seen);
+    return 'Record<string, unknown>';
+  }
+
+  if ('const' in node) {
+    return formatLiteralValue(node.const);
+  }
+
+  if (Array.isArray(node.enum) && node.enum.length > 0) {
+    return node.enum.map(item => formatLiteralValue(item)).join(' | ');
+  }
+
+  const unionBranches = Array.isArray(node.anyOf)
+    ? node.anyOf
+    : Array.isArray(node.oneOf)
+      ? node.oneOf
+      : undefined;
+  if (unionBranches && unionBranches.length > 0) {
+    const parts: string[] = [];
+    for (const branch of unionBranches) {
+      const rendered = jsonSchemaNodeToTs(branch, defs, seenRefs);
+      if (!parts.includes(rendered)) {
+        parts.push(rendered);
       }
-      return 'unknown';
     }
-    case 'nullable': {
-      if ('innerType' in def && isZodSchema(def.innerType)) {
-        return `${zodTypeToTs(def.innerType, seen)} | null`;
+    return parts.length > 0 ? parts.join(' | ') : 'unknown';
+  }
+
+  if (Array.isArray(node.type) && node.type.length > 0) {
+    const parts: string[] = [];
+    for (const entry of node.type) {
+      const rendered =
+        entry === 'array' || entry === 'object'
+          ? jsonSchemaNodeToTs({...node, type: entry}, defs, seenRefs)
+          : mapPrimitiveTypeName(entry);
+      if (!parts.includes(rendered)) {
+        parts.push(rendered);
       }
-      return 'unknown';
     }
-    case 'pipe': {
-      if (
-        'in' in def &&
-        'out' in def &&
-        isZodSchema(def.in) &&
-        isZodSchema(def.out)
-      ) {
-        return def.in._zod.def.type === 'transform'
-          ? zodTypeToTs(def.out, seen)
-          : zodTypeToTs(def.in, seen);
-      }
-      return 'unknown';
-    }
+    return parts.join(' | ');
+  }
+
+  switch (node.type) {
+    case 'string':
+    case 'number':
+    case 'integer':
+    case 'boolean':
+    case 'null':
+      return mapPrimitiveTypeName(node.type);
     case 'array': {
-      if ('element' in def && isZodSchema(def.element)) {
-        const elemTs = zodTypeToTs(def.element, seen);
+      if (isPlainRecord(node.items)) {
+        const elemTs = jsonSchemaNodeToTs(node.items, defs, seenRefs);
         return elemTs.includes(' | ') ? `Array<${elemTs}>` : `${elemTs}[]`;
       }
       return 'unknown[]';
     }
     case 'object': {
-      if ('shape' in def && isToolSchema(def.shape)) {
-        const nextSeen = new Set(seen);
-        nextSeen.add(schema);
-        return zodShapeToTsWithSeen(def.shape, nextSeen);
-      }
-      return 'Record<string, unknown>';
-    }
-    case 'record': {
-      const keyTs =
-        'keyType' in def && isZodSchema(def.keyType)
-          ? zodTypeToTs(def.keyType, seen)
-          : 'string';
-      const valTs =
-        'valueType' in def && isZodSchema(def.valueType)
-          ? zodTypeToTs(def.valueType, seen)
-          : 'unknown';
-      return `Record<${keyTs}, ${valTs}>`;
-    }
-    case 'union': {
-      if ('options' in def && Array.isArray(def.options)) {
-        const parts: string[] = [];
-        for (const option of def.options) {
-          if (isZodSchema(option)) {
-            parts.push(zodTypeToTs(option, seen));
-          }
+      if (isPlainRecord(node.properties)) {
+        const entries = Object.entries(node.properties);
+        if (entries.length === 0) {
+          return '{}';
         }
-        if (parts.length > 0) {
-          return parts.join(' | ');
+        const requiredSet = new Set<string>(
+          Array.isArray(node.required)
+            ? node.required.filter((r): r is string => typeof r === 'string')
+            : [],
+        );
+        const fields: string[] = [];
+        for (const [key, propNode] of entries) {
+          const optionalSuffix = requiredSet.has(key) ? '' : '?';
+          const propTs = jsonSchemaNodeToTs(propNode, defs, seenRefs);
+          fields.push(`${formatPropertyKey(key)}${optionalSuffix}: ${propTs}`);
         }
+        return `{ ${fields.join('; ')} }`;
       }
-      return 'unknown';
-    }
-    case 'lazy': {
-      if ('getter' in def && typeof def.getter === 'function') {
-        const nextSeen = new Set(seen);
-        nextSeen.add(schema);
-        const resolved: unknown = def.getter();
-        if (isZodSchema(resolved)) {
-          return zodTypeToTs(resolved, nextSeen);
+      if ('additionalProperties' in node) {
+        if (node.additionalProperties === false) {
+          return '{}';
         }
+        if (isPlainRecord(node.additionalProperties)) {
+          const valTs = jsonSchemaNodeToTs(
+            node.additionalProperties,
+            defs,
+            seenRefs,
+          );
+          return `Record<string, ${valTs}>`;
+        }
+        return 'Record<string, unknown>';
       }
-      return 'Record<string, unknown>';
+      return '{}';
     }
     default:
       return 'unknown';
   }
 }
 
-function zodShapeToTsWithSeen(shape: ToolSchema, seen: Set<object>): string {
-  if (!isPlainRecord(shape)) {
-    return '{}';
+function zodSchemaToTs(schema: zod.ZodType): string {
+  const root: unknown = zod.toJSONSchema(schema, {unrepresentable: 'any'});
+  if (!isPlainRecord(root)) {
+    return 'unknown';
   }
-  const entries = Object.entries(shape);
-  if (entries.length === 0) {
-    return '{}';
-  }
-  const fields: string[] = [];
-  for (const [key, fieldSchema] of entries) {
-    if (!isZodSchema(fieldSchema)) {
-      continue;
-    }
-    const optionalSuffix = isFieldOptional(fieldSchema) ? '?' : '';
-    const fieldTs = zodTypeToTs(fieldSchema, seen);
-    fields.push(`${formatPropertyKey(key)}${optionalSuffix}: ${fieldTs}`);
-  }
-  if (fields.length === 0) {
-    return '{}';
-  }
-  return `{ ${fields.join('; ')} }`;
+  return jsonSchemaNodeToTs(root, extractJsonSchemaDefs(root), new Set());
+}
+
+function zodOutputShapeToTs(shape: ToolSchema): string {
+  const root = toOutputShapeJsonSchema(shape);
+  return jsonSchemaNodeToTs(root, extractJsonSchemaDefs(root), new Set());
 }
 
 export function zodShapeToTs(shape: ToolSchema): string {
-  return zodShapeToTsWithSeen(shape, new Set());
+  const root = toInputJsonSchema(shape);
+  return jsonSchemaNodeToTs(root, extractJsonSchemaDefs(root), new Set());
 }
 
-function stripReplMethodInputSchema(schema: ToolSchema): ToolSchema {
-  const stripped: ToolSchema = {};
-  for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (key === 'pageId' || STRIPPED_INNER_PARAMS.has(key)) {
-      continue;
+function augmentObjectSchemaWithReplElements(
+  objNode: Record<string, unknown>,
+  options: {
+    includeElementsArrayItem: boolean;
+    collapseLargeStringEnums: boolean;
+  },
+): Record<string, unknown> {
+  if (!isPlainRecord(objNode.properties)) {
+    return objNode;
+  }
+  const props = objNode.properties;
+  const reqSet = new Set<string>(
+    Array.isArray(objNode.required)
+      ? objNode.required.filter((r): r is string => typeof r === 'string')
+      : [],
+  );
+  const nextProps: Record<string, unknown> = {};
+
+  for (const [key, propVal] of Object.entries(props)) {
+    let effectiveProp: unknown = propVal;
+    if (
+      options.collapseLargeStringEnums &&
+      isPlainRecord(propVal) &&
+      propVal.type === 'array' &&
+      isPlainRecord(propVal.items) &&
+      Array.isArray(propVal.items.enum) &&
+      propVal.items.enum.length >= 8 &&
+      propVal.items.enum.every(v => typeof v === 'string')
+    ) {
+      effectiveProp = {...propVal, items: {type: 'string'}};
     }
-    stripped[key] = fieldSchema;
+
+    if (
+      options.includeElementsArrayItem &&
+      key === 'elements' &&
+      isPlainRecord(effectiveProp) &&
+      effectiveProp.type === 'array' &&
+      isPlainRecord(effectiveProp.items)
+    ) {
+      effectiveProp = {
+        ...effectiveProp,
+        items: augmentObjectSchemaWithReplElements(effectiveProp.items, {
+          includeElementsArrayItem: false,
+          collapseLargeStringEnums: options.collapseLargeStringEnums,
+        }),
+      };
+    }
+
+    nextProps[key] = effectiveProp;
+
+    if (key === 'uid') {
+      reqSet.delete('uid');
+      if (!('element' in props)) {
+        nextProps.element = {[REPL_TS_TYPE_KEY]: 'Element'};
+      }
+    } else if (key === 'from_uid') {
+      reqSet.delete('from_uid');
+      if (!('fromElement' in props)) {
+        nextProps.fromElement = {[REPL_TS_TYPE_KEY]: 'Element'};
+      }
+    } else if (key === 'to_uid') {
+      reqSet.delete('to_uid');
+      if (!('toElement' in props)) {
+        nextProps.toElement = {[REPL_TS_TYPE_KEY]: 'Element'};
+      }
+    }
   }
-  return stripped;
+
+  return {
+    ...objNode,
+    properties: nextProps,
+    required: [...reqSet],
+  };
 }
 
-export function formatReplToolMethodSignature(tool: AnyToolDefinition): string {
-  if (!isPlainRecord(tool) || typeof tool.name !== 'string' || !tool.schema) {
-    return '';
-  }
-
-  const inputSchema = stripReplMethodInputSchema(tool.schema);
-  const inputEntries = Object.entries(inputSchema);
+function formatReplToolMethodSignatureInternal(
+  tool: AnyToolDefinition,
+  options?: {collapseLargeStringEnums?: boolean},
+): string {
+  const inputSchema = stripReplToolParams(tool.schema, {stripPageId: true});
   let paramsPart = '';
-  if (inputEntries.length > 0) {
-    const allOptional = inputEntries.every(
-      ([, fieldSchema]) =>
-        isZodSchema(fieldSchema) && isFieldOptional(fieldSchema),
+  if (Object.keys(inputSchema).length > 0) {
+    const rawRoot = toInputJsonSchema(inputSchema);
+    const initialRequired = Array.isArray(rawRoot.required)
+      ? rawRoot.required.filter((r): r is string => typeof r === 'string')
+      : [];
+    const allOptional = initialRequired.length === 0;
+    const augmentedRoot = augmentObjectSchemaWithReplElements(rawRoot, {
+      includeElementsArrayItem: tool.name === 'fill_form',
+      collapseLargeStringEnums: options?.collapseLargeStringEnums ?? false,
+    });
+    const inputTs = jsonSchemaNodeToTs(
+      augmentedRoot,
+      extractJsonSchemaDefs(augmentedRoot),
+      new Set(),
     );
-    const inputTs = zodShapeToTs(inputSchema);
     paramsPart = `params${allOptional ? '?' : ''}: ${inputTs}`;
   }
 
-  const outputTs =
-    tool.outputSchema && Object.keys(tool.outputSchema).length > 0
-      ? zodShapeToTs(tool.outputSchema)
-      : '{ ok: boolean }';
-
+  const outputTs = zodOutputShapeToTs(withRequiredOk(tool.outputSchema));
   return `${tool.name}(${paramsPart}): Promise<${outputTs}>;`;
+}
+
+export function formatReplToolMethodSignature(tool: AnyToolDefinition): string {
+  return formatReplToolMethodSignatureInternal(tool);
 }
 
 function compactTsWhitespace(ts: string): string {
@@ -906,21 +967,33 @@ function compactTsWhitespace(ts: string): string {
 }
 
 function collectCascadeRuleTypeLiterals(): string {
-  const def = cascadeRuleSchema._zod.def;
+  const root: unknown = zod.toJSONSchema(cascadeRuleSchema, {
+    unrepresentable: 'any',
+  });
+  if (!isPlainRecord(root)) {
+    return 'string';
+  }
+  const defs = extractJsonSchemaDefs(root);
+  const branches = Array.isArray(root.anyOf)
+    ? root.anyOf
+    : Array.isArray(root.oneOf)
+      ? root.oneOf
+      : [];
   const literals: string[] = [];
-  if ('options' in def && Array.isArray(def.options)) {
-    for (const option of def.options) {
-      if (
-        isZodSchema(option) &&
-        'shape' in option._zod.def &&
-        isToolSchema(option._zod.def.shape) &&
-        isZodSchema(option._zod.def.shape.type)
-      ) {
-        const typeTs = zodTypeToTs(option._zod.def.shape.type, new Set());
-        for (const part of typeTs.split(' | ')) {
-          if (!literals.includes(part)) {
-            literals.push(part);
-          }
+  for (const branch of branches) {
+    if (
+      isPlainRecord(branch) &&
+      isPlainRecord(branch.properties) &&
+      'type' in branch.properties
+    ) {
+      const typeTs = jsonSchemaNodeToTs(
+        branch.properties.type,
+        defs,
+        new Set(),
+      );
+      for (const part of typeTs.split(' | ')) {
+        if (!literals.includes(part)) {
+          literals.push(part);
         }
       }
     }
@@ -928,29 +1001,24 @@ function collectCascadeRuleTypeLiterals(): string {
   return literals.length > 0 ? literals.join('|') : 'string';
 }
 
-const SNAPSHOT_NODE_RAW_TS = zodTypeToTs(snapshotNodeSchema, new Set());
-const PAGINATION_TS = zodTypeToTs(paginationOutputObjectSchema, new Set());
-const ACTION_RESULT_RAW_TS = zodShapeToTs(actionOutputSchema);
-const NET_CONCISE_TS = zodTypeToTs(networkRequestConciseSchema, new Set());
-const NET_DETAILED_TS = zodTypeToTs(networkRequestDetailedSchema, new Set());
-const CONSOLE_CONCISE_TS = zodTypeToTs(consoleMessageConciseSchema, new Set());
-const CONSOLE_DETAILED_TS = zodTypeToTs(
-  consoleMessageDetailedSchema,
-  new Set(),
+const SNAPSHOT_NODE_RAW_TS = zodSchemaToTs(snapshotNodeSchema);
+const PAGINATION_TS = zodSchemaToTs(paginationOutputObjectSchema);
+const ACTION_RESULT_RAW_TS = zodOutputShapeToTs(
+  withRequiredOk(actionOutputSchema),
 );
-const ISSUE_CONCISE_TS = zodTypeToTs(issueConciseSchema, new Set());
-const ISSUE_DETAILED_TS = zodTypeToTs(issueDetailedSchema, new Set());
-const CSS_PROP_TS = zodTypeToTs(structuredCssPropertySchema, new Set());
-const CSS_STYLES_RAW_TS = zodTypeToTs(structuredCssStylesSchema, new Set());
+const NET_CONCISE_TS = zodSchemaToTs(networkRequestConciseSchema);
+const NET_DETAILED_TS = zodSchemaToTs(networkRequestDetailedSchema);
+const CONSOLE_CONCISE_TS = zodSchemaToTs(consoleMessageConciseSchema);
+const CONSOLE_DETAILED_TS = zodSchemaToTs(consoleMessageDetailedSchema);
+const ISSUE_CONCISE_TS = zodSchemaToTs(issueConciseSchema);
+const ISSUE_DETAILED_TS = zodSchemaToTs(issueDetailedSchema);
+const CSS_PROP_TS = zodSchemaToTs(structuredCssPropertySchema);
+const CSS_STYLES_RAW_TS = zodSchemaToTs(structuredCssStylesSchema);
 const CSS_RULE_TYPES_TS = collectCascadeRuleTypeLiterals();
 
 export function buildReplApiDeclaration(
   innerTools: readonly AnyToolDefinition[],
 ): string {
-  if (!Array.isArray(innerTools)) {
-    return '';
-  }
-
   const netDetailExtraFields: ToolSchema = {};
   for (const [k, v] of Object.entries(networkRequestDetailedSchema.shape)) {
     if (
@@ -961,7 +1029,7 @@ export function buildReplApiDeclaration(
       netDetailExtraFields[k] = v;
     }
   }
-  const netDetailExtraTs = zodShapeToTs(netDetailExtraFields)
+  const netDetailExtraTs = zodOutputShapeToTs(netDetailExtraFields)
     .replaceAll(`Array<${NET_CONCISE_TS}>`, 'NetReq[]')
     .replaceAll(`${NET_CONCISE_TS}[]`, 'NetReq[]');
 
@@ -971,7 +1039,7 @@ export function buildReplApiDeclaration(
       issueDetailExtraFields[k] = v;
     }
   }
-  const issueDetailExtraTs = zodShapeToTs(issueDetailExtraFields);
+  const issueDetailExtraTs = zodOutputShapeToTs(issueDetailExtraFields);
 
   const typeAliases: string[] = [
     compactTsWhitespace(
@@ -992,19 +1060,15 @@ export function buildReplApiDeclaration(
 
   const methodLines: string[] = [];
   for (const tool of innerTools) {
-    const rawSig = formatReplToolMethodSignature(tool);
-    if (!rawSig) {
-      continue;
-    }
+    const rawSig = formatReplToolMethodSignatureInternal(tool, {
+      collapseLargeStringEnums: true,
+    });
     const splitIdx = rawSig.indexOf('): Promise<');
     if (splitIdx === -1) {
       methodLines.push(compactTsWhitespace(rawSig));
       continue;
     }
-    const head = rawSig
-      .slice(0, splitIdx)
-      .replace(/\buid\??:\s*string\b/g, 'uid?: string; element?: Element')
-      .replace(/Array<(?:'[^']+'\s*\|\s*){7,}'[^']+'>/g, 'string[]');
+    const head = rawSig.slice(0, splitIdx);
     const tail = rawSig
       .slice(splitIdx)
       .replaceAll(`Promise<${ACTION_RESULT_RAW_TS}>`, 'Promise<ActionResult>')

@@ -32,7 +32,7 @@ import {
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
-import {buildStrictRuntimeOutputSchema} from './tools/replSchema.js';
+import {buildStrictRuntimeOutputSchema} from './tools/repl/replSchema.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';

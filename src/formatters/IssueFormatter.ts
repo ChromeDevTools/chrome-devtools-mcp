@@ -10,7 +10,7 @@ import type {
   AffectedResource,
   IssueConcise,
   IssueDetailed,
-} from '../tools/replSchema.js';
+} from '../tools/repl/replSchema.js';
 import {logger} from '../utils/logger.js';
 import {substitutePlaceholders} from '../utils/text.js';
 

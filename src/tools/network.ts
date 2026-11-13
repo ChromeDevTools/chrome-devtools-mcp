@@ -16,7 +16,7 @@ import {ToolCategory} from './categories.js';
 import {
   getNetworkRequestOutputSchema,
   listNetworkRequestsOutputSchema,
-} from './replSchema.js';
+} from './repl/replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type FilterableResourceType = Exclude<ResourceType, 'websocket'>;

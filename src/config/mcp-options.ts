@@ -457,6 +457,8 @@ export const CONFLICTING_ARGS: Array<Array<keyof McpOptions>> = [
 export const IMPLICATIONS: Array<[keyof McpOptions, keyof McpOptions]> = [
   ['wsHeaders', 'wsEndpoint'],
   ['experimentalFfmpegPath', 'experimentalScreencast'],
+  ['repl', 'javascriptEvaluation'],
+  ['replMainWorld', 'javascriptEvaluation'],
 ];
 
 export function withoutDefaults(
