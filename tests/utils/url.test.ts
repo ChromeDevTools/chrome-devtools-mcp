@@ -5,7 +5,10 @@
  */
 
 import assert from 'node:assert';
+import os from 'node:os';
 import {describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import {
   isAllowedUrl,
@@ -51,6 +54,50 @@ describe('isLocalBrowserEndpoint', () => {
     assert.strictEqual(isLocalBrowserEndpoint('file://0.0.0.0/x'), false);
     assert.strictEqual(isLocalBrowserEndpoint(''), false);
     assert.strictEqual(isLocalBrowserEndpoint('not a url'), false);
+  });
+
+  it('returns true for endpoints on a local network interface address', () => {
+    const ipv4: os.NetworkInterfaceInfoIPv4 = {
+      address: '192.168.1.20',
+      netmask: '255.255.255.0',
+      family: 'IPv4',
+      mac: '00:00:00:00:00:01',
+      internal: false,
+      cidr: '192.168.1.20/24',
+    };
+    const ipv6: os.NetworkInterfaceInfoIPv6 = {
+      address: '2001:db8::20',
+      netmask: 'ffff:ffff:ffff:ffff::',
+      family: 'IPv6',
+      mac: '00:00:00:00:00:01',
+      internal: false,
+      cidr: '2001:db8::20/64',
+      scopeid: 0,
+    };
+    sinon.stub(os, 'networkInterfaces').returns({eth0: [ipv4, ipv6]});
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.20:9222'), true);
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://[2001:db8:0::20]:9222'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.21:9222'), false);
+  });
+
+  it('returns true for endpoints on the local host name', () => {
+    sinon.stub(os, 'hostname').returns('My-Host');
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://my-host:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://MY-HOST.:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://other-host:9222'), false);
+  });
+
+  it('treats an endpoint as remote when network interfaces cannot be read', () => {
+    sinon.stub(os, 'hostname').returns('my-host');
+    sinon.stub(os, 'networkInterfaces').throws(new Error('uv error'));
+
+    assert.strictEqual(isLocalBrowserEndpoint('ws://192.168.1.20:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://localhost:9222'), true);
   });
 });
 

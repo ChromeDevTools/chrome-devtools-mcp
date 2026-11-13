@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import {describe, it, after, before} from 'node:test';
 
-import {runCli, stopDaemonForCleanup} from '../utils.js';
+import {runCli, startCli, stopDaemonForCleanup} from '../utils.js';
 
 describe('chrome-devtools positional values starting with a hyphen', () => {
   const fillCases: Array<{value: string[]; expected: string}> = [
@@ -30,7 +30,7 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   before(async () => {
     sessionId = crypto.randomUUID();
 
-    const startResult = await runCli(['start'], sessionId);
+    const startResult = await startCli(sessionId);
     assert.strictEqual(
       startResult.status,
       0,

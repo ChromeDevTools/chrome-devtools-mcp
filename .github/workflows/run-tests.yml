@@ -48,7 +48,7 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run bundle
+        run: npm run build
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
@@ -70,11 +70,6 @@ jobs:
           npm run test:no-build --
           ${{ matrix.os == 'windows-latest' && '--test-concurrency=1' || '' }}
           ${{ github.event_name == 'merge_group' && '--retry' || '' }}
-
-      - name: Run notices tests
-        shell: bash
-        run: >
-          npm run test:notices:no-build
 
   # Gating job for branch protection.
   test-success:

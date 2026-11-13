@@ -1432,6 +1432,18 @@
       {
         "name": "body_length",
         "argType": "number"
+      },
+      {
+        "name": "upstream_length",
+        "argType": "number"
+      },
+      {
+        "name": "abort",
+        "argType": "boolean"
+      },
+      {
+        "name": "allow_origin_length",
+        "argType": "number"
       }
     ]
   },

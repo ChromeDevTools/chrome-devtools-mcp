@@ -305,6 +305,11 @@ export interface Response {
       serviceWorkerId?: string;
     },
   ): void;
+  /**
+   * Lists the console errors and uncaught exceptions that the page raises from
+   * now until the response is handled.
+   */
+  includeConsoleErrorsFrom(page: ContextPage): void;
   setIncludeCssStyles(
     matchedStyles: MatchedStyles,
     options: CssFormatterOptions & PaginationOptions,

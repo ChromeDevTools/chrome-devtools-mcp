@@ -15,6 +15,7 @@ import {
   createCliSession,
   createTempDir,
   runCli,
+  startCli,
   stopDaemonForCleanup,
 } from '../utils.js';
 
@@ -22,7 +23,7 @@ import {
 describe('chrome-devtools', {concurrency: true}, () => {
   it('can invoke list_pages', async t => {
     const sessionId = createCliSession(t);
-    const startResult = await runCli(['start'], sessionId);
+    const startResult = await startCli(sessionId);
     assert.strictEqual(
       startResult.status,
       0,
@@ -45,7 +46,7 @@ describe('chrome-devtools', {concurrency: true}, () => {
 
   it('can take screenshot', async t => {
     const sessionId = createCliSession(t);
-    const startResult = await runCli(['start'], sessionId);
+    const startResult = await startCli(sessionId);
     assert.strictEqual(
       startResult.status,
       0,
@@ -80,7 +81,7 @@ describe('chrome-devtools', {concurrency: true}, () => {
       'utf8',
     );
     try {
-      const startResult = await runCli(['start'], sessionId, {
+      const startResult = await startCli(sessionId, [], {
         cwd: daemonDirectory,
       });
       assert.strictEqual(

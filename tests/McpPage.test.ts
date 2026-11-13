@@ -678,6 +678,55 @@ describe('McpPage', () => {
     });
   });
 
+  describe('getLatestConsoleMessageId() and getConsoleDataAfter()', () => {
+    function createUncaughtError(exceptionId: number): UncaughtError {
+      return new UncaughtError(
+        {
+          exceptionId,
+          text: `error-${exceptionId}`,
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+        '<mock>',
+      );
+    }
+
+    it('getLatestConsoleMessageId() returns 0 and getConsoleDataAfter() nothing for an empty collector', async () => {
+      const {mcpPage} = await createMcpPage();
+
+      assert.strictEqual(mcpPage.getLatestConsoleMessageId(), 0);
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(0), []);
+    });
+
+    it('getLatestConsoleMessageId() includes messages from an earlier navigation', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const error = createUncaughtError(1);
+      pptrPage.emit('uncaughtError', error);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+
+      const id = mcpPage.getLatestConsoleMessageId();
+
+      assert.strictEqual(id, mcpPage.consoleCollector.getIdForResource(error));
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(id), []);
+    });
+
+    it('getConsoleDataAfter() returns the messages after the id, from an earlier navigation too', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.emit('uncaughtError', createUncaughtError(1));
+      const id = mcpPage.getLatestConsoleMessageId();
+      const beforeNavigation = createUncaughtError(2);
+      pptrPage.emit('uncaughtError', beforeNavigation);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      const afterNavigation = createUncaughtError(3);
+      pptrPage.emit('uncaughtError', afterNavigation);
+
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(id), [
+        beforeNavigation,
+        afterNavigation,
+      ]);
+    });
+  });
+
   describe('getTitle()', () => {
     function createPage(url: string, title: string): McpPage {
       const target = createMockPuppeteerTarget({url, title});

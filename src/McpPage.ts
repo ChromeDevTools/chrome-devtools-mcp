@@ -375,7 +375,10 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
-      this.#networkOverrideManager = new NetworkOverrideManager(page);
+      this.#networkOverrideManager = new NetworkOverrideManager(
+        page,
+        this.#config,
+      );
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
@@ -850,6 +853,19 @@ export class McpPage implements ContextPage {
     id: number,
   ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
     return this.consoleCollector.getById(id);
+  }
+
+  getLatestConsoleMessageId(): number {
+    const latest = this.consoleCollector.getData(true).at(-1);
+    return latest ? this.consoleCollector.getIdForResource(latest) : 0;
+  }
+
+  getConsoleDataAfter(
+    id: number,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector
+      .getData(true)
+      .filter(item => this.consoleCollector.getIdForResource(item) > id);
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {

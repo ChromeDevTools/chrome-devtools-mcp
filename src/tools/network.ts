@@ -198,27 +198,71 @@ const mockNetworkSchema = zod
   // eslint-disable-next-line @local/enforce-zod-schema -- Flat parameters.
   .object({
     ...mockFilterSchema,
+    abort: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Abort matching requests when true. When false, use the stored ' +
+          'body or upstream source, or send the request to the network if ' +
+          'neither is set. A mock without a source still wins over older ' +
+          'matching mocks. Abortion takes precedence over body, upstream, ' +
+          'and allowOrigin.',
+      ),
+    allowOrigin: zod
+      .string()
+      .refine(value => {
+        if (value === '*' || value === 'null') {
+          return true;
+        }
+        try {
+          return new URL(value).origin === value;
+        } catch {
+          return false;
+        }
+      }, 'allowOrigin must be *, null, or a serialized origin such as https://example.com.')
+      .optional()
+      .describe(
+        'Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.',
+      ),
     body: zod
       .string()
       .trim()
       .min(1)
       .optional()
       .describe(
-        'Local response body file, revalidated and reread for every request. Content-Type follows its extension.',
+        'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
       ),
-  });
+    upstream: zod
+      .url({protocol: /^https?$/})
+      .optional()
+      .describe(
+        'Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.',
+      ),
+  })
+  .refine(
+    params => params.body === undefined || params.upstream === undefined,
+    {
+      message: 'body and upstream are mutually exclusive.',
+      path: ['upstream'],
+    },
+  );
 
 export const mockNetwork: PageToolFactory = definePageTool(() => ({
   name: 'mock_network',
   description:
     'Inspect or update network mocks for a page. With no actions, list mocks ' +
     'matching the supplied filters, or all mocks when no filters are given. ' +
-    'Providing body updates the exact route/resourceType pair. ' +
+    'Providing abort (including false), allowOrigin, body, or upstream updates ' +
+    'the exact route/resourceType pair; omitted actions keep existing settings. ' +
+    'Remove and recreate a mock to clear its source or allowOrigin. ' +
     'An omitted route matches any URL. Other mocks are preserved. ' +
+    'abort=true suppresses its response and allowOrigin header. ' +
     'The most recently updated matching mock wins and persists across ' +
     'navigations. Configure before navigating or reloading; inspection shows ' +
-    'hit counts and replacement errors. Changes are rejected during ' +
-    'a performance trace. Mocks disable the page HTTP cache and intercept ' +
+    'hit counts and replacement errors. allowOrigin requires a body or ' +
+    'upstream source. Upstream responses use server-side GET/HEAD fetches. ' +
+    'Changes are rejected during a performance trace. ' +
+    'Mocks disable the page HTTP cache and intercept ' +
     'every request, affecting measurements. Service workers can bypass mocks. ' +
     'Use remove_network_mock to remove mocks.',
   annotations: {
@@ -235,27 +279,38 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
       urlPattern: params.route,
       resourceType: params.resourceType,
     };
-    let input: NetworkMockInput | undefined;
-    if (params.body !== undefined) {
-      const responseFilePath = params.body;
-      input = {
-        ...filter,
-        kind: 'file',
-        responseFilePath,
-        loadResponseFile: async () => {
-          const validatedPath = await context.validatePath(responseFilePath);
-          return await fs.readFile(validatedPath);
-        },
-      };
-    }
     let overrides;
-    if (input) {
+    if (
+      params.abort === undefined &&
+      params.allowOrigin === undefined &&
+      params.body === undefined &&
+      params.upstream === undefined
+    ) {
+      overrides = request.page.listNetworkMocks(filter);
+    } else {
+      let input: NetworkMockInput = {
+        ...filter,
+        abort: params.abort,
+        allowOrigin: params.allowOrigin,
+      };
+      if (params.upstream !== undefined) {
+        input = {...input, kind: 'upstream', upstreamUrl: params.upstream};
+      } else if (params.body !== undefined) {
+        const responseFilePath = params.body;
+        input = {
+          ...input,
+          kind: 'file',
+          responseFilePath,
+          loadResponseFile: async () => {
+            const validatedPath = await context.validatePath(responseFilePath);
+            return await fs.readFile(validatedPath);
+          },
+        };
+      }
       overrides = [await request.page.mockNetwork(input)];
       response.appendResponseLine(
         'Network mock configured. Reload or navigate the page to apply it.',
       );
-    } else {
-      overrides = request.page.listNetworkMocks(filter);
     }
 
     if (overrides.length === 0) {

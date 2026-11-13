@@ -354,6 +354,84 @@ describe('daemon pid handling', () => {
   });
 
   describe('isDaemonRunning', () => {
+    for (const scenario of [
+      {
+        name: 'recognizes a daemon after EPERM',
+        code: 'EPERM',
+        identity: 'daemon',
+        expected: true,
+        pid: 1234567891,
+      },
+      {
+        name: 'rejects an unrelated process after EPERM',
+        code: 'EPERM',
+        identity: 'unrelated',
+        expected: false,
+        pid: 1234567893,
+      },
+      {
+        name: 'preserves liveness when EPERM prevents inspection',
+        code: 'EPERM',
+        identity: 'unavailable',
+        expected: true,
+        pid: 1234567894,
+      },
+    ]) {
+      it(scenario.name, () => {
+        using tempDir = createTempDir('cdm-permission-test-');
+        process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+        writePidFile(SESSION_ID, `${scenario.pid}\n`);
+        sinon
+          .stub(fs, 'existsSync')
+          .callThrough()
+          .withArgs('/proc')
+          .returns(false);
+        const inspection = sinon.stub(childProcess, 'execFileSync');
+        if (scenario.identity === 'unavailable') {
+          inspection.throws(new Error('process inspection denied'));
+        } else {
+          inspection.returns(
+            scenario.identity === 'daemon'
+              ? `${process.execPath} ${DAEMON_SCRIPT_PATH}`
+              : `${process.execPath} unrelated.js`,
+          );
+        }
+        const probe = sinon.stub(process, 'kill');
+        probe
+          .withArgs(scenario.pid, 0)
+          .throws(
+            Object.assign(new Error('probe denied'), {code: scenario.code}),
+          );
+        assert.strictEqual(isDaemonRunning(SESSION_ID), scenario.expected);
+        sinon.assert.calledOnceWithExactly(probe, scenario.pid, 0);
+        if (IS_WINDOWS) {
+          sinon.assert.calledOnceWithExactly(
+            inspection,
+            'powershell.exe',
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-Command',
+              '(Get-CimInstance Win32_Process -Filter ' +
+                `"ProcessId = ${scenario.pid}").CommandLine`,
+            ],
+            {
+              encoding: 'utf-8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+              windowsHide: true,
+            },
+          );
+        } else {
+          sinon.assert.calledOnceWithExactly(
+            inspection,
+            'ps',
+            ['-p', String(scenario.pid), '-o', 'command='],
+            {encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore']},
+          );
+        }
+      });
+    }
+
     it('returns false when no pid file exists', () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;

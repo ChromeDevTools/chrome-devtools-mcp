@@ -32,10 +32,8 @@ jobs:
         shell: bash
         run: npm run sync
 
-      - name: Build and bundle
-        run: npm run bundle
-        env:
-          NODE_ENV: 'production'
+      - name: Build
+        run: npm run build:release
 
       - name: Publish chrome-devtools-mcp
         run: |

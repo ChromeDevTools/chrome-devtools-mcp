@@ -10,8 +10,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
-import {createTempDir} from '../utils.js';
+import {getTempFilePath, resolveCanonicalPath} from '../../src/utils/files.js';
+import {createDisposableTempFile, createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
   t: it.TestContext,
@@ -160,4 +160,20 @@ describe('resolveCanonicalPath', () => {
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
     );
   });
+});
+
+describe('getTempFilePath', () => {
+  it('keeps the file under the created temp directory', async () => {
+    using tempFile = await createDisposableTempFile('shot.png');
+    const dir = path.dirname(tempFile.path);
+    assert.strictEqual(path.basename(tempFile.path), 'shot.png');
+    assert.ok(path.basename(dir).startsWith('chrome-devtools-mcp-'));
+    assert.strictEqual(path.relative(dir, tempFile.path), 'shot.png');
+  });
+
+  for (const name of ['../escape.png', 'sub/shot.png', '..', '.', '']) {
+    it(`rejects "${name}" instead of writing outside the temp directory`, async () => {
+      await assert.rejects(getTempFilePath(name), /Invalid temp file name/);
+    });
+  }
 });

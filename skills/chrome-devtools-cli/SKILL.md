@@ -134,6 +134,8 @@ chrome-devtools list_network_requests 1 --resourceTypes fetch # Filter requests 
 chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
 chrome-devtools mock_network 1 --route 'https://example.com/app.js*' \
   --body /tmp/app.js # Replace a response with a local file
+chrome-devtools mock_network 1 --route 'https://example.com/app.js*' \
+  --upstream https://example.com/dev.js # Use an upstream URL instead
 chrome-devtools mock_network 1 # Inspect all mocks
 chrome-devtools mock_network 1 --resourceType script # Inspect script mocks
 chrome-devtools remove_network_mock 1 --route 'https://example.com/app.js*'

@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {NetworkOverride} from '../../src/NetworkOverrideManager.js';
 import {NetworkOverridesFormatter} from '../../src/formatters/NetworkOverridesFormatter.js';
 import {
   mockNetwork,
@@ -45,12 +46,26 @@ describe('network', () => {
     });
 
     for (const params of [
+      {body: './script.js', upstream: 'https://example.com/script.js'},
       {body: ' '},
-      {route: '/app.js*', body: './app.js'},
+      {upstream: 'file:///tmp/script.js'},
+      {allowOrigin: 'https://example.com\r\nX-Header: value'},
+      {allowOrigin: '\n*\n'},
+      {allowOrigin: ' '},
+      {allowOrigin: 'https://example.com/path'},
+      {allowOrigin: 'https://example.com/'},
+      {allowOrigin: 'https://example.com?query=1'},
+      {allowOrigin: 'https://example.com#fragment'},
+      {allowOrigin: 'https://user:password@example.com'},
+      {allowOrigin: 'https://example.com:443'},
+      {allowOrigin: 'https://example.com https://other.example'},
+      {allowOrigin: 'example.com'},
+      {allowOrigin: 'file:///tmp/script.js'},
+      {route: '/app.js*', abort: true},
+      {resourceType: 'websocket', abort: true},
       {route: '*app.js*', body: './app.js'},
       {route: 'https://example.com/:file', body: './app.js'},
       {route: 'https://example.com/(app|other).js', body: './app.js'},
-      {resourceType: 'websocket', body: './app.js'},
     ]) {
       it(
         'rejects invalid mock parameters before any state change: ' +
@@ -67,6 +82,166 @@ describe('network', () => {
         },
       );
     }
+
+    it('accepts wildcard, null, and serialized origins for allowOrigin', () => {
+      const schema = mockNetwork(createMockParsedArguments()).schema
+        .allowOrigin;
+      for (const origin of [
+        '*',
+        'null',
+        'https://example.com',
+        'http://localhost:8080',
+        'https://[::1]:8443',
+      ]) {
+        assert.strictEqual(schema.parse(origin), origin);
+      }
+    });
+
+    it('updates an upstream mock with the exact supplied actions', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const override = {
+        id: 7,
+        kind: 'upstream',
+        urlPattern: 'https://example.com/script.js*',
+        resourceType: 'script',
+        upstreamUrl: 'https://example.com/replacement.js',
+        allowOrigin: '*',
+        diagnostics: {hits: 0, errors: 0, navigations: 0},
+      } satisfies NetworkOverride;
+      page.mockNetwork.resolves(override);
+      await mockNetwork(args).handler(
+        {
+          params: {
+            route: override.urlPattern,
+            resourceType: 'script',
+            upstream: override.upstreamUrl,
+            allowOrigin: '*',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'upstream',
+        urlPattern: override.urlPattern,
+        resourceType: 'script',
+        upstreamUrl: override.upstreamUrl,
+        abort: undefined,
+        allowOrigin: '*',
+      });
+      sinon.assert.notCalled(page.listNetworkMocks);
+      sinon.assert.notCalled(context.validatePath);
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.firstCall,
+        'Network mock configured. Reload or navigate the page to apply it.',
+      );
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine.secondCall,
+        new NetworkOverridesFormatter([override]).toString(),
+      );
+    });
+
+    for (const abort of [true, false]) {
+      it(
+        'treats abort=' + abort + ' as an update without inventing a source',
+        async () => {
+          const {page, context, response, args} = createHandlerMocks();
+          page.mockNetwork.resolves({
+            id: 1,
+            kind: 'passthrough',
+            urlPattern: '*://*:*/*',
+            resourceType: 'script',
+            abort,
+            diagnostics: {hits: 0, errors: 0, navigations: 0},
+          });
+          await mockNetwork(args).handler(
+            {params: {resourceType: 'script', abort}, page},
+            response,
+            context,
+          );
+          sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+            urlPattern: undefined,
+            resourceType: 'script',
+            abort,
+            allowOrigin: undefined,
+          });
+          sinon.assert.notCalled(page.listNetworkMocks);
+        },
+      );
+    }
+
+    it('updates only allowOrigin without replacing an existing source', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.mockNetwork.resolves({
+        id: 1,
+        kind: 'upstream',
+        urlPattern: '*://*:*/*',
+        upstreamUrl: 'https://example.com/app.js',
+        allowOrigin: '*',
+        diagnostics: {hits: 0, errors: 0, navigations: 0},
+      });
+      await mockNetwork(args).handler(
+        {params: {allowOrigin: '*'}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        urlPattern: undefined,
+        resourceType: undefined,
+        abort: undefined,
+        allowOrigin: '*',
+      });
+      sinon.assert.notCalled(page.listNetworkMocks);
+    });
+
+    it('configures an upstream source while aborting matching requests', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.mockNetwork.resolves({
+        id: 1,
+        kind: 'upstream',
+        urlPattern: '*://*:*/*',
+        upstreamUrl: 'https://example.com/app.js',
+        abort: true,
+        diagnostics: {hits: 0, errors: 0, navigations: 0},
+      });
+      await mockNetwork(args).handler(
+        {params: {upstream: 'https://example.com/app.js', abort: true}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'upstream',
+        urlPattern: undefined,
+        resourceType: undefined,
+        abort: true,
+        allowOrigin: undefined,
+        upstreamUrl: 'https://example.com/app.js',
+      });
+      sinon.assert.notCalled(page.listNetworkMocks);
+    });
+
+    it('propagates upstream policy failures without reporting success', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.mockNetwork.rejects(new Error('Blocked by blocklist'));
+      await assert.rejects(
+        mockNetwork(args).handler(
+          {params: {upstream: 'https://blocked.example/script.js'}, page},
+          response,
+          context,
+        ),
+        /Blocked by blocklist/,
+      );
+      sinon.assert.calledOnceWithExactly(page.mockNetwork, {
+        kind: 'upstream',
+        urlPattern: undefined,
+        resourceType: undefined,
+        abort: undefined,
+        allowOrigin: undefined,
+        upstreamUrl: 'https://blocked.example/script.js',
+      });
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
 
     it('revalidates the canonical body file before each read', async () => {
       const {page, context, response, args} = createHandlerMocks();
@@ -93,6 +268,8 @@ describe('network', () => {
         kind: 'file',
         urlPattern: undefined,
         resourceType: undefined,
+        abort: undefined,
+        allowOrigin: undefined,
         responseFilePath: '/tmp/script.js',
         loadResponseFile: input.loadResponseFile,
       });
@@ -162,10 +339,9 @@ describe('network', () => {
         {
           id: 2,
           diagnostics: {hits: 0, errors: 0, navigations: 1},
-          kind: 'file',
+          kind: 'upstream',
           urlPattern: 'https://example.com/missing.js',
-          responseFilePath: '/tmp/replacement.js',
-          contentType: 'text/javascript',
+          upstreamUrl: 'https://example.com/replacement.js',
         },
       ]);
       await mockNetwork(args).handler({params: {}, page}, response, context);

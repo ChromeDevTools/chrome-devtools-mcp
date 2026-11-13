@@ -6,9 +6,11 @@
 
 import assert from 'node:assert';
 import {rm, writeFile} from 'node:fs/promises';
+import type {IncomingHttpHeaders} from 'node:http';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import {NetworkOverridesFormatter} from '../src/formatters/NetworkOverridesFormatter.js';
 import {mockNetwork, removeNetworkMock} from '../src/tools/network.js';
 import {serverHooks} from './server.js';
 import {createTempDir, html, withMcpContext} from './utils.js';
@@ -28,6 +30,160 @@ describe('network overrides integration', () => {
       res.end(source);
     });
   }
+
+  it('redirects matching requests across reloads until removed', async () => {
+    let originalRequests = 0;
+    let replacementRequests = 0;
+    addJavaScriptRoute(
+      '/redirect-original.js?v=42',
+      "document.documentElement.dataset.overrideSource = 'original';",
+      () => {
+        originalRequests++;
+      },
+    );
+    addJavaScriptRoute(
+      '/redirect-replacement.js',
+      "document.documentElement.dataset.overrideSource = 'replacement';",
+      () => {
+        replacementRequests++;
+      },
+    );
+    server.addHtmlRoute(
+      '/redirect-page',
+      html`<script src="${server.getRoute('/redirect-original.js?v=42')}"></script>`,
+    );
+
+    await withMcpContext(async (response, context, args) => {
+      const mcpPage = context.getSelectedMcpPage();
+      const page = mcpPage.pptrPage;
+      await mockNetwork(args).handler(
+        {
+          params: {
+            route: server.baseUrl + '/redirect-original.js*',
+            upstream: server.getRoute('/redirect-replacement.js'),
+          },
+          page: mcpPage,
+        },
+        response,
+        context,
+      );
+      assert.deepStrictEqual(response.responseLines, [
+        'Network mock configured. Reload or navigate the page to apply it.',
+        new NetworkOverridesFormatter(mcpPage.listNetworkMocks()).toString(),
+      ]);
+
+      await page.goto(server.getRoute('/redirect-page'));
+      assert.strictEqual(
+        await page.evaluate(
+          () => document.documentElement.dataset.overrideSource,
+        ),
+        'replacement',
+      );
+
+      await page.reload();
+      assert.strictEqual(
+        await page.evaluate(
+          () => document.documentElement.dataset.overrideSource,
+        ),
+        'replacement',
+      );
+      assert.strictEqual(originalRequests, 0);
+      assert.strictEqual(replacementRequests, 2);
+
+      response.resetResponseLineForTesting();
+      await removeNetworkMock(args).handler(
+        {params: {}, page: mcpPage},
+        response,
+        context,
+      );
+      await page.reload();
+      assert.strictEqual(
+        await page.evaluate(
+          () => document.documentElement.dataset.overrideSource,
+        ),
+        'original',
+      );
+      assert.strictEqual(originalRequests, 1);
+    });
+  });
+
+  it('sanitizes cross-origin headers while preserving Origin', async t => {
+    let replacementHeaders: IncomingHttpHeaders = {};
+    server.addHtmlRoute('/cross-origin-setup', html`<main>Setup</main>`);
+    addJavaScriptRoute(
+      '/cross-origin-original.js',
+      "document.documentElement.dataset.overrideSource = 'original';",
+    );
+    server.addHtmlRoute(
+      '/cross-origin-page',
+      html`<script src="${server.getRoute('/cross-origin-original.js')}"></script>`,
+    );
+    server.addRoute('/cross-origin-replacement.js', (req, res) => {
+      replacementHeaders = req.headers;
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.statusCode = 200;
+      res.end(
+        "document.documentElement.dataset.overrideSource = 'replacement';",
+      );
+    });
+
+    await withMcpContext(async (response, context, args) => {
+      const mcpPage = context.getSelectedMcpPage();
+      const page = mcpPage.pptrPage;
+      const browserContext = page.browserContext();
+      t.after(async () => {
+        await browserContext.deleteMatchingCookies({
+          name: 'override_secret',
+          domain: new URL(server.baseUrl).hostname,
+        });
+      });
+      await page.goto(server.getRoute('/cross-origin-setup'));
+      await page.evaluate(() => {
+        document.cookie = 'override_secret=cookie; path=/';
+      });
+      await page.setExtraHTTPHeaders({
+        Authorization: 'Bearer secret',
+        Origin: server.baseUrl,
+        'X-Api-Key': 'secret',
+      });
+
+      const replacementUrl =
+        server.baseUrl.replace('127.0.0.1', 'localhost') +
+        '/cross-origin-replacement.js';
+      await mockNetwork(args).handler(
+        {
+          params: {
+            route: server.getRoute('/cross-origin-original.js'),
+            resourceType: 'script',
+            upstream: replacementUrl,
+          },
+          page: mcpPage,
+        },
+        response,
+        context,
+      );
+
+      await page.goto(server.getRoute('/cross-origin-page'));
+      assert.strictEqual(
+        await page.evaluate(
+          () => document.documentElement.dataset.overrideSource,
+        ),
+        'replacement',
+      );
+      assert.strictEqual(replacementHeaders.origin, server.baseUrl);
+      assert.strictEqual(replacementHeaders.authorization, undefined);
+      assert.strictEqual(replacementHeaders.cookie, undefined);
+      assert.strictEqual(replacementHeaders.referer, undefined);
+      assert.strictEqual(replacementHeaders['x-api-key'], undefined);
+
+      response.resetResponseLineForTesting();
+      await removeNetworkMock(args).handler(
+        {params: {}, page: mcpPage},
+        response,
+        context,
+      );
+    });
+  });
 
   it('serves the latest contents of a local file when the URL has a query string', async () => {
     using directory = createTempDir('network-override-');
@@ -86,6 +242,53 @@ describe('network overrides integration', () => {
         response,
         context,
       );
+    });
+  });
+
+  it('enforces CORS for cross-origin fetches with allowOrigin and fails requests with abort: true', async () => {
+    using directory = createTempDir('network-mock-cors-');
+    const body = join(directory.path, 'response.txt');
+    await writeFile(body, 'mock response');
+    server.addHtmlRoute('/cors-page', html`<main>CORS test</main>`);
+    server.addRoute('/cors-response', (_req, res) => {
+      res.end('original response');
+    });
+    const route = server
+      .getRoute('/cors-response')
+      .replace('127.0.0.1', 'localhost');
+
+    await withMcpContext(async (response, context, args) => {
+      const mcpPage = context.getSelectedMcpPage();
+      const page = mcpPage.pptrPage;
+      await page.goto(server.getRoute('/cors-page'));
+      const fetchBody = () =>
+        page.evaluate(async url => {
+          const response = await fetch(url, {
+            signal: AbortSignal.timeout(5_000),
+          });
+          return await response.text();
+        }, route);
+
+      await mockNetwork(args).handler(
+        {params: {route, body}, page: mcpPage},
+        response,
+        context,
+      );
+      await assert.rejects(fetchBody, /Failed to fetch/);
+
+      await mockNetwork(args).handler(
+        {params: {route, allowOrigin: server.baseUrl}, page: mcpPage},
+        response,
+        context,
+      );
+      assert.strictEqual(await fetchBody(), 'mock response');
+
+      await mockNetwork(args).handler(
+        {params: {route, abort: true}, page: mcpPage},
+        response,
+        context,
+      );
+      await assert.rejects(fetchBody, /Failed to fetch/);
     });
   });
 

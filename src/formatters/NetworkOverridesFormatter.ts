@@ -30,11 +30,21 @@ export class NetworkOverridesFormatter {
     const lines = [warning];
     for (const override of overrides) {
       const source =
-        override.responseFilePath + ' (' + override.contentType + ')';
+        override.kind === 'file'
+          ? override.responseFilePath + ' (' + override.contentType + ')'
+          : override.kind === 'upstream'
+            ? override.upstreamUrl
+            : 'original response';
       const resourceType = override.resourceType
         ? ' [' + override.resourceType + ']'
         : '';
       lines.push(override.urlPattern + resourceType + ' -> ' + source);
+      if (override.abort) {
+        lines.push('  Requests are aborted; the response source is ignored.');
+      }
+      if (override.allowOrigin !== undefined) {
+        lines.push('  Access-Control-Allow-Origin: ' + override.allowOrigin);
+      }
       const {hits, errors, navigations, lastError} = override.diagnostics;
       lines.push(
         '  Since configured: ' + hits + ' hits, ' + errors + ' errors.',
