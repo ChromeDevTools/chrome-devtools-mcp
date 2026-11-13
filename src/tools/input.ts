@@ -13,10 +13,8 @@ import {
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
-import {
-  raceWithSignal,
-  type WaitForEventsResult,
-} from '../utils/WaitForHelper.js';
+import {raceWithSignal} from '../utils/raceWithSignal.js';
+import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import {

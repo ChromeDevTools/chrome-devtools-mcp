@@ -7,8 +7,8 @@
 import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod, type CdpPage} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {raceWithSignal} from '../utils/raceWithSignal.js';
 import {validateUrl} from '../utils/url.js';
-import {raceWithSignal} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import {

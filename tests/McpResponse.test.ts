@@ -1055,7 +1055,7 @@ describe('extensions', () => {
       const emptyResult = await response.handle(context);
       const emptyText = getTextContent(emptyResult.content[0]);
       assert.ok(
-        emptyText.includes('No extensions installed.'),
+        emptyText.includes('No unpacked extensions found.'),
         'Should show message for ampty extensions',
       );
 

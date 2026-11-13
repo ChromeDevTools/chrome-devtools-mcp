@@ -29,6 +29,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #loadedNewDocument = false;
   #openedPages = new Set<Target>();
 
   constructor(
@@ -177,6 +178,22 @@ export class WaitForHelper {
       this.#publicPage.off('popup', popupHandler);
     });
 
+    // CDP reports each new document the main frame commits, a reload or a
+    // back/forward cache restore included, with `Page.frameNavigated`, while
+    // a same-document navigation comes as `Page.navigatedWithinDocument`.
+    const frameNavigatedHandler = (
+      event: Protocol.Page.FrameNavigatedEvent,
+    ): void => {
+      if (!event.frame.parentId) {
+        this.#loadedNewDocument = true;
+      }
+    };
+    const client = this.#page._client();
+    client.on('Page.frameNavigated', frameNavigatedHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      client.off('Page.frameNavigated', frameNavigatedHandler);
+    });
+
     // A scoped AbortController used to clean up navigation probe listeners.
     // When aborted (either after navigation detection finishes or if this.#abortController
     // aborts), it removes CDP navigation probe listeners and automatically
@@ -302,7 +319,7 @@ export class WaitForHelper {
   #getResult(): WaitForEventsResult {
     const urlAfterAction = this.#page.url();
     return {
-      ...(urlAfterAction !== this.#initialUrl
+      ...(urlAfterAction !== this.#initialUrl || this.#loadedNewDocument
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
@@ -322,31 +339,6 @@ export interface WaitForEventsResult {
    */
   dialogHandled?: boolean;
   openedPages?: Set<Target>;
-}
-
-export function raceWithSignal<T>(
-  promise: Promise<T>,
-  signal: AbortSignal,
-): Promise<T> {
-  if (signal.aborted) {
-    return Promise.reject(signal.reason);
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      reject(signal.reason);
-    };
-    signal.addEventListener('abort', onAbort, {once: true});
-    Promise.resolve(promise).then(
-      value => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      error => {
-        signal.removeEventListener('abort', onAbort);
-        reject(error);
-      },
-    );
-  });
 }
 
 export function getNetworkMultiplierFromString(

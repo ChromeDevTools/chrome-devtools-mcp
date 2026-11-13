@@ -178,6 +178,105 @@ describe('pwa', () => {
     sinon.assert.alwaysCalledWithExactly(response.setIncludePages, true);
   });
 
+  it('install_pwa rejects a file: bundle URL when fileNavigations is disabled', async () => {
+    const {context, response, args} = createHandlerMocks({
+      fileNavigations: false,
+    });
+
+    await assert.rejects(
+      installPwa(args).handler(
+        {
+          params: {
+            manifestId: 'isolated-app://app/',
+            installUrlOrBundleUrl: 'file:///tmp/app.swbn',
+          },
+        },
+        response,
+        context,
+      ),
+      /Navigating to file: URLs is not allowed/,
+    );
+    sinon.assert.notCalled(context.installPWA);
+  });
+
+  it('install_pwa rejects a restricted manifest ID or install URL', async () => {
+    const {context, response, args} = createHandlerMocks({
+      javascriptEvaluation: false,
+    });
+
+    await assert.rejects(
+      installPwa(args).handler(
+        {params: {manifestId: 'chrome://settings/', installUrlOrBundleUrl: ''}},
+        response,
+        context,
+      ),
+      /Navigating to chrome: URLs is not allowed/,
+    );
+    await assert.rejects(
+      installPwa(args).handler(
+        {
+          params: {
+            manifestId: 'https://example.com/',
+            installUrlOrBundleUrl: 'javascript:alert(1)',
+          },
+        },
+        response,
+        context,
+      ),
+      /Navigating to javascript: URLs is not allowed/,
+    );
+    sinon.assert.notCalled(context.installPWA);
+  });
+
+  it('install_pwa passes a file path through without URL validation', async () => {
+    const {context, response, args} = createHandlerMocks({
+      fileNavigations: false,
+    });
+    context.installPWA.resolves('isolated-app://app/');
+
+    await installPwa(args).handler(
+      {
+        params: {
+          manifestId: 'isolated-app://app/',
+          installUrlOrBundleUrl: '/tmp/app.swbn',
+        },
+      },
+      response,
+      context,
+    );
+
+    sinon.assert.calledOnceWithExactly(context.installPWA, {
+      manifestId: 'isolated-app://app/',
+      installUrlOrBundleUrl: '/tmp/app.swbn',
+      displayMode: undefined,
+    });
+  });
+
+  it('launch_pwa rejects file: and restricted URLs', async () => {
+    const {context, response, args} = createHandlerMocks({
+      fileNavigations: false,
+    });
+    const manifestId = 'https://example.com/pwa/';
+
+    await assert.rejects(
+      launchPwa(args).handler(
+        {params: {manifestId, url: 'file:///etc/passwd'}},
+        response,
+        context,
+      ),
+      /Navigating to file: URLs is not allowed/,
+    );
+    await assert.rejects(
+      launchPwa(args).handler(
+        {params: {manifestId, url: 'devtools://devtools/bundled/x.html'}},
+        response,
+        context,
+      ),
+      /Navigating to devtools: URLs is not allowed/,
+    );
+    sinon.assert.notCalled(context.launchPWA);
+  });
+
   it('launches an installed PWA in a standalone window', async () => {
     const {manifestId, startUrl} = setupPwaRoutes();
     await withMcpContext(
