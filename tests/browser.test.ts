@@ -172,33 +172,6 @@ describe('browser', () => {
       });
     });
 
-    it('falls back to CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH when executablePath is unset on default or stable channel', async () => {
-      const pptrBrowser = createMockPuppeteerBrowser();
-      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
-      sinon.stub(process, 'env').value({
-        ...process.env,
-        CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH: '/env/chrome',
-      });
-
-      const stableManager = new BrowserManager(
-        createMockServerConfig({isolated: true, channel: 'stable'}),
-      );
-      await stableManager.ensureBrowser();
-      sinon.assert.calledOnceWithMatch(launchStub, {
-        channel: undefined,
-        executablePath: '/env/chrome',
-      });
-
-      const canaryManager = new BrowserManager(
-        createMockServerConfig({isolated: true, channel: 'canary'}),
-      );
-      await canaryManager.ensureBrowser();
-      sinon.assert.calledWithMatch(launchStub.secondCall, {
-        channel: 'chrome-canary',
-        executablePath: undefined,
-      });
-    });
-
     it('disables Puppeteer signal handlers so close() can shut the browser down gracefully', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);

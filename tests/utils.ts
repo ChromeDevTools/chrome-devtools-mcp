@@ -479,15 +479,7 @@ export async function runCli(
       finalArgs.unshift('--sessionId', sessionId);
     }
     const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
-      env: {
-        ...process.env,
-        ...(process.env['PUPPETEER_EXECUTABLE_PATH']
-          ? {
-              CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH:
-                process.env['PUPPETEER_EXECUTABLE_PATH'],
-            }
-          : {}),
-      },
+      env: process.env,
       cwd: options?.cwd,
     });
     let stdout = '';
@@ -503,6 +495,20 @@ export async function runCli(
     child.on('close', status => resolve({status, stdout, stderr}));
     child.on('error', reject);
   });
+}
+
+/**
+ * Runs `chrome-devtools start` for tests that use the browser. Passes
+ * `PUPPETEER_EXECUTABLE_PATH` as `--executablePath` when it is set.
+ */
+export async function startCli(
+  sessionId: string,
+  args: string[] = [],
+  options?: {cwd?: string},
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  const chromePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+  const pathArgs = chromePath ? [`--executablePath=${chromePath}`] : [];
+  return await runCli(['start', ...args, ...pathArgs], sessionId, options);
 }
 
 export async function assertDaemonIsNotRunning(

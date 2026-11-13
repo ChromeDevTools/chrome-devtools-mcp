@@ -286,12 +286,7 @@ export class BrowserManager {
     if (devtools) {
       args.push('--auto-open-devtools-for-tabs');
     }
-    const resolvedExecutablePath =
-      executablePath ??
-      (!channel || channel === 'stable'
-        ? process.env['CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH']
-        : undefined);
-    if (!resolvedExecutablePath) {
+    if (!executablePath) {
       puppeteerChannel =
         channel && channel !== 'stable' ? `chrome-${channel}` : 'chrome';
     }
@@ -305,7 +300,7 @@ export class BrowserManager {
       browser = await puppeteer.launch({
         channel: puppeteerChannel,
         targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
-        executablePath: resolvedExecutablePath,
+        executablePath,
         defaultViewport: null,
         userDataDir,
         pipe: true,
