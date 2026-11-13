@@ -436,6 +436,8 @@ export function createMockMcpPage(
     return {};
   });
   page.getWebMcpTools.returns([]);
+  page.getLatestConsoleMessageId.returns(0);
+  page.getConsoleDataAfter.returns([]);
   page.discoverThirdPartyDeveloperTools.resolves([]);
   page.getWebAuthnAuthenticator.returns(undefined);
   Object.defineProperty(page, 'pptrPage', {
