@@ -44,11 +44,16 @@ function delay(ms: number): Promise<void> {
 async function waitFor(
   check: () => boolean,
   timeoutMessage: string,
+  getStartupError?: () => Error | undefined,
 ): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   while (Date.now() < deadline) {
     if (check()) {
       return;
+    }
+    const startupError = getStartupError?.();
+    if (startupError) {
+      throw startupError;
     }
     const timeLeft = deadline - Date.now();
     if (timeLeft > 0) {
@@ -66,20 +71,30 @@ async function waitFor(
 /**
  * Waits for a file to be created and populated.
  */
-async function waitForFile(filePath: string): Promise<void> {
-  await waitFor(() => {
-    if (!fs.existsSync(filePath)) {
-      return false;
-    }
-    try {
-      return fs.statSync(filePath).size > 0;
-    } catch {
-      return false;
-    }
-  }, `Timeout: file ${filePath} not found within ${FILE_TIMEOUT}ms`);
+async function waitForFile(
+  filePath: string,
+  getStartupError?: () => Error | undefined,
+): Promise<void> {
+  await waitFor(
+    () => {
+      if (!fs.existsSync(filePath)) {
+        return false;
+      }
+      try {
+        return fs.statSync(filePath).size > 0;
+      } catch {
+        return false;
+      }
+    },
+    `Timeout: file ${filePath} not found within ${FILE_TIMEOUT}ms`,
+    getStartupError,
+  );
 }
 
-async function waitForDaemonReady(sessionId: string): Promise<void> {
+async function waitForDaemonReady(
+  sessionId: string,
+  getStartupError?: () => Error | undefined,
+): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   let lastError: unknown;
 
@@ -96,6 +111,13 @@ async function waitForDaemonReady(sessionId: string): Promise<void> {
       lastError = new Error(String(response.error));
     } catch (error) {
       lastError = error;
+    }
+    // Checked after a failed status: when two callers start the same session,
+    // the second daemon exits because the first one is running, and the
+    // caller should connect to that one.
+    const startupError = getStartupError?.();
+    if (startupError) {
+      throw startupError;
     }
 
     const timeLeft = deadline - Date.now();
@@ -147,8 +169,22 @@ export async function startDaemon(
   });
   child.unref();
 
-  await waitForFile(pidFilePath);
-  await waitForDaemonReady(sessionId);
+  // The daemon's stdio is ignored, so a daemon that fails during startup (for
+  // example, a socket path it cannot bind) would otherwise only surface as a
+  // timeout waiting for a PID file it has already removed.
+  let startupError: Error | undefined;
+  const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+    startupError = new Error(
+      `Daemon exited (${signal ? `signal ${signal}` : `exit code ${code}`}) before it was ready.`,
+    );
+  };
+  child.once('exit', onExit);
+  try {
+    await waitForFile(pidFilePath, () => startupError);
+    await waitForDaemonReady(sessionId, () => startupError);
+  } finally {
+    child.off('exit', onExit);
+  }
 }
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms

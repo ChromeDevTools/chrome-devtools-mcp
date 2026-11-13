@@ -57,6 +57,14 @@ describe('daemon client', () => {
       );
     });
 
+    it('reports a daemon that exits during startup instead of timing out', async () => {
+      // The timeout path rejects with a "Timeout: ..." error, so matching the
+      // exit error shows the failure came from the child's exit code.
+      await assert.rejects(startDaemon(['--viewport=invalid'], sessionId), {
+        message: 'Daemon exited (exit code 1) before it was ready.',
+      });
+    });
+
     it('should handle starting daemon when already running', async () => {
       await startDaemon([], sessionId);
       assert.ok(isDaemonRunning(sessionId), 'Daemon should be running');
