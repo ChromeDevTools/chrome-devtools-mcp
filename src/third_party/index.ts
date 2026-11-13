@@ -10,12 +10,12 @@ import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
-import {z as zod} from 'zod';
 
 // eslint-disable-next-line no-restricted-imports
 import * as DevToolsRoot from '../../third_party/devtools-frontend/front_end/core/root/root.js';
 
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
+import * as zod from './zod.js';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
@@ -76,6 +76,7 @@ export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
+export {CdpHTTPRequest} from 'puppeteer-core/internal/cdp/HTTPRequest.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export {CdpScreenRecording} from 'puppeteer-core/internal/cdp/ScreenRecording.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';

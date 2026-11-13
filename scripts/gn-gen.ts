@@ -23,9 +23,9 @@ export function getGnBinaryPath(): string {
   }
 }
 
-export function runGnGen(): void {
+export function runGnGen(gnArgs: string[] = []): void {
   linkDevToolsDeps();
-  execFileSync(getGnBinaryPath(), ['gen', 'out/Default'], {
+  execFileSync(getGnBinaryPath(), ['gen', 'out/Default', ...gnArgs], {
     cwd: projectRoot,
     stdio: 'inherit',
   });
@@ -35,5 +35,5 @@ export function runGnGen(): void {
 }
 
 if (import.meta.main) {
-  runGnGen();
+  runGnGen(process.argv.slice(2));
 }

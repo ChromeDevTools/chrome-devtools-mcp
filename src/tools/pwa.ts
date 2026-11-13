@@ -4,10 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
+import {validateUrl} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool, type ToolFactory} from './ToolDefinition.js';
+
+function validatePwaUrl(url: string, args: ParsedArguments): void {
+  validateUrl(url, {
+    javascriptEvaluation: args.javascriptEvaluation,
+    categoryExtensions: args.categoryExtensions,
+    fileNavigations: args.fileNavigations,
+  });
+}
 
 const manifestIdSchema = zod
   .string()
@@ -28,7 +38,7 @@ const displayModeSchema = zod
       'app-window experience.',
   );
 
-export const installPwa: ToolFactory = defineTool(() => ({
+export const installPwa: ToolFactory = defineTool((args: ParsedArguments) => ({
   name: 'install_pwa',
   description:
     'Installs a Progressive Web App (PWA) identified by its manifest ID. ' +
@@ -64,6 +74,12 @@ export const installPwa: ToolFactory = defineTool(() => ({
   },
   handler: async (request, response, context) => {
     const {manifestId, installUrlOrBundleUrl, displayMode} = request.params;
+    // Without an install URL, the browser installs from the manifest ID.
+    validatePwaUrl(manifestId, args);
+    // A plain file path is not a URL and was already confined to the roots.
+    if (installUrlOrBundleUrl && URL.canParse(installUrlOrBundleUrl)) {
+      validatePwaUrl(installUrlOrBundleUrl, args);
+    }
     await context.installPWA({
       manifestId,
       installUrlOrBundleUrl,
@@ -103,7 +119,7 @@ export const uninstallPwa: ToolFactory = defineTool(() => ({
   },
 }));
 
-export const launchPwa: ToolFactory = defineTool(() => ({
+export const launchPwa: ToolFactory = defineTool((args: ParsedArguments) => ({
   name: 'launch_pwa',
   description:
     'Launches an installed Progressive Web App using its saved display mode. ' +
@@ -127,6 +143,9 @@ export const launchPwa: ToolFactory = defineTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
+    if (url !== undefined) {
+      validatePwaUrl(url, args);
+    }
     const page = await context.launchPWA({manifestId, url});
     response.appendResponseLine(
       `Launched PWA with manifest ID: ${manifestId} (${page.url()})`,

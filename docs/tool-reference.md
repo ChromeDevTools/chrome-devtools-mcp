@@ -56,6 +56,9 @@
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
   - [`query_heapsnapshot_objects`](#query_heapsnapshot_objects)
+- **[Network mocks](#network-mocks)** (2 tools)
+  - [`mock_network`](#mock_network)
+  - [`remove_network_mock`](#remove_network_mock)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
   - [`list_extensions`](#list_extensions)
@@ -334,7 +337,7 @@
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.
+- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network mocks always disable the page HTTP cache.
 - **reload** (boolean) _(optional)_: Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
@@ -717,6 +720,38 @@ in the DevTools Elements panel (if any).
 
 ---
 
+## Network mocks
+
+> NOTE: The Network mocks category is not active by default. Use the '--categoryNetworkMocks' flag.
+
+### `mock_network`
+
+**Description:** Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route matches any URL. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. allowOrigin requires a body or upstream source. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use [`remove_network_mock`](#remove_network_mock) to remove mocks. (requires flag: --categoryNetworkMocks=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **abort** (boolean) _(optional)_: Abort matching requests when true. When false, use the stored body or upstream source, or send the request to the network if neither is set. A mock without a source still wins over older matching mocks. Abortion takes precedence over body, upstream, and allowOrigin.
+- **allowOrigin** (string) _(optional)_: Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.
+- **body** (string) _(optional)_: Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
+- **upstream** (string) _(optional)_: Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.
+
+---
+
+### `remove_network_mock`
+
+**Description:** Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace. (requires flag: --categoryNetworkMocks=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.
+- **route** (string) _(optional)_: Absolute URLPattern, e.g. https://example.com/app.js or `*://*:*/app.js`. Use `*` for wildcards; omitted query strings match any query. Regex and `:name` groups are rejected. Inspection and removal compare the stored pattern exactly. Omit to inspect/remove all routes or match any URL.
+
+---
+
 ## Extensions
 
 > NOTE: The Extensions category is not active by default. Use the '--categoryExtensions' flag.
@@ -733,7 +768,7 @@ in the DevTools Elements panel (if any).
 
 ### `list_extensions`
 
-**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)
+**Description:** Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included. (requires flag: --categoryExtensions=true)
 
 **Parameters:** None
 
