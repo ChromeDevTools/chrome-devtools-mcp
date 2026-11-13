@@ -226,6 +226,10 @@ export type ExceptionDetailsLike =
   | Protocol.Runtime.ExceptionDetails
   | DevTools.Protocol.Runtime.ExceptionDetails;
 
+// Only `send()` is used, so the session of a handle from any copy of
+// Puppeteer qualifies.
+export type SessionLike = Pick<CDPSession, 'send'>;
+
 export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
@@ -264,7 +268,7 @@ export class SymbolizedError {
     devTools?: TargetUniverse;
     // The session that reported `details`. Remote object ids are scoped to
     // the session that issued them, so the cause has to be resolved there.
-    session?: CDPSession;
+    session?: SessionLike;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
     resolvedCauseForTesting?: SymbolizedError;
@@ -335,7 +339,7 @@ export class SymbolizedError {
     error: RemoteObjectLike;
     targetId: string;
     devTools?: TargetUniverse;
-    session?: CDPSession;
+    session?: SessionLike;
   }): Promise<SymbolizedError> {
     return await SymbolizedError.#fromError(opts, 0);
   }
@@ -405,7 +409,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<ExceptionDetailsLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
@@ -442,7 +446,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<RemoteObjectLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
