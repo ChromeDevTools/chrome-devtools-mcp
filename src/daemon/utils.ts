@@ -153,9 +153,12 @@ export function isDaemonRunning(sessionId: string): boolean {
   const pid = getDaemonPid(sessionId);
   if (pid) {
     try {
-      process.kill(pid, 0); // Throws if process doesn't exist
+      process.kill(pid, 0);
       return isDaemonProcess(pid);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'EPERM') {
+        return isDaemonProcess(pid);
+      }
       // Process is dead, stale PID file. Proceed with startup.
       verifiedDaemonPids.delete(pid);
     }

@@ -15,7 +15,7 @@ import path from 'node:path';
 import type {TestContext} from 'node:test';
 
 import type {Browser} from 'puppeteer';
-import puppeteer, {Locator} from 'puppeteer';
+import puppeteer, {executablePath, Locator} from 'puppeteer';
 
 import type {
   Frame,
@@ -37,6 +37,7 @@ import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type CallToolResult} from '../src/third_party/index.js';
+import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
@@ -458,6 +459,10 @@ export function getMockBrowser(options?: {
   return browser;
 }
 
+export async function getExecutablePath(): Promise<string> {
+  return process.env['PUPPETEER_EXECUTABLE_PATH'] ?? (await executablePath());
+}
+
 export const CLI_PATH: string = path.resolve(
   import.meta.dirname,
   '../src/bin/chrome-devtools.js',
@@ -491,6 +496,20 @@ export async function runCli(
     child.on('close', status => resolve({status, stdout, stderr}));
     child.on('error', reject);
   });
+}
+
+/**
+ * Runs `chrome-devtools start` for tests that use the browser. Passes
+ * `PUPPETEER_EXECUTABLE_PATH` as `--executablePath` when it is set.
+ */
+export async function startCli(
+  sessionId: string,
+  args: string[] = [],
+  options?: {cwd?: string},
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  const chromePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+  const pathArgs = chromePath ? [`--executablePath=${chromePath}`] : [];
+  return await runCli(['start', ...args, ...pathArgs], sessionId, options);
 }
 
 export async function assertDaemonIsNotRunning(
@@ -590,6 +609,19 @@ export function createTempFile(
       } catch {
         // ignore
       }
+    },
+  };
+}
+
+export async function createDisposableTempFile(filename: string): Promise<{
+  path: string;
+  [Symbol.dispose]: () => void;
+}> {
+  const filepath = await getTempFilePath(filename);
+  return {
+    path: filepath,
+    [Symbol.dispose](): void {
+      fs.rmSync(path.dirname(filepath), {recursive: true, force: true});
     },
   };
 }

@@ -150,6 +150,7 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
         request.params.background,
         request.params.isolatedContext,
       );
+      response.includeConsoleErrorsFrom(page);
 
       try {
         await page.waitForEventsAfterAction(

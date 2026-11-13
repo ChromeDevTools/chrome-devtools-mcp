@@ -7,13 +7,13 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {createCliSession, runCli} from '../utils.js';
+import {createCliSession, runCli, startCli} from '../utils.js';
 
 // Each test uses its own daemon session, so the tests run in parallel.
 describe('chrome-devtools', {concurrency: true}, () => {
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async t => {
     const sessionId = createCliSession(t);
-    await runCli(['start', '--categoryNetwork=false'], sessionId);
+    await startCli(sessionId, ['--categoryNetwork=false']);
 
     const result = await runCli(['list_network_requests', '1'], sessionId);
     assert.strictEqual(result.status, 0);
@@ -32,7 +32,7 @@ describe('chrome-devtools', {concurrency: true}, () => {
 
   it('fails to invoke click_at when experimentalVision is disabled (default)', async t => {
     const sessionId = createCliSession(t);
-    await runCli(['start'], sessionId);
+    await startCli(sessionId);
 
     const result = await runCli(['click_at', '1', '100', '100'], sessionId);
     assert.strictEqual(result.status, 0);
@@ -50,7 +50,7 @@ describe('chrome-devtools', {concurrency: true}, () => {
 
   it('fails to invoke evaluate_script when javascriptEvaluation is disabled', async t => {
     const sessionId = createCliSession(t);
-    await runCli(['start', '--no-javascript-evaluation'], sessionId);
+    await startCli(sessionId, ['--no-javascript-evaluation']);
 
     // The three commands do not change daemon state, so they run in
     // parallel.

@@ -855,6 +855,19 @@ export class McpPage implements ContextPage {
     return this.consoleCollector.getById(id);
   }
 
+  getLatestConsoleMessageId(): number {
+    const latest = this.consoleCollector.getData(true).at(-1);
+    return latest ? this.consoleCollector.getIdForResource(latest) : 0;
+  }
+
+  getConsoleDataAfter(
+    id: number,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector
+      .getData(true)
+      .filter(item => this.consoleCollector.getIdForResource(item) > id);
+  }
+
   getNetworkRequestById(reqid: number): HTTPRequest {
     return this.networkCollector.getById(reqid);
   }

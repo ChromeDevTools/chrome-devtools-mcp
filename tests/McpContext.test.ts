@@ -11,7 +11,6 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
 import {UncaughtError} from '../src/collectors/PageCollector.js';
@@ -25,6 +24,7 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {
   type Browser,
   type HTTPResponse,
+  Locator,
   ScreenRecorder,
   type Target,
   TargetType,
@@ -60,13 +60,11 @@ import {
   stabilizeStructuredContent,
 } from './utils.js';
 
-const EXTENSION_WITH_SW_PATH = path.join(
-  import.meta.dirname,
-  '../../../../tests/tools/fixtures/extension-sw',
+const EXTENSION_WITH_SW_PATH = path.resolve(
+  'tests/tools/fixtures/extension-sw',
 );
-const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
-  import.meta.dirname,
-  '../../../../tests/tools/fixtures/extension-content-script',
+const EXTENSION_CONTENT_SCRIPT_PATH = path.resolve(
+  'tests/tools/fixtures/extension-content-script',
 );
 
 describe('McpContext', () => {

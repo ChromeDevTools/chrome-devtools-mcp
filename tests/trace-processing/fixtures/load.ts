@@ -17,20 +17,7 @@ import zlib from 'node:zlib';
 export function loadTraceAsBuffer(filePath: string): Uint8Array {
   try {
     const compressedData = fs.readFileSync(
-      path.join(
-        import.meta.dirname,
-        // Get back up to the root directory as fixtures aren't moved into the out/Default/gen/ dir.
-        '..',
-        '..',
-        '..',
-        '..',
-        '..',
-        '..',
-        'tests',
-        'trace-processing',
-        'fixtures',
-        filePath,
-      ),
+      path.resolve('tests', 'trace-processing', 'fixtures', filePath),
     );
     const decompressedData = zlib.gunzipSync(compressedData);
     const jsonString = decompressedData.toString('utf-8');
