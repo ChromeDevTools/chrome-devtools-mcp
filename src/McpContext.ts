@@ -21,6 +21,7 @@ import type {
   HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
+import {McpResponse} from './McpResponse.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
@@ -47,11 +48,16 @@ import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';
 import {
   CLOSE_PAGE_ERROR,
+  isBrowserlessTool,
   isCapabilityEnabled,
+  isPageScopedTool,
+  type AnyToolDefinition,
   type BrowserlessContext,
   type CapabilityGate,
   type Context,
+  type ContextPage,
   type DevToolsData,
+  type ImageContentData,
   type SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
@@ -1281,5 +1287,36 @@ export class McpContext implements Context, BrowserlessContext {
       currentFilePath,
       classIndex,
     );
+  }
+
+  async runReplInnerTool(
+    tool: AnyToolDefinition,
+    params: Record<string, unknown>,
+    page: ContextPage,
+  ): Promise<{
+    structuredContent: Record<string, unknown>;
+    images: ImageContentData[];
+  }> {
+    const innerResponse = new McpResponse(this.#config);
+    const targetMcpPage =
+      this.#selectedPage?.id === page.id
+        ? this.#selectedPage
+        : this.getPageById(page.id);
+    innerResponse.setPage(targetMcpPage);
+    if (isPageScopedTool(tool)) {
+      await tool.handler({params, page}, innerResponse, this);
+    } else if (isBrowserlessTool(tool)) {
+      await tool.handler({params}, innerResponse, this);
+    } else {
+      await tool.handler({params}, innerResponse, this);
+    }
+    const {structuredContent} = await innerResponse.handle(this, 'default');
+    if (innerResponse.error) {
+      throw innerResponse.error;
+    }
+    return {
+      structuredContent: Object.fromEntries(Object.entries(structuredContent)),
+      images: innerResponse.images,
+    };
   }
 }

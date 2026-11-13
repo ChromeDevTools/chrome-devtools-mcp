@@ -11,6 +11,10 @@ import {
   type HTTPRequest,
   type HTTPResponse,
 } from '../third_party/index.js';
+import type {
+  NetworkRequestConcise,
+  NetworkRequestDetailed,
+} from '../tools/repl/replSchema.js';
 import {truncateText, truncateUrl} from '../utils/text.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
@@ -50,25 +54,6 @@ export interface NetworkFormatterOptions {
   redactNetworkHeaders: boolean;
   /** Defaults to `RESPONSE_BODY_TIMEOUT_MS`. */
   responseBodyTimeout?: number;
-}
-
-interface NetworkRequestConcise {
-  requestId?: number | string;
-  method: string;
-  url: string;
-  status: string;
-  selectedInDevToolsUI?: boolean;
-}
-
-interface NetworkRequestDetailed extends NetworkRequestConcise {
-  requestHeaders: Record<string, string>;
-  requestBody?: string;
-  requestBodyFilePath?: string;
-  responseHeaders?: Record<string, string>;
-  responseBody?: string;
-  responseBodyFilePath?: string;
-  failure?: string;
-  redirectChain?: NetworkRequestConcise[];
 }
 
 export class NetworkFormatter {

@@ -8,6 +8,10 @@ import {TimeoutError, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
+  takeSnapshotOutputSchema,
+  waitForOutputSchema,
+} from './repl/replSchema.js';
+import {
   definePageTool,
   type PageToolFactory,
   timeoutSchema,
@@ -37,6 +41,7 @@ in the DevTools Elements panel (if any).`,
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
   },
+  outputSchema: takeSnapshotOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {
@@ -77,6 +82,7 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
         'If true, wait until the matching text is visible. By default, hidden text also counts.',
       ),
   },
+  outputSchema: waitForOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},

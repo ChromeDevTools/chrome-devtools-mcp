@@ -5,6 +5,10 @@
  */
 
 import type {TextSnapshot} from '../TextSnapshot.js';
+import type {
+  SnapshotJsonNode,
+  SnapshotPrimitiveAttribute,
+} from '../tools/repl/replSchema.js';
 import type {TextSnapshotNode} from '../types.js';
 import {truncateUrl} from '../utils/text.js';
 
@@ -33,7 +37,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     return chunks.join('');
   }
 
-  toJSON(): object {
+  toJSON(): SnapshotJsonNode {
     return this.#nodeToJSON(this.#snapshot.root);
   }
 
@@ -75,10 +79,21 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     return stripWhitespace(text) === stripWhitespace(node.name);
   }
 
-  #nodeToJSON(node: TextSnapshotNode): object {
-    const rawAttrs = this.#getAttributesMap(node);
+  #nodeToJSON(node: TextSnapshotNode): SnapshotJsonNode {
+    const result: SnapshotJsonNode = {};
+    if (node.id) {
+      result.id = node.id;
+    }
+    if (node.role) {
+      result.role = node.role;
+    }
+    if (node.name) {
+      result.name = node.name;
+    }
+    for (const [key, val] of Object.entries(this.#extractedAttributes(node))) {
+      result[key] = val;
+    }
     const children = node.children.map(child => this.#nodeToJSON(child));
-    const result: Record<string, unknown> = structuredClone(rawAttrs);
     if (children.length > 0) {
       result.children = children;
     }
@@ -142,8 +157,8 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   #getAttributesMap(
     node: TextSnapshotNode,
     excludeSpecial = false,
-  ): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+  ): Record<string, SnapshotPrimitiveAttribute> {
+    const result: Record<string, SnapshotPrimitiveAttribute> = {};
     if (!excludeSpecial) {
       if (node.id) {
         result.id = node.id;
@@ -163,14 +178,16 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     };
   }
 
-  #extractedAttributes(node: TextSnapshotNode): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+  #extractedAttributes(
+    node: TextSnapshotNode,
+  ): Record<string, SnapshotPrimitiveAttribute> {
+    const result: Record<string, SnapshotPrimitiveAttribute> = {};
 
     for (const attr of Object.keys(node).sort()) {
       if (excludedAttributes.has(attr)) {
         continue;
       }
-      const value = (node as unknown as Record<string, unknown>)[attr];
+      const value: unknown = Reflect.get(node, attr);
       if (typeof value === 'boolean') {
         if (booleanPropertyMap[attr]) {
           result[booleanPropertyMap[attr]] = true;

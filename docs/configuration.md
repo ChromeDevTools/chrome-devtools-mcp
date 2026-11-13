@@ -239,6 +239,16 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--repl`**
+  Enable REPL mode: keep lifecycle, session, dialog, and file tools on the outer MCP surface while exposing in-page interaction and inspection tools as an mcp.* API inside evaluate_script in an isolated CDP world.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--replMainWorld`/ `--repl-main-world`**
+  Run evaluate_script REPL mode in the page main world instead of an isolated CDP world (implies --repl). Use only on trusted pages.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
   If true, redacts some of the network headers considered sensitive before returning to the client.
   - **Type:** boolean

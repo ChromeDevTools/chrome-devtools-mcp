@@ -150,13 +150,24 @@ export class ServerConfig implements ReadonlyServerConfig {
     for (const [key, implied] of IMPLICATIONS) {
       const isKeySet =
         explicitArgs[key] !== undefined && explicitArgs[key] !== false;
+      const defaultVal =
+        'default' in mcpOptions[implied]
+          ? mcpOptions[implied].default
+          : undefined;
+      const effectiveImplied =
+        implied in explicitArgs && explicitArgs[implied] !== undefined
+          ? explicitArgs[implied]
+          : defaultVal;
       const isImpliedSet =
-        explicitArgs[implied] !== undefined && explicitArgs[implied] !== false;
+        effectiveImplied !== undefined && effectiveImplied !== false;
       if (isKeySet && !isImpliedSet) {
         throw new Error(
           `Implications failed:\n  ${String(key)} -> ${String(implied)}`,
         );
       }
+    }
+    if (explicitArgs.replMainWorld === true && explicitArgs.repl === false) {
+      throw new Error('Implications failed:\n  replMainWorld -> repl');
     }
   }
 
@@ -190,8 +201,14 @@ export class ServerConfig implements ReadonlyServerConfig {
       delete resolvedArgs.channel;
     }
 
+    if (resolvedArgs.replMainWorld) {
+      resolvedArgs.repl = true;
+    }
+
     if (isViaCli) {
       resolvedArgs.slim = false;
+      resolvedArgs.repl = false;
+      resolvedArgs.replMainWorld = false;
       resolvedArgs.pageIdRouting = true;
       if (
         resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&

@@ -12,6 +12,10 @@ import {
 import {UncaughtError} from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage, Protocol} from '../third_party/index.js';
+import type {
+  ConsoleMessageConcise,
+  ConsoleMessageDetailed,
+} from '../tools/repl/replSchema.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';
@@ -31,23 +35,6 @@ export interface ConsoleFormatterOptions {
 export type IgnoreCheck = (
   frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
 ) => boolean;
-
-interface ConsoleMessageConcise {
-  type: string;
-  text: string;
-  argsCount: number;
-  id: number;
-  count?: number;
-  // pre-formatted stacktrace.
-  stackTrace?: string;
-}
-
-interface ConsoleMessageDetailed extends ConsoleMessageConcise {
-  // pre-formatted args.
-  args: string[];
-  // pre-formatted stacktrace.
-  stackTrace?: string;
-}
 
 // JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
 // on symbols and cyclic objects. Those are formatted from their preview.

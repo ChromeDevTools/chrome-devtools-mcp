@@ -17,6 +17,7 @@ import {raceWithSignal} from '../utils/raceWithSignal.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
+import {actionOutputSchema, typeTextOutputSchema} from './repl/replSchema.js';
 import {
   definePageTool,
   zodTransform,
@@ -135,15 +136,19 @@ export const click: PageToolFactory = definePageTool(() => ({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
-    const aXNode = request.page.getAXNodeByUid(uid);
     const shouldSelectNativeOption =
-      !request.params.dblClick && aXNode?.role === 'option';
+      !request.params.dblClick &&
+      Boolean(
+        request.page.isOptionUid(uid) ||
+        request.page.getAXNodeByUid(uid)?.role === 'option',
+      );
     try {
       const result = await request.page.waitForEventsAfterAction(
         async signal => {
@@ -194,6 +199,7 @@ export const clickAt: PageToolFactory = definePageTool(() => ({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -231,6 +237,7 @@ export const hover: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -399,6 +406,7 @@ export const fill: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -432,6 +440,7 @@ export const typeText: PageToolFactory = definePageTool(() => ({
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
+  outputSchema: typeTextOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -463,6 +472,7 @@ export const drag: PageToolFactory = definePageTool(() => ({
     to_uid: zod.string().describe('The uid of the element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -511,6 +521,7 @@ export const fillForm: PageToolFactory = definePageTool(() => ({
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
@@ -626,6 +637,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: actionOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},

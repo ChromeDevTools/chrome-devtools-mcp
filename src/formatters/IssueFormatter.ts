@@ -6,35 +6,20 @@
 
 import {ISSUE_UTILS} from '../devtools/issueDescriptions.js';
 import {DevTools} from '../third_party/index.js';
+import type {
+  AffectedResource,
+  IssueConcise,
+  IssueDetailed,
+} from '../tools/repl/replSchema.js';
 import {logger} from '../utils/logger.js';
 import {substitutePlaceholders} from '../utils/text.js';
+
+export type {AffectedResource, IssueConcise, IssueDetailed};
 
 export interface IssueFormatterOptions {
   requestIdResolver?: (requestId: string) => number | undefined;
   elementIdResolver?: (backendNodeId: number) => string | undefined;
   id: number;
-}
-
-export interface AffectedResource {
-  uid?: string;
-  data?: unknown;
-  request?: string | number;
-}
-
-interface IssueConcise {
-  type: 'issue';
-  title?: string;
-  count: number;
-  id: number;
-}
-
-interface IssueDetailed extends IssueConcise {
-  description?: string;
-  links?: Array<{
-    link: string;
-    linkTitle: string;
-  }>;
-  affectedResources: AffectedResource[];
 }
 
 const parsedDescriptionCache = new WeakMap<
@@ -75,7 +60,9 @@ export class IssueFormatter {
       count: this.#issue.getAggregatedIssuesCount(),
       title: this.#getTitle(),
       description: this.#getDescription(),
-      links: this.#issue.getDescription()?.links,
+      links: this.#issue
+        .getDescription()
+        ?.links?.map(({link, linkTitle}) => ({link, linkTitle})),
       affectedResources: this.#getAffectedResources(),
     };
   }

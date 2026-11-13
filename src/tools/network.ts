@@ -13,6 +13,10 @@ import {zod, type ResourceType} from '../third_party/index.js';
 import {validateUrlPatterns} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
+import {
+  getNetworkRequestOutputSchema,
+  listNetworkRequestsOutputSchema,
+} from './repl/replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type FilterableResourceType = Exclude<ResourceType, 'websocket'>;
@@ -80,6 +84,7 @@ export const listNetworkRequests: PageToolFactory = definePageTool(
           `Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.`,
         ),
     },
+    outputSchema: listNetworkRequestsOutputSchema,
     blockedByDialog: false,
     concurrency: 'page',
     verifyFilesSchema: {},
@@ -127,6 +132,7 @@ export const getNetworkRequest: PageToolFactory = definePageTool(() => ({
         'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
       ),
   },
+  outputSchema: getNetworkRequestOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {

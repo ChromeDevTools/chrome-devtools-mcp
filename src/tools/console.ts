@@ -8,6 +8,10 @@ import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod, type ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {
+  getConsoleMessageOutputSchema,
+  listConsoleMessagesOutputSchema,
+} from './repl/replSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 import {
   GET_CONSOLE_MESSAGE_TOOL_NAME,
@@ -94,6 +98,7 @@ export const listConsoleMessages: PageToolFactory = definePageTool(
             'Filter messages by the service worker ID shown by list_pages (sw-N).',
           ),
       },
+      outputSchema: listConsoleMessagesOutputSchema,
       blockedByDialog: false,
       concurrency: 'page',
       verifyFilesSchema: {},
@@ -125,6 +130,7 @@ export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
         'The msgid of a console message on the page from the listed console messages',
       ),
   },
+  outputSchema: getConsoleMessageOutputSchema,
   blockedByDialog: false,
   concurrency: 'page',
   verifyFilesSchema: {},
