@@ -892,6 +892,10 @@ export class McpPage implements ContextPage {
     return this.emulationSettings.userAgent ?? null;
   }
 
+  get backgroundColor(): string | null {
+    return this.emulationSettings.backgroundColor ?? null;
+  }
+
   get colorScheme(): 'dark' | 'light' | null {
     return this.emulationSettings.colorScheme ?? null;
   }
@@ -1445,6 +1449,7 @@ export class McpPage implements ContextPage {
     cpuThrottlingRate?: number;
     geolocation?: GeolocationOptions;
     userAgent?: string;
+    backgroundColor?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
     forcedColors?: ForcedColors | 'auto';
     prefersContrast?: PrefersContrast | 'auto';
@@ -1563,6 +1568,36 @@ export class McpPage implements ContextPage {
       newSettings.extraHttpHeaders = options.extraHttpHeaders;
       if (Object.keys(options.extraHttpHeaders).length === 0) {
         delete newSettings.extraHttpHeaders;
+      }
+    }
+
+    if (options.backgroundColor || this.emulationSettings.backgroundColor) {
+      if (!secondarySession) {
+        throw new Error(
+          'Background color emulation requires a DevTools session.',
+        );
+      }
+      const color = options.backgroundColor;
+      await secondarySession.send(
+        'Emulation.setDefaultBackgroundColorOverride',
+        color
+          ? {
+              color: {
+                r: parseInt(color.slice(1, 3), 16),
+                g: parseInt(color.slice(3, 5), 16),
+                b: parseInt(color.slice(5, 7), 16),
+                a:
+                  color.length === 9
+                    ? parseInt(color.slice(7, 9), 16) / 255
+                    : 1,
+              },
+            }
+          : {},
+      );
+      if (color) {
+        newSettings.backgroundColor = color;
+      } else {
+        delete newSettings.backgroundColor;
       }
     }
 

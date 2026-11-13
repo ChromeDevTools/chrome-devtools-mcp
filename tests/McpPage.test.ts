@@ -787,6 +787,134 @@ describe('McpPage', () => {
   });
 
   describe('emulate()', () => {
+    describe('background color', () => {
+      it('sets, updates and clears the default background color', async () => {
+        const {mcpPage, mockSession} = await createMcpPage();
+        await mcpPage.emulate({backgroundColor: '#0f172a'});
+        sinon.assert.calledWithExactly(
+          mockSession.send.lastCall,
+          'Emulation.setDefaultBackgroundColorOverride',
+          {color: {r: 15, g: 23, b: 42, a: 1}},
+        );
+        assert.strictEqual(mcpPage.backgroundColor, '#0f172a');
+
+        await mcpPage.emulate({backgroundColor: '#AAbbCC80'});
+        sinon.assert.calledWithExactly(
+          mockSession.send.lastCall,
+          'Emulation.setDefaultBackgroundColorOverride',
+          {color: {r: 170, g: 187, b: 204, a: 128 / 255}},
+        );
+        assert.strictEqual(mcpPage.backgroundColor, '#AAbbCC80');
+
+        await mcpPage.emulate({cpuThrottlingRate: 2});
+        sinon.assert.calledWithExactly(
+          mockSession.send.lastCall,
+          'Emulation.setDefaultBackgroundColorOverride',
+          {},
+        );
+        assert.strictEqual(mcpPage.backgroundColor, null);
+        assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      });
+
+      it('restores a transparent background override', async () => {
+        const {mcpPage, mockSession} = await createMcpPage();
+        await mcpPage.emulate({backgroundColor: '#00000000'});
+        mockSession.send.resetHistory();
+        await mcpPage.restoreEmulation();
+        sinon.assert.calledWithExactly(
+          mockSession.send.lastCall,
+          'Emulation.setDefaultBackgroundColorOverride',
+          {color: {r: 0, g: 0, b: 0, a: 0}},
+        );
+        assert.strictEqual(mcpPage.backgroundColor, '#00000000');
+      });
+
+      it('retains the previous background setting if the protocol call fails', async () => {
+        const {mcpPage, mockSession} = await createMcpPage();
+        await mcpPage.emulate({backgroundColor: '#0f172a'});
+        mockSession.send
+          .withArgs('Emulation.setDefaultBackgroundColorOverride')
+          .rejects(new Error('Protocol failure'));
+        for (const options of [{backgroundColor: '#ffffff'}, {}]) {
+          await assert.rejects(mcpPage.emulate(options), /Protocol failure/);
+          assert.strictEqual(mcpPage.backgroundColor, '#0f172a');
+        }
+      });
+
+      it('requires a DevTools session only when a background is requested', async () => {
+        const {mcpPage} = await createMcpPage();
+        sinon.stub(mcpPage, 'devtoolsUniverse').get(() => undefined);
+        await mcpPage.emulate({});
+        await assert.rejects(
+          mcpPage.emulate({backgroundColor: '#0f172a'}),
+          /Background color emulation requires a DevTools session/,
+        );
+        assert.strictEqual(mcpPage.backgroundColor, null);
+      });
+
+      it('captures the override, preserves CSS backgrounds and isolates pages', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = context.getSelectedMcpPage();
+          await page.pptrPage.setContent(
+            '<style>body{margin:0}</style><canvas></canvas>',
+          );
+          const readPixel = async (pptrPage: typeof page.pptrPage) => {
+            const bytes = await pptrPage.screenshot({type: 'png'});
+            return await pptrPage.evaluate(
+              async url => {
+                const image = new Image();
+                image.src = url;
+                await image.decode();
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 1;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  throw new Error('Missing 2D context');
+                }
+                ctx.drawImage(image, 0, 0);
+                return [...ctx.getImageData(0, 0, 1, 1).data];
+              },
+              `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`,
+            );
+          };
+
+          await page.emulate({backgroundColor: '#0f172a'});
+          assert.deepStrictEqual(
+            await readPixel(page.pptrPage),
+            [15, 23, 42, 255],
+          );
+          const other = await context.newPage();
+          assert.deepStrictEqual(
+            await readPixel(other.pptrPage),
+            [255, 255, 255, 255],
+          );
+
+          await page.pptrPage.reload();
+          assert.deepStrictEqual(
+            await readPixel(page.pptrPage),
+            [15, 23, 42, 255],
+          );
+          await page.emulate({backgroundColor: '#00000000'});
+          assert.deepStrictEqual(await readPixel(page.pptrPage), [0, 0, 0, 0]);
+          await page.pptrPage.setContent(
+            '<style>body{margin:0;background:rgb(12,34,56)}</style><canvas></canvas>',
+          );
+          assert.deepStrictEqual(
+            await readPixel(page.pptrPage),
+            [12, 34, 56, 255],
+          );
+          await page.pptrPage.setContent(
+            '<style>body{margin:0}</style><canvas></canvas>',
+          );
+          await page.emulate({});
+          assert.deepStrictEqual(
+            await readPixel(page.pptrPage),
+            [255, 255, 255, 255],
+          );
+        });
+      });
+    });
+
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Offline'});

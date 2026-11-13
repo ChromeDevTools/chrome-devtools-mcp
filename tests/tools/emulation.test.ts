@@ -18,6 +18,49 @@ import {
 import {createHandlerMocks} from '../mocks.js';
 
 describe('emulation', () => {
+  describe('backgroundColor', () => {
+    it('passes validated hex colors to the page', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = emulate(args);
+      const schema = zod.object(tool.schema);
+      for (const backgroundColor of ['#0f172a', '#AAbbCC80', '#00000000']) {
+        const params = schema.parse({pageId: 1, backgroundColor});
+        assert.deepStrictEqual(params, {pageId: 1, backgroundColor});
+        await tool.handler({params, page}, response, context);
+        sinon.assert.calledWithExactly(page.emulate.lastCall, params);
+      }
+      assert.deepStrictEqual(
+        schema.parse({pageId: 1, backgroundColor: ' #0f172a '}),
+        {
+          pageId: 1,
+          backgroundColor: '#0f172a',
+        },
+      );
+      assert.deepStrictEqual(schema.parse({pageId: 1}), {pageId: 1});
+    });
+
+    it('rejects malformed colors before changing emulation', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      for (const backgroundColor of [
+        '',
+        'red',
+        '#fff',
+        '0f172a',
+        '#gg172a',
+        '#0011223',
+        '#001122334',
+        '#00 1122',
+      ]) {
+        assert.strictEqual(
+          schema.safeParse({pageId: 1, backgroundColor}).success,
+          false,
+          backgroundColor,
+        );
+      }
+    });
+  });
+
   describe('transforms', () => {
     describe('viewportTransform', () => {
       it('returns undefined for undefined input', () => {

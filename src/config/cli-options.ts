@@ -392,6 +392,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      backgroundColor: {
+        name: 'backgroundColor',
+        type: 'string',
+        description:
+          'Default background color as #RRGGBB or #RRGGBBAA (alpha from 00 to FF). Visible only where the page is transparent; does not override CSS backgrounds. Omit to clear the override.',
+        required: false,
+        positional: false,
+      },
       colorScheme: {
         name: 'colorScheme',
         type: 'string',

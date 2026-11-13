@@ -289,6 +289,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
+- **backgroundColor** (string) _(optional)_: Default background color as #RRGGBB or #RRGGBBAA (alpha from 00 to FF). Visible only where the page is transparent; does not override CSS backgrounds. Omit to clear the override.
 - **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Omit or set to "auto" to reset to the default.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
 - **extraHttpHeaders** (string) _(optional)_: Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.

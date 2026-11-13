@@ -85,6 +85,17 @@ export const emulate: PageToolFactory = definePageTool(() => ({
       .describe(
         'User agent to emulate. Omit or set to empty string to clear the user agent override.',
       ),
+    backgroundColor: zod
+      .string()
+      .trim()
+      .regex(
+        /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/,
+        'Background color must be #RRGGBB or #RRGGBBAA.',
+      )
+      .optional()
+      .describe(
+        'Default background color as #RRGGBB or #RRGGBBAA (alpha from 00 to FF). Visible only where the page is transparent; does not override CSS backgrounds. Omit to clear the override.',
+      ),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()

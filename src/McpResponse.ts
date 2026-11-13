@@ -963,6 +963,7 @@ export class McpResponse implements Response {
       viewport?: object;
       userAgent?: string;
       cpuThrottlingRate?: number;
+      backgroundColor?: string;
       colorScheme?: string;
       forcedColors?: string;
       prefersContrast?: string;
@@ -1110,6 +1111,12 @@ export class McpResponse implements Response {
     if (cpuThrottlingRate > 1) {
       response.push(`Emulating CPU throttling: ${cpuThrottlingRate}x slowdown`);
       structuredContent.cpuThrottlingRate = cpuThrottlingRate;
+    }
+
+    const backgroundColor = this.#page?.backgroundColor;
+    if (backgroundColor) {
+      response.push(`Emulating default background color: ${backgroundColor}`);
+      structuredContent.backgroundColor = backgroundColor;
     }
 
     const colorScheme = this.#page?.colorScheme;

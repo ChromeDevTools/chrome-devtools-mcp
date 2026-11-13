@@ -117,6 +117,10 @@
       {
         "name": "prefers_reduced_motion",
         "argType": "string"
+      },
+      {
+        "name": "background_color_length",
+        "argType": "number"
       }
     ]
   },
