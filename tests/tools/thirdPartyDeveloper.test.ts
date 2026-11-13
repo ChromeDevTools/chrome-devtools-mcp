@@ -337,6 +337,7 @@ describe('thirdPartyDeveloperTools', () => {
           ],
         },
       ]);
+      const {signal} = new AbortController();
 
       await executeThirdPartyDeveloperTool(args).handler(
         {
@@ -345,6 +346,7 @@ describe('thirdPartyDeveloperTools', () => {
             params: {arg: 'value'},
           },
           page,
+          signal,
         },
         response,
         context,
@@ -356,6 +358,7 @@ describe('thirdPartyDeveloperTools', () => {
         'test-tool',
         {arg: 'value'},
         response,
+        signal,
       );
       sinon.assert.callOrder(
         page.discoverThirdPartyDeveloperTools,
