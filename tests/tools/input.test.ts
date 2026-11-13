@@ -1731,6 +1731,104 @@ describe('input', () => {
       });
     });
 
+    it('uploads multiple files when clicking an element opens a multi-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload files</button>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile(args).handler(
+          {
+            params: {
+              uid: '1_1',
+              filePaths: [firstFile.path, secondFile.path],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          `File uploaded from ${firstFile.path}, ${secondFile.path}.`,
+        );
+        const uploadedFileNames = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return Array.from(input.files ?? []).map(file => file.name);
+        });
+        assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+      });
+    });
+
+    it('throws an error if multiple files are uploaded through an element that opens a single-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_1',
+                filePaths: [firstFile.path, secondFile.path],
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {
+            message:
+              'Multiple file uploads only work with <input type=file multiple>',
+          },
+        );
+        const uploadedFileCount = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return input.files?.length ?? 0;
+        });
+        assert.strictEqual(uploadedFileCount, 0);
+      });
+    });
+
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
       using testFile = createTempFile('test file content', 'test.txt');
 
