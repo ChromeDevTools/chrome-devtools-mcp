@@ -30,9 +30,9 @@ import {
   type Root,
   type Transport,
   puppeteer,
-  zod,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
+import {buildStrictRuntimeOutputSchema} from './tools/replSchema.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
@@ -418,7 +418,7 @@ export class McpServer {
     const handler = this.#createToolHandler(tool);
     const outputSchema =
       this.#config.resolved.experimentalStructuredContent && tool.outputSchema
-        ? zod.object(tool.outputSchema).passthrough()
+        ? buildStrictRuntimeOutputSchema(tool.outputSchema)
         : undefined;
 
     const registeredTool = outputSchema

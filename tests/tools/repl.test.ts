@@ -14,7 +14,7 @@ import {BrowserManager} from '../../src/BrowserManager.js';
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {McpServer} from '../../src/index.js';
 import {McpContext} from '../../src/McpContext.js';
-import type {McpResponse} from '../../src/McpResponse.js';
+import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {zod} from '../../src/third_party/index.js';
 import {
@@ -989,5 +989,234 @@ describe('repl mode (evaluate_script with --repl)', () => {
       {},
       {repl: true},
     );
+  });
+
+  it('validates inner tool structuredContent against strict outputSchema at runtime while tolerating active page emulation metadata', async () => {
+    httpServer.addHtmlRoute(
+      '/emul-repl',
+      html`
+        <style>
+          #emul-btn {
+            color: rgb(10, 20, 30);
+          }
+        </style>
+        <button
+          id="emul-btn"
+          onclick="console.log('clicked-under-emulation')"
+        >
+          Emulate Action
+        </button>
+      `,
+    );
+
+    await withMcpContext(
+      async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.goto(httpServer.getRoute('/emul-repl'));
+        await mcpPage.emulate({
+          colorScheme: 'dark',
+          cpuThrottlingRate: 2,
+        });
+
+        await runReplEvaluate(
+          args,
+          {
+            pageId: mcpPage.id,
+            function: `async (mcp) => {
+              const btn = document.getElementById('emul-btn');
+              const clickRes = await mcp.click({ element: btn });
+              const snapRes = await mcp.take_snapshot();
+              const findButtonUid = (node) => {
+                if (!node || typeof node !== 'object') {
+                  return undefined;
+                }
+                if (node.role === 'button' && typeof node.id === 'string') {
+                  return node.id;
+                }
+                if (Array.isArray(node.children)) {
+                  for (const child of node.children) {
+                    const found = findButtonUid(child);
+                    if (found) {
+                      return found;
+                    }
+                  }
+                }
+                return undefined;
+              };
+              const uid = findButtonUid(snapRes.snapshot);
+              const stylesRes = await mcp.get_css_styles({ uid });
+              const logsRes = await mcp.list_console_messages();
+              const netRes = await mcp.list_network_requests();
+              return {
+                clickOk: clickRes.ok,
+                snapOk: snapRes.ok,
+                hasMatchedStyles: Boolean(stylesRes.matchedStyles),
+                logsOk: logsRes.ok,
+                hasClickedLog:
+                  Array.isArray(logsRes.consoleMessages) &&
+                  logsRes.consoleMessages.some(
+                    entry =>
+                      typeof entry.text === 'string' &&
+                      entry.text.includes('clicked-under-emulation'),
+                  ),
+                netOk: netRes.ok,
+                netCount: Array.isArray(netRes.networkRequests)
+                  ? netRes.networkRequests.length
+                  : 0,
+              };
+            }`,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(response.error, undefined);
+        const emulResult = parseEvaluatedJson(response);
+        assert.strictEqual(emulResult.clickOk, true);
+        assert.strictEqual(emulResult.snapOk, true);
+        assert.strictEqual(emulResult.hasMatchedStyles, true);
+        assert.strictEqual(emulResult.logsOk, true);
+        assert.strictEqual(emulResult.hasClickedLog, true);
+        assert.strictEqual(emulResult.netOk, true);
+        assert.ok(
+          typeof emulResult.netCount === 'number' && emulResult.netCount >= 1,
+        );
+
+        const originalHandle = McpResponse.prototype.handle;
+        const handleStub = sinon
+          .stub(McpResponse.prototype, 'handle')
+          .callsFake(async function (this: McpResponse, ctx, dataFormat) {
+            if (this.includeConsoleData) {
+              return {
+                content: [{type: 'text', text: 'ok'}],
+                structuredContent: {
+                  ok: true,
+                  consoleMessages: [
+                    {
+                      id: 1,
+                      type: 'log',
+                      text: 'x',
+                      argsCount: 0,
+                      undeclaredField: true,
+                    },
+                  ],
+                },
+              };
+            }
+            return await originalHandle.call(this, ctx, dataFormat);
+          });
+
+        try {
+          response.resetResponseLineForTesting();
+          await assert.rejects(
+            runReplEvaluate(
+              args,
+              {
+                pageId: mcpPage.id,
+                function: `async (mcp) => {
+                  return await mcp.list_console_messages();
+                }`,
+              },
+              response,
+              context,
+            ),
+            /Invalid output|outputSchema|undeclaredField|Unrecognized key/i,
+          );
+        } finally {
+          handleStub.restore();
+        }
+      },
+      {},
+      {repl: true},
+    );
+
+    await withBrowser(async browser => {
+      TextSnapshot.resetCounter();
+      McpContext.resetPageIdsForTesting();
+      McpContext.resetWorkerIdsForTesting();
+
+      const browserManager = sinon.createStubInstance(BrowserManager);
+      browserManager.ensureBrowser.resolves(browser);
+      browserManager.close.resolves();
+
+      const config = createMockServerConfig({
+        repl: false,
+        experimentalStructuredContent: true,
+      });
+      const mcpServer = await McpServer.from(config, {browserManager});
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      await mcpServer.connect(serverTransport);
+      const client = new Client({
+        name: 'strict-output-schema-client',
+        version: '1.0.0',
+      });
+      await client.connect(clientTransport);
+
+      const originalHandle = McpResponse.prototype.handle;
+      const handleStub = sinon
+        .stub(McpResponse.prototype, 'handle')
+        .callsFake(async function (this: McpResponse, ctx, dataFormat) {
+          if (this.includeConsoleData) {
+            return {
+              content: [{type: 'text', text: 'ok'}],
+              structuredContent: {
+                ok: true,
+                consoleMessages: [
+                  {
+                    id: 1,
+                    type: 'log',
+                    text: 'x',
+                    argsCount: 0,
+                    undeclaredField: true,
+                  },
+                ],
+              },
+            };
+          }
+          return await originalHandle.call(this, ctx, dataFormat);
+        });
+
+      try {
+        const listRes = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        const listText = getClientResultText(listRes);
+        const pageIdMatch = listText.match(/(\d+): .* \[selected\]/);
+        const pageId = pageIdMatch ? Number(pageIdMatch[1]) : 1;
+
+        let serverRejectedOrErrored = false;
+        let serverFailureMessage = '';
+        try {
+          const driftRes = await client.callTool({
+            name: 'list_console_messages',
+            arguments: {pageId},
+          });
+          if (driftRes.isError === true) {
+            serverRejectedOrErrored = true;
+            serverFailureMessage = getClientResultText(driftRes);
+          }
+        } catch (err) {
+          serverRejectedOrErrored = true;
+          serverFailureMessage =
+            err instanceof Error ? err.message : String(err);
+        }
+
+        assert.strictEqual(
+          serverRejectedOrErrored,
+          true,
+          'Expected McpServer with experimentalStructuredContent: true to reject drifted structuredContent',
+        );
+        assert.match(
+          serverFailureMessage,
+          /Invalid output|outputSchema|undeclaredField|Unrecognized key|Output validation/i,
+        );
+      } finally {
+        handleStub.restore();
+        await client.close();
+        await mcpServer.close();
+      }
+    });
   });
 });

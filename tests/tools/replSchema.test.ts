@@ -361,4 +361,396 @@ describe('replSchema', () => {
       assert.deepStrictEqual(networkFields.get('networkRequests'), []);
     });
   });
+
+  describe('strict outputSchema drift & formatter parity', () => {
+    function buildInnerToolMap(): Map<string, AnyToolDefinition> {
+      const tools = createTools(
+        createMockParsedArguments({
+          repl: false,
+          experimentalVision: true,
+          categoryExperimentalWebmcp: true,
+          categoryExperimentalThirdParty: true,
+        }),
+      );
+      const byName = new Map<string, AnyToolDefinition>();
+      for (const tool of tools) {
+        byName.set(tool.name, tool);
+      }
+      return byName;
+    }
+
+    function parseStrictOutput(
+      byName: Map<string, AnyToolDefinition>,
+      toolName: string,
+      payload: unknown,
+    ): {success: boolean; errorSummary: string} {
+      const tool = byName.get(toolName);
+      assert.ok(tool, `Expected inner REPL tool "${toolName}" to exist`);
+      assert.ok(
+        tool.outputSchema,
+        `Expected "${toolName}" to declare outputSchema`,
+      );
+      const parsed = zod.object(tool.outputSchema).strict().safeParse(payload);
+      return {
+        success: parsed.success,
+        errorSummary: parsed.success ? '' : parsed.error.message,
+      };
+    }
+
+    it('rejects undeclared drifted fields across inner tool outputSchemas', () => {
+      const byName = buildInnerToolMap();
+      const driftedCases: Array<{
+        label: string;
+        toolName: string;
+        payload: unknown;
+      }> = [
+        {
+          label: 'click top-level undeclared field',
+          toolName: 'click',
+          payload: {
+            ok: true,
+            unexpectedDriftField: 'bad',
+          },
+        },
+        {
+          label: 'list_network_requests pagination undeclared field',
+          toolName: 'list_network_requests',
+          payload: {
+            networkRequests: [],
+            pagination: {
+              currentPage: 0,
+              totalPages: 1,
+              hasNextPage: false,
+              hasPreviousPage: false,
+              startIndex: 0,
+              endIndex: 0,
+              invalidPage: false,
+              unexpectedDriftField: 'bad',
+            },
+          },
+        },
+        {
+          label: 'list_network_requests networkRequests[0] undeclared field',
+          toolName: 'list_network_requests',
+          payload: {
+            networkRequests: [
+              {
+                method: 'GET',
+                url: 'https://example.com',
+                status: '200',
+                unexpectedDriftField: 'bad',
+              },
+            ],
+          },
+        },
+        {
+          label: 'get_network_request networkRequest undeclared field',
+          toolName: 'get_network_request',
+          payload: {
+            networkRequest: {
+              method: 'GET',
+              url: 'https://example.com',
+              status: '200',
+              requestHeaders: {},
+              unexpectedDriftField: 'bad',
+            },
+          },
+        },
+        {
+          label: 'list_console_messages consoleMessages[0] undeclared field',
+          toolName: 'list_console_messages',
+          payload: {
+            consoleMessages: [
+              {
+                id: 1,
+                type: 'log',
+                text: 'hi',
+                argsCount: 0,
+                unexpectedDriftField: 'bad',
+              },
+            ],
+          },
+        },
+        {
+          label: 'get_console_message consoleMessage undeclared field',
+          toolName: 'get_console_message',
+          payload: {
+            consoleMessage: {
+              id: 1,
+              type: 'log',
+              text: 'hi',
+              argsCount: 0,
+              args: [],
+              unexpectedDriftField: 'bad',
+            },
+          },
+        },
+        {
+          label: 'get_css_styles matchedStyles undeclared field',
+          toolName: 'get_css_styles',
+          payload: {
+            matchedStyles: {
+              element: {uid: '1_1', selector: 'div'},
+              rules: [],
+              unexpectedDriftField: 'bad',
+            },
+          },
+        },
+        {
+          label: 'get_css_styles matchedStyles.rules[0] undeclared field',
+          toolName: 'get_css_styles',
+          payload: {
+            matchedStyles: {
+              element: {uid: '1_1', selector: 'div'},
+              rules: [
+                {
+                  type: 'inline',
+                  selector: 'element.style',
+                  properties: [],
+                  unexpectedDriftField: 'bad',
+                },
+              ],
+            },
+          },
+        },
+        {
+          label: 'list_webmcp_tools webmcpTools[0] undeclared field',
+          toolName: 'list_webmcp_tools',
+          payload: {
+            webmcpTools: [
+              {
+                name: 'search',
+                description: 'Search items',
+                unexpectedDriftField: 'bad',
+              },
+            ],
+          },
+        },
+        {
+          label:
+            'list_3p_developer_tools thirdPartyDeveloperTools[0] undeclared field',
+          toolName: 'list_3p_developer_tools',
+          payload: {
+            thirdPartyDeveloperTools: [
+              {
+                name: 'devtools-ext',
+                description: 'Extension tools',
+                tools: [],
+                unexpectedDriftField: 'bad',
+              },
+            ],
+          },
+        },
+        {
+          label:
+            'list_3p_developer_tools thirdPartyDeveloperTools[0].tools[0] undeclared field',
+          toolName: 'list_3p_developer_tools',
+          payload: {
+            thirdPartyDeveloperTools: [
+              {
+                name: 'devtools-ext',
+                description: 'Extension tools',
+                tools: [
+                  {
+                    name: 'inspect',
+                    description: 'Inspect state',
+                    unexpectedDriftField: 'bad',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      const wronglyAccepted: string[] = [];
+      for (const testCase of driftedCases) {
+        const result = parseStrictOutput(
+          byName,
+          testCase.toolName,
+          testCase.payload,
+        );
+        if (result.success) {
+          wronglyAccepted.push(testCase.label);
+        }
+      }
+
+      assert.deepStrictEqual(
+        wronglyAccepted,
+        [],
+        `Expected strict outputSchema to reject all drifted payloads, but accepted: ${wronglyAccepted.join(', ')}`,
+      );
+    });
+
+    it('accepts all real formatter shapes on strict outputSchemas and rejects non-primitive snapshot attributes', () => {
+      const byName = buildInnerToolMap();
+      const validFormatterCases: Array<{
+        label: string;
+        toolName: string;
+        payload: unknown;
+      }> = [
+        {
+          label:
+            'get_network_request with string requestId, body file paths, and redirectChain',
+          toolName: 'get_network_request',
+          payload: {
+            networkRequest: {
+              requestId: 'str-req-1',
+              method: 'POST',
+              url: 'https://example.com/api',
+              status: '200',
+              requestHeaders: {'content-type': 'application/octet-stream'},
+              requestBodyFilePath: '/tmp/req.bin',
+              responseHeaders: {'content-type': 'application/octet-stream'},
+              responseBodyFilePath: '/tmp/res.bin',
+              redirectChain: [
+                {
+                  requestId: 1,
+                  method: 'GET',
+                  url: 'https://example.com/old',
+                  status: '302',
+                },
+              ],
+            },
+          },
+        },
+        {
+          label:
+            'list_console_messages with concise console message and concise issue',
+          toolName: 'list_console_messages',
+          payload: {
+            consoleMessages: [
+              {
+                id: 1,
+                type: 'log',
+                text: 'hello',
+                argsCount: 2,
+                count: 3,
+                stackTrace: 'at fn (a.js:1:1)',
+              },
+              {
+                id: 2,
+                type: 'issue',
+                title: 'Mixed Content',
+                count: 1,
+              },
+            ],
+          },
+        },
+        {
+          label: 'get_console_message detailed console message with argsCount',
+          toolName: 'get_console_message',
+          payload: {
+            consoleMessage: {
+              id: 1,
+              type: 'error',
+              text: 'boom',
+              argsCount: 1,
+              args: ['detail'],
+              stackTrace: 'at fn (a.js:1:1)',
+            },
+          },
+        },
+        {
+          label:
+            'get_console_message detailed issue with count, links, and affectedResources',
+          toolName: 'get_console_message',
+          payload: {
+            consoleMessage: {
+              id: 2,
+              type: 'issue',
+              count: 1,
+              title: 'CORS Issue',
+              description: 'Blocked',
+              links: [{link: 'https://web.dev', linkTitle: 'Learn more'}],
+              affectedResources: [
+                {uid: '1_2', request: 4, data: {status: 403}},
+              ],
+            },
+          },
+        },
+        {
+          label:
+            'take_snapshot with dynamic primitive AX attributes and child node without id',
+          toolName: 'take_snapshot',
+          payload: {
+            snapshot: {
+              id: '1_0',
+              role: 'RootWebArea',
+              name: 'App',
+              focused: true,
+              focusable: true,
+              level: 2,
+              value: 'abc',
+              children: [{role: 'StaticText', name: 'Hello'}],
+            },
+          },
+        },
+        {
+          label: 'list_webmcp_tools with annotations object',
+          toolName: 'list_webmcp_tools',
+          payload: {
+            webmcpTools: [
+              {
+                name: 'add_todo',
+                description: 'Add todo item',
+                inputSchema: {type: 'object'},
+                annotations: {readOnlyHint: true},
+              },
+            ],
+          },
+        },
+      ];
+
+      const rejectedValidCases: string[] = [];
+      for (const testCase of validFormatterCases) {
+        const result = parseStrictOutput(
+          byName,
+          testCase.toolName,
+          testCase.payload,
+        );
+        if (!result.success) {
+          rejectedValidCases.push(`${testCase.label}: ${result.errorSummary}`);
+        }
+      }
+
+      assert.deepStrictEqual(
+        rejectedValidCases,
+        [],
+        `Expected strict outputSchema to accept all real formatter shapes, but rejected:\n${rejectedValidCases.join('\n')}`,
+      );
+
+      const badRootSnapshot = parseStrictOutput(byName, 'take_snapshot', {
+        snapshot: {
+          id: '1_1',
+          role: 'WebArea',
+          bogusNestedObj: {bad: 1},
+        },
+      });
+      assert.strictEqual(
+        badRootSnapshot.success,
+        false,
+        'Expected take_snapshot outputSchema to reject non-primitive nested object attribute on root node',
+      );
+
+      const badChildSnapshot = parseStrictOutput(byName, 'take_snapshot', {
+        snapshot: {
+          id: '1_0',
+          role: 'RootWebArea',
+          children: [
+            {
+              role: 'StaticText',
+              name: 'Hello',
+              bogusNestedObj: {bad: 1},
+            },
+          ],
+        },
+      });
+      assert.strictEqual(
+        badChildSnapshot.success,
+        false,
+        'Expected take_snapshot outputSchema to reject non-primitive nested object attribute on child node',
+      );
+    });
+  });
 });

@@ -8,8 +8,8 @@ import {zod, ajv, type JSONSchema7} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
+  executeThirdPartyToolOutputSchema,
   listThirdPartyToolsOutputSchema,
-  messageOutputSchema,
 } from './replSchema.js';
 import {
   definePageTool,
@@ -93,7 +93,7 @@ export const executeThirdPartyDeveloperTool: PageToolFactory = definePageTool(
         .optional()
         .describe('The JSON-stringified parameters to pass to the tool'),
     },
-    outputSchema: messageOutputSchema,
+    outputSchema: executeThirdPartyToolOutputSchema,
     blockedByDialog: false,
     concurrency: 'page',
     verifyFilesSchema: {},

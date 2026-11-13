@@ -22,6 +22,10 @@ import {
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
 import {
+  buildStrictRuntimeOutputSchema,
+  formatZodOutputValidationError,
+} from './tools/replSchema.js';
+import {
   isAvailableInMode,
   isBrowserlessTool,
   isPageScopedTool,
@@ -243,6 +247,7 @@ export class ToolHandler {
   #tool: AnyToolDefinition;
   #config: ReadonlyServerConfig;
   #registeredInputSchema: zod.ZodObject<zod.ZodRawShape, zod.core.$strict>;
+  #registeredOutputSchema?: zod.ZodObject<zod.ZodRawShape, zod.core.$strict>;
   #disabled = false;
   #disabledReason?: string;
 
@@ -255,6 +260,9 @@ export class ToolHandler {
     this.#tool = tool;
     this.#config = config;
     this.#registeredInputSchema = zod.object(tool.schema).strict();
+    this.#registeredOutputSchema = tool.outputSchema
+      ? buildStrictRuntimeOutputSchema(tool.outputSchema)
+      : undefined;
     this.#updateStatus(tool);
   }
 
@@ -294,6 +302,9 @@ export class ToolHandler {
 
     this.#tool = tool;
     this.#registeredInputSchema = nextInputSchema;
+    this.#registeredOutputSchema = tool.outputSchema
+      ? buildStrictRuntimeOutputSchema(tool.outputSchema)
+      : undefined;
     this.#updateStatus(tool);
 
     if (previousDisabled !== this.#disabled) {
@@ -556,10 +567,27 @@ export class ToolHandler {
       if (response.error) {
         result.isError = true;
       }
-      success = true;
       if (this.#config.resolved.experimentalStructuredContent) {
-        result.structuredContent = structuredContent as Record<string, unknown>;
+        if (
+          this.#registeredOutputSchema &&
+          !response.error &&
+          !result.isError
+        ) {
+          const outputParse =
+            this.#registeredOutputSchema.safeParse(structuredContent);
+          if (!outputParse.success) {
+            throw new Error(
+              formatZodOutputValidationError(tool.name, outputParse.error),
+            );
+          }
+          result.structuredContent = outputParse.data;
+        } else {
+          result.structuredContent = Object.fromEntries(
+            Object.entries(structuredContent),
+          );
+        }
       }
+      success = true;
       return result;
     } catch (err) {
       if (signal.aborted) {

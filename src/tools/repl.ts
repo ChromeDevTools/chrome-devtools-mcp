@@ -26,7 +26,11 @@ import {getNetworkMultiplierFromString} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import {INNER_REPL_TOOL_NAMES, STRIPPED_INNER_PARAMS} from './replPartition.js';
-import {buildReplApiDeclaration} from './replSchema.js';
+import {
+  buildReplApiDeclaration,
+  buildStrictRuntimeOutputSchema,
+  formatZodOutputValidationError,
+} from './replSchema.js';
 import {
   definePageTool,
   isBrowserlessTool,
@@ -420,6 +424,10 @@ class ReplToolDispatcher {
     string,
     zod.ZodObject<zod.ZodRawShape, zod.core.$strict>
   >();
+  #outputSchemasByName = new Map<
+    string,
+    zod.ZodObject<zod.ZodRawShape, zod.core.$strict>
+  >();
 
   constructor(options: {
     mcpPage: McpPage;
@@ -734,6 +742,22 @@ class ReplToolDispatcher {
       const structuredRecord: Record<string, unknown> = {ok: true};
       for (const [k, v] of Object.entries(structuredContent)) {
         structuredRecord[k] = v;
+      }
+
+      if (innerTool.outputSchema) {
+        let strictOutputSchema = this.#outputSchemasByName.get(toolName);
+        if (!strictOutputSchema) {
+          strictOutputSchema = buildStrictRuntimeOutputSchema(
+            innerTool.outputSchema,
+          );
+          this.#outputSchemasByName.set(toolName, strictOutputSchema);
+        }
+        const outParse = strictOutputSchema.safeParse(structuredRecord);
+        if (!outParse.success) {
+          throw new Error(
+            formatZodOutputValidationError(`mcp.${toolName}`, outParse.error),
+          );
+        }
       }
 
       const navigatedToUrl =

@@ -17,6 +17,7 @@ import {
   CssFormatter,
   type CssFormatterOptions,
   resolveContainerQueries,
+  type StructuredCssStyles,
 } from './formatters/CssFormatter.js';
 import {
   collectRankedContexts,
@@ -57,6 +58,17 @@ import {
   type Protocol,
 } from './third_party/index.js';
 import {handleDialog, listPages} from './tools/pages.js';
+import type {
+  ConsoleMessageConcise,
+  ConsoleMessageDetailed,
+  IssueConcise,
+  IssueDetailed,
+  NetworkRequestConcise,
+  NetworkRequestDetailed,
+  PaginationOutput,
+  SnapshotJsonNode,
+  WebMcpToolSummary,
+} from './tools/replSchema.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
@@ -887,13 +899,13 @@ export class McpResponse implements Response {
     structuredContent: object;
   }> {
     const structuredContent: {
-      snapshot?: object;
+      snapshot?: SnapshotJsonNode;
       snapshotFilePath?: string;
       tabId?: string;
-      networkRequest?: object;
-      networkRequests?: object[];
-      consoleMessage?: object;
-      consoleMessages?: object[];
+      networkRequest?: NetworkRequestDetailed;
+      networkRequests?: NetworkRequestConcise[];
+      consoleMessage?: ConsoleMessageDetailed | IssueDetailed;
+      consoleMessages?: Array<ConsoleMessageConcise | IssueConcise>;
       traceSummary?: string;
       traceInsights?: Array<{
         insightName: string;
@@ -904,7 +916,7 @@ export class McpResponse implements Response {
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
-      webmcpTools?: object[];
+      webmcpTools?: WebMcpToolSummary[];
       message?: string;
       reconnected?: boolean;
       networkConditions?: string;
@@ -923,7 +935,7 @@ export class McpResponse implements Response {
       };
       pages?: object[];
       openedPages?: object[];
-      pagination?: object;
+      pagination?: PaginationOutput;
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
@@ -948,7 +960,7 @@ export class McpResponse implements Response {
       extensionPages?: object[];
       comments?: StructuredCommentThread[];
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
-      matchedStyles?: object;
+      matchedStyles?: StructuredCssStyles;
       webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
       ok?: boolean;
@@ -1671,8 +1683,12 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         ({name, description, inputSchema, annotations}) => ({
           name,
           description,
-          inputSchema,
-          annotations,
+          inputSchema: inputSchema
+            ? Object.fromEntries(Object.entries(inputSchema))
+            : undefined,
+          annotations: annotations
+            ? Object.fromEntries(Object.entries(annotations))
+            : undefined,
         }),
       );
       response.push('## WebMCP tools');
