@@ -484,7 +484,12 @@ function formatFrame(
     const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
     result += ` (${location.linkText(/* skipTrim */ false, /* showColumnNumber */ true)})`;
   } else if (frame.url) {
-    result += ` (${frame.url}:${frame.line}:${frame.column})`;
+    // Like linkText(), print the 0-based raw position 1-based, and a wasm
+    // position as its hex byte offset.
+    const position = frame.url.startsWith('wasm://')
+      ? `0x${frame.column.toString(16)}`
+      : `${frame.line + 1}:${frame.column + 1}`;
+    result += ` (${frame.url}:${position})`;
   }
   return result;
 }
