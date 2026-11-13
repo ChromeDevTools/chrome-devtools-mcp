@@ -12,7 +12,7 @@ import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 export const getCssStyles: PageToolFactory = definePageTool(() => ({
   name: 'get_css_styles',
   description: `Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
-Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded].
+Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved values as inline comments (e.g. color: var(--brand); /* #ff0000 */).
 Treat the output as authoritative and complete.
 Results are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
   annotations: {
