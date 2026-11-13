@@ -66,7 +66,10 @@ template("third_party_bundle") {
     metafile = "$target_gen_dir/$target_name.meta.json"
     bundle_all = true
     platform = "node"
-    deps = [ ":third_party_sources" ]
+    deps = [
+      ":third_party",
+      ":third_party_sources",
+    ]
     forward_variables_from(invoker,
                            [
                              "external",
