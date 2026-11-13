@@ -7,6 +7,7 @@
 import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod, type CdpPage} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {raceWithSignal} from '../utils/raceWithSignal.js';
 import {validateUrl} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
@@ -19,6 +20,24 @@ import {
   timeoutSchema,
   type ToolFactory,
 } from './ToolDefinition.js';
+
+const DIALOG_BEFORE_LOAD_MESSAGE =
+  'The page opened a dialog before it finished loading.';
+
+async function finishedBeforeDialog(
+  navigation: Promise<unknown>,
+  signal: AbortSignal,
+): Promise<boolean> {
+  try {
+    await raceWithSignal(navigation, signal);
+    return true;
+  } catch (error) {
+    if (signal.aborted) {
+      return false;
+    }
+    throw error;
+  }
+}
 
 export const listPages: ToolFactory = defineTool((args: ParsedArguments) => {
   return {
@@ -153,10 +172,13 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
 
       try {
         await page.waitForEventsAfterAction(
-          async () => {
-            await page.pptrPage.goto(request.params.url, {
-              timeout: request.params.timeout,
-            });
+          async signal => {
+            await raceWithSignal(
+              page.pptrPage.goto(request.params.url, {
+                timeout: request.params.timeout,
+              }),
+              signal,
+            );
           },
           {timeout: request.params.timeout},
         );
@@ -164,21 +186,22 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
         // A dialog-blocked load stays open for handle_dialog. Otherwise cleanup is
         // best-effort: the navigation error is always what gets rethrown.
         if (page.getDialog()) {
+          response.appendResponseLine(DIALOG_BEFORE_LOAD_MESSAGE);
           response.setIncludePages(true);
-        } else {
-          try {
-            if (previousPage && !previousPage.isClosed()) {
-              context.selectPage(previousPage);
-            }
-          } catch {
-            // Keep the new tab selected.
+          return;
+        }
+        try {
+          if (previousPage && !previousPage.isClosed()) {
+            context.selectPage(previousPage);
           }
-          try {
-            await context.closePage(page.id);
-          } catch {
-            // The tab survived, so list pages to tell the caller its pageId.
-            response.setIncludePages(true);
-          }
+        } catch {
+          // Keep the new tab selected.
+        }
+        try {
+          await context.closePage(page.id);
+        } catch {
+          // The tab survived, so list pages to tell the caller its pageId.
+          response.setIncludePages(true);
         }
         throw error;
       }
@@ -264,7 +287,7 @@ export const navigatePage: PageToolFactory = definePageTool(
         try {
           const action = request.params.handleBeforeUnload ?? 'accept';
           const result = await page.waitForEventsAfterAction(
-            async () => {
+            async signal => {
               switch (request.params.type) {
                 case 'url':
                   if (!request.params.url) {
@@ -273,10 +296,16 @@ export const navigatePage: PageToolFactory = definePageTool(
                     );
                   }
                   try {
-                    await page.pptrPage.goto(request.params.url, options);
-                    response.appendResponseLine(
-                      `Successfully navigated to ${request.params.url}.`,
-                    );
+                    if (
+                      await finishedBeforeDialog(
+                        page.pptrPage.goto(request.params.url, options),
+                        signal,
+                      )
+                    ) {
+                      response.appendResponseLine(
+                        `Successfully navigated to ${request.params.url}.`,
+                      );
+                    }
                   } catch (error) {
                     response.appendResponseLine(
                       `Unable to navigate in the selected page: ${error.message}.`,
@@ -285,10 +314,16 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'back':
                   try {
-                    await page.pptrPage.goBack(options);
-                    response.appendResponseLine(
-                      `Successfully navigated back to ${page.pptrPage.url()}.`,
-                    );
+                    if (
+                      await finishedBeforeDialog(
+                        page.pptrPage.goBack(options),
+                        signal,
+                      )
+                    ) {
+                      response.appendResponseLine(
+                        `Successfully navigated back to ${page.pptrPage.url()}.`,
+                      );
+                    }
                   } catch (error) {
                     response.appendResponseLine(
                       `Unable to navigate back in the selected page: ${error.message}.`,
@@ -297,10 +332,16 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'forward':
                   try {
-                    await page.pptrPage.goForward(options);
-                    response.appendResponseLine(
-                      `Successfully navigated forward to ${page.pptrPage.url()}.`,
-                    );
+                    if (
+                      await finishedBeforeDialog(
+                        page.pptrPage.goForward(options),
+                        signal,
+                      )
+                    ) {
+                      response.appendResponseLine(
+                        `Successfully navigated forward to ${page.pptrPage.url()}.`,
+                      );
+                    }
                   } catch (error) {
                     response.appendResponseLine(
                       `Unable to navigate forward in the selected page: ${error.message}.`,
@@ -309,19 +350,28 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'reload':
                   try {
-                    await page.pptrPage.reload({
-                      ...options,
-                      ignoreCache: request.params.ignoreCache,
-                    });
-                    response.appendResponseLine(
-                      `Successfully reloaded the page.`,
-                    );
+                    if (
+                      await finishedBeforeDialog(
+                        page.pptrPage.reload({
+                          ...options,
+                          ignoreCache: request.params.ignoreCache,
+                        }),
+                        signal,
+                      )
+                    ) {
+                      response.appendResponseLine(
+                        `Successfully reloaded the page.`,
+                      );
+                    }
                   } catch (error) {
                     response.appendResponseLine(
                       `Unable to reload the selected page: ${error.message}.`,
                     );
                   }
                   break;
+              }
+              if (signal.aborted && page.getDialog()) {
+                response.appendResponseLine(DIALOG_BEFORE_LOAD_MESSAGE);
               }
             },
             {

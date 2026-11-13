@@ -311,22 +311,52 @@ describe('pages', () => {
       const {context, response, args} = createHandlerMocks();
       const page = createMockMcpPage();
       context.newPage.resolves(page);
-      const error = new Error('Navigation timeout of 1000 ms exceeded');
-      page.pptrPage.goto.rejects(error);
+      page.pptrPage.goto.rejects(new Error('Action interrupted by a dialog'));
       page.getDialog.returns(createMockDialog({message: 'blocked'}));
 
-      await assert.rejects(
-        newPage(args).handler(
-          {params: {url: 'https://example.com', timeout: 1000}},
-          response,
-          context,
-        ),
-        error,
+      await newPage(args).handler(
+        {params: {url: 'https://example.com', timeout: 1000}},
+        response,
+        context,
       );
 
       sinon.assert.notCalled(context.selectPage);
       sinon.assert.notCalled(context.closePage);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The page opened a dialog before it finished loading.',
+      );
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      sinon.assert.notCalled(response.setListThirdPartyDeveloperTools);
+    });
+    it('reports a dialog that blocks the new page load without waiting for the timeout', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const start = Date.now();
+
+        await newPage(args).handler(
+          {
+            params: {
+              url: 'data:text/html,<script>alert("loading")</script>',
+              timeout: 30_000,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.ok(Date.now() - start < 5_000);
+        const page = context.getSelectedMcpPage();
+        assert.strictEqual(page, context.getPageById(2));
+        const dialog = page.getDialog();
+        assert.ok(dialog);
+        assert.strictEqual(dialog.message(), 'loading');
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'The page opened a dialog before it finished loading.',
+        );
+        assert.ok(response.includePages);
+        await dialog.dismiss();
+      });
     });
     it('create a page', async () => {
       await withMcpContext(async (response, context, args) => {
@@ -1219,6 +1249,56 @@ describe('pages', () => {
           'Unable to reload the selected page: Navigation timeout of 500 ms exceeded.\nDismissed a beforeunload dialog.',
         );
       });
+    });
+
+    it('reports a dialog that blocks the page load without waiting for the timeout', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        const start = Date.now();
+
+        await navigatePage(args).handler(
+          {
+            params: {
+              url: 'data:text/html,<script>alert("loading")</script>',
+              timeout: 30_000,
+            },
+            page,
+          },
+          response,
+          context,
+        );
+
+        assert.ok(Date.now() - start < 5_000);
+        const dialog = page.getDialog();
+        assert.ok(dialog);
+        assert.strictEqual(dialog.message(), 'loading');
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'The page opened a dialog before it finished loading.',
+        );
+        await dialog.dismiss();
+      });
+    });
+
+    it('does not report a dialog-blocked load when no dialog is open', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const controller = new AbortController();
+      page.waitForEventsAfterAction.callsFake(async action => {
+        await action(controller.signal);
+        return {};
+      });
+      page.pptrPage.goto.callsFake(async () => {
+        controller.abort();
+        return null;
+      });
+
+      await navigatePage(args).handler(
+        {params: {url: 'https://example.com'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('go forward with error', async () => {
