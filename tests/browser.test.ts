@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
@@ -684,6 +685,132 @@ describe('browser', () => {
         assert.strictEqual(err.cause, puppeteerError);
         return true;
       });
+    });
+
+    it('explains macOS Files & Folders permission when autoConnect is denied reading DevToolsActivePort without userDataDir', async () => {
+      sinon.stub(os, 'platform').returns('darwin');
+      const epermError = Object.assign(
+        new Error(
+          "EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+        ),
+        {code: 'EPERM'},
+      );
+      const puppeteerError = new Error(
+        'Could not read DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort: permission denied',
+        {cause: epermError},
+      );
+      sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          autoConnect: true,
+          channel: 'stable',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          'Could not connect to Chrome: macOS blocked reading DevToolsActivePort. Grant the host application (such as your terminal or IDE) access to Google Chrome in System Settings > Privacy & Security > Files & Folders, then try again.',
+        );
+        assert.strictEqual(err.cause, puppeteerError);
+        return true;
+      });
+    });
+
+    it('explains file permissions when autoConnect is denied reading DevToolsActivePort on non-macOS', async () => {
+      sinon.stub(os, 'platform').returns('linux');
+      const eaccesError = Object.assign(
+        new Error(
+          "EACCES: permission denied, open '/home/test/.config/google-chrome/DevToolsActivePort'",
+        ),
+        {code: 'EACCES'},
+      );
+      const puppeteerError = new Error(
+        'Could not read DevToolsActivePort for chrome at /home/test/.config/google-chrome/DevToolsActivePort: permission denied',
+        {cause: eaccesError},
+      );
+      sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          autoConnect: true,
+          channel: 'stable',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          'Could not connect to Chrome: reading DevToolsActivePort was denied by file permissions. Check that the current user can read the Chrome profile directory, then try again.',
+        );
+        assert.strictEqual(err.cause, puppeteerError);
+        return true;
+      });
+    });
+
+    it('explains macOS Files & Folders permission when reading DevToolsActivePort in userDataDir fails with EPERM', async () => {
+      sinon.stub(os, 'platform').returns('darwin');
+      const userDataDir = '/Users/test/custom-chrome-profile';
+      const epermError = Object.assign(
+        new Error(
+          `EPERM: operation not permitted, open '${userDataDir}/DevToolsActivePort'`,
+        ),
+        {code: 'EPERM'},
+      );
+      sinon.stub(fs.promises, 'readFile').rejects(epermError);
+      const connectStub = sinon.stub(puppeteer, 'connect');
+
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          autoConnect: true,
+          userDataDir,
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          `Could not connect to Chrome in ${userDataDir}: macOS blocked reading DevToolsActivePort. Grant the host application (such as your terminal or IDE) access to Google Chrome in System Settings > Privacy & Security > Files & Folders, then try again.`,
+        );
+        assert.strictEqual(err.cause, epermError);
+        return true;
+      });
+      sinon.assert.notCalled(connectStub);
+    });
+
+    it('explains file permissions when reading DevToolsActivePort in userDataDir fails with EACCES on non-macOS', async () => {
+      sinon.stub(os, 'platform').returns('linux');
+      const userDataDir = '/home/test/custom-chrome-profile';
+      const eaccesError = Object.assign(
+        new Error(
+          `EACCES: permission denied, open '${userDataDir}/DevToolsActivePort'`,
+        ),
+        {code: 'EACCES'},
+      );
+      sinon.stub(fs.promises, 'readFile').rejects(eaccesError);
+      const connectStub = sinon.stub(puppeteer, 'connect');
+
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          autoConnect: true,
+          userDataDir,
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          `Could not connect to Chrome in ${userDataDir}: reading DevToolsActivePort was denied by file permissions. Check that the current user can read the Chrome profile directory, then try again.`,
+        );
+        assert.strictEqual(err.cause, eaccesError);
+        return true;
+      });
+      sinon.assert.notCalled(connectStub);
     });
   });
 
