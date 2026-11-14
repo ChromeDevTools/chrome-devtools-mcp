@@ -5,10 +5,14 @@
  */
 
 import {
+  ConnectionClosedError,
+  TargetCloseError,
   TimeoutError,
   zod,
+  type CDPSession,
   type ElementHandle,
   type KeyInput,
+  type Page,
 } from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
@@ -541,6 +545,97 @@ export const fillForm: PageToolFactory = definePageTool(() => ({
   },
 }));
 
+/**
+ * `Page.waitForFileChooser()` enables `Page.setInterceptFileChooserDialog` on
+ * the page's CDP session but never disables it again. When the server is
+ * connected to a browser that a person is also using (e.g. via `--browserUrl`),
+ * that would swallow every file chooser the person opens in this tab
+ * afterwards. Interception is per CDP session, so it has to be turned off on
+ * the same session that Puppeteer enabled it on.
+ */
+async function disableFileChooserInterception(page: Page): Promise<void> {
+  // @ts-expect-error internal API
+  const client: CDPSession = page._client();
+  try {
+    await client.send('Page.setInterceptFileChooserDialog', {enabled: false});
+  } catch (error) {
+    // If the session or the whole connection is gone (e.g. the page was
+    // closed), the interception went away with it.
+    if (
+      error instanceof TargetCloseError ||
+      error instanceof ConnectionClosedError
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Some sites use a proxy element to trigger file upload instead of a
+ * type=file element. Click it and upload through the file chooser it opens.
+ *
+ * Interception is always turned off afterwards. If that fails too, the
+ * upload failure stays the cause, so neither failure is lost.
+ */
+async function uploadThroughFileChooser(
+  page: Page,
+  handle: ElementHandle,
+  filePaths: string[],
+): Promise<void> {
+  const fileChooserAbortController = new AbortController();
+  let uploadFailed = false;
+  let uploadError: unknown;
+  try {
+    const [fileChooser] = await Promise.all([
+      page.waitForFileChooser({
+        timeout: 3000,
+        signal: fileChooserAbortController.signal,
+      }),
+      handle.asLocator().click(),
+    ]);
+    await fileChooser.accept(filePaths);
+  } catch (error) {
+    uploadFailed = true;
+    uploadError = error;
+  }
+  // If the click fails, Promise.all() rejects but waitForFileChooser() keeps
+  // waiting until its timeout. Release it right away.
+  fileChooserAbortController.abort();
+
+  let cleanupFailed = false;
+  let cleanupError: unknown;
+  try {
+    await disableFileChooserInterception(page);
+  } catch (error) {
+    cleanupFailed = true;
+    cleanupError = error;
+  }
+
+  const uploadFailure =
+    'Failed to upload file. The element could not accept the file directly, and uploading through a file chooser after clicking it failed.';
+  const cleanupFailure =
+    'stopping file chooser interception failed, so file dialogs opened in this page may not appear';
+  if (uploadFailed && cleanupFailed) {
+    const reason =
+      cleanupError instanceof Error
+        ? cleanupError.message
+        : String(cleanupError);
+    throw new Error(
+      `${uploadFailure} In addition, ${cleanupFailure} (${reason}).`,
+      {cause: uploadError},
+    );
+  }
+  if (uploadFailed) {
+    throw new Error(uploadFailure, {cause: uploadError});
+  }
+  if (cleanupFailed) {
+    throw new Error(`The file was uploaded, but ${cleanupFailure}.`, {
+      cause: cleanupError,
+    });
+  }
+}
+
 export const uploadFile: PageToolFactory = definePageTool(() => ({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
@@ -587,21 +682,7 @@ export const uploadFile: PageToolFactory = definePageTool(() => ({
       ) {
         throw err;
       }
-      // Some sites use a proxy element to trigger file upload instead of
-      // a type=file element. In this case, we want to default to
-      // Page.waitForFileChooser() and upload the file this way.
-      let fileChooser;
-      try {
-        [fileChooser] = await Promise.all([
-          request.page.pptrPage.waitForFileChooser({timeout: 3000}),
-          handle.asLocator().click(),
-        ]);
-      } catch {
-        throw new Error(
-          `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
-        );
-      }
-      await fileChooser.accept(filePaths);
+      await uploadThroughFileChooser(request.page.pptrPage, handle, filePaths);
     }
     if (request.params.includeSnapshot) {
       response.includeSnapshot();

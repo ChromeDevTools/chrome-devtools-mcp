@@ -63,6 +63,7 @@ export {
   CDPSession,
   CDPSessionEvent,
   Connection,
+  ConnectionClosedError,
   ScreenRecorder,
   Target,
   TargetType,
@@ -78,6 +79,7 @@ export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpHTTPRequest} from 'puppeteer-core/internal/cdp/HTTPRequest.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {TargetCloseError} from 'puppeteer-core/internal/common/Errors.js';
 export {CdpScreenRecording} from 'puppeteer-core/internal/cdp/ScreenRecording.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';
 export {CdpMouse} from 'puppeteer-core/internal/cdp/Input.js';

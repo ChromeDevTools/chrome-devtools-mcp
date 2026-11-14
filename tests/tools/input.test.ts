@@ -11,7 +11,13 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {TimeoutError, zod} from '../../src/third_party/index.js';
+import {
+  ConnectionClosedError,
+  TargetCloseError,
+  TimeoutError,
+  zod,
+  type FileChooser,
+} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1731,6 +1737,238 @@ describe('input', () => {
       });
     });
 
+    it('stops intercepting file choosers after uploading through an element that opens one', async () => {
+      using testFile = createTempFile('test file content', 'test.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile(args).handler(
+          {
+            params: {
+              uid: '1_1',
+              filePaths: [testFile.path],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        // A file chooser that is not intercepted gets dismissed in headless
+        // Chrome, which fires `cancel` on the input. An intercepted one is
+        // swallowed and fires nothing, which is what a person using the tab
+        // would experience as a file dialog that never opens.
+        await page.$eval('#file-input', el => {
+          el.addEventListener(
+            'cancel',
+            () => {
+              (el as HTMLElement).dataset['cancelled'] = 'true';
+            },
+            {once: true},
+          );
+        });
+        await page.click('#file-input');
+        await page.waitForSelector('#file-input[data-cancelled="true"]', {
+          timeout: 5000,
+        });
+      });
+    });
+
+    describe('when uploading through a file chooser', () => {
+      const UPLOAD_FAILURE =
+        'Failed to upload file. The element could not accept the file directly, and uploading through a file chooser after clicking it failed.';
+      const CLEANUP_FAILURE =
+        'stopping file chooser interception failed, so file dialogs opened in this page may not appear';
+
+      function setUpProxyElementUpload() {
+        const mocks = createHandlerMocks();
+        const {handle, locator} = createMockElementHandle();
+        // uploadFile() is abstract on ElementHandle, so it is not stubbed.
+        handle.uploadFile = sinon
+          .stub()
+          .rejects(
+            new Error('Protocol error: Node is not a file input element'),
+          );
+        mocks.page.getElementByUid.resolves(handle);
+        const accept = sinon.stub().resolves();
+        mocks.page.pptrPage.waitForFileChooser.resolves({
+          accept,
+        } as unknown as FileChooser);
+        // @ts-expect-error internal API
+        const client = mocks.page.pptrPage._client();
+        return {...mocks, locator, accept, client};
+      }
+
+      function assertInterceptionTurnedOff(client: {send: sinon.SinonStub}) {
+        sinon.assert.calledWithExactly(
+          client.send,
+          'Page.setInterceptFileChooserDialog',
+          {enabled: false},
+        );
+      }
+
+      it('turns interception off after the file chooser was accepted', async () => {
+        const {page, context, response, args, accept, client} =
+          setUpProxyElementUpload();
+
+        await uploadFile(args).handler(
+          {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(accept, ['/tmp/a.txt']);
+        assertInterceptionTurnedOff(client);
+        assert.ok(
+          client.send.calledAfter(accept),
+          'interception was turned off before the chooser was accepted',
+        );
+      });
+
+      it('aborts the wait and turns interception off when clicking fails', async () => {
+        const {page, context, response, args, locator, client} =
+          setUpProxyElementUpload();
+        // The click fails before any file chooser opens.
+        page.pptrPage.waitForFileChooser.returns(new Promise(() => {}));
+        const clickError = new Error('Element is not visible');
+        locator.click.rejects(clickError);
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+            response,
+            context,
+          ),
+          {message: UPLOAD_FAILURE, cause: clickError},
+        );
+        const {signal} = page.pptrPage.waitForFileChooser.firstCall.args[0]!;
+        assert.strictEqual(signal?.aborted, true);
+        assertInterceptionTurnedOff(client);
+      });
+
+      it('does not claim that no file chooser opened when the click fails after it opened', async () => {
+        const {page, context, response, args, locator, accept, client} =
+          setUpProxyElementUpload();
+        const clickError = new TargetCloseError('Session closed.');
+        locator.click.rejects(clickError);
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+            response,
+            context,
+          ),
+          {message: UPLOAD_FAILURE, cause: clickError},
+        );
+        sinon.assert.notCalled(accept);
+        assertInterceptionTurnedOff(client);
+      });
+
+      it('reports a failure to accept the file chooser', async () => {
+        const {page, context, response, args, accept, client} =
+          setUpProxyElementUpload();
+        const acceptError = new Error('Protocol error: file not found');
+        accept.rejects(acceptError);
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+            response,
+            context,
+          ),
+          {message: UPLOAD_FAILURE, cause: acceptError},
+        );
+        assertInterceptionTurnedOff(client);
+      });
+
+      for (const closedError of [
+        new TargetCloseError('Session closed.'),
+        new ConnectionClosedError('Connection closed.'),
+      ]) {
+        it(`ignores ${closedError.constructor.name} while turning interception off`, async () => {
+          const {page, context, response, args, client} =
+            setUpProxyElementUpload();
+          client.send.rejects(closedError);
+
+          await uploadFile(args).handler(
+            {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+            response,
+            context,
+          );
+
+          sinon.assert.calledOnceWithExactly(
+            response.appendResponseLine,
+            'File uploaded from /tmp/a.txt.',
+          );
+        });
+      }
+
+      it('reports a failure to turn interception off after a successful upload', async () => {
+        const {page, context, response, args, accept, client} =
+          setUpProxyElementUpload();
+        const cleanupError = new Error('Protocol error: unexpected');
+        client.send.rejects(cleanupError);
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+            response,
+            context,
+          ),
+          {
+            message: `The file was uploaded, but ${CLEANUP_FAILURE}.`,
+            cause: cleanupError,
+          },
+        );
+        sinon.assert.calledOnce(accept);
+        sinon.assert.notCalled(response.appendResponseLine);
+      });
+
+      for (const failingStep of ['click', 'accept'] as const) {
+        it(`keeps the ${failingStep} failure as the cause when turning interception off fails too`, async () => {
+          const {page, context, response, args, locator, accept, client} =
+            setUpProxyElementUpload();
+          const uploadError = new Error(`${failingStep} failed`);
+          if (failingStep === 'click') {
+            page.pptrPage.waitForFileChooser.returns(new Promise(() => {}));
+            locator.click.rejects(uploadError);
+          } else {
+            accept.rejects(uploadError);
+          }
+          client.send.rejects(new Error('Protocol error: unexpected'));
+
+          await assert.rejects(
+            uploadFile(args).handler(
+              {params: {uid: '1_1', filePaths: ['/tmp/a.txt']}, page},
+              response,
+              context,
+            ),
+            {
+              message: `${UPLOAD_FAILURE} In addition, ${CLEANUP_FAILURE} (Protocol error: unexpected).`,
+              cause: uploadError,
+            },
+          );
+        });
+      }
+    });
+
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
       using testFile = createTempFile('test file content', 'test.txt');
 
@@ -1753,9 +1991,15 @@ describe('input', () => {
             response,
             context,
           ),
-          {
-            message:
-              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
+          (error: Error) => {
+            assert.strictEqual(
+              error.message,
+              'Failed to upload file. The element could not accept the file directly, and uploading through a file chooser after clicking it failed.',
+            );
+            // No file chooser opened, so waiting for one timed out. The page
+            // comes from the test's own puppeteer, so compare by name.
+            assert.strictEqual((error.cause as Error).name, 'TimeoutError');
+            return true;
           },
         );
 
