@@ -237,7 +237,8 @@ export class TextSnapshot {
         id,
         backendNodeId,
         children: [],
-        elementHandle: async () => handle,
+        // Callers dispose their handle, so keep the page-owned one alive.
+        elementHandle: () => handle.evaluateHandle(element => element),
       };
       return extraNode;
     };
