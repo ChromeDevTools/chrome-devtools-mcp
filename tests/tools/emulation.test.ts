@@ -672,6 +672,18 @@ describe('emulation', () => {
         nonObjectHeadersResult.error.issues[0].message,
         'Invalid JSON for headers: Headers must be a JSON object',
       );
+
+      for (const value of ['1', 'true', 'null', '{}']) {
+        const invalidHeaderValueResult = schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: `{"X-Invalid": ${value}}`,
+        });
+        assert.strictEqual(invalidHeaderValueResult.success, false);
+        assert.strictEqual(
+          invalidHeaderValueResult.error.issues[0].message,
+          'Invalid JSON for headers: Header "X-Invalid" must have a string value',
+        );
+      }
     });
   });
 
