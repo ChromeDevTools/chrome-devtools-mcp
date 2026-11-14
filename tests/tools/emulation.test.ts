@@ -673,6 +673,29 @@ describe('emulation', () => {
         'Invalid JSON for headers: Headers must be a JSON object',
       );
     });
+
+    it('rejects non-string extraHttpHeaders values in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+
+      for (const [json, headerName] of [
+        ['{"X-Count": 1}', 'X-Count'],
+        ['{"X-Flag": true}', 'X-Flag'],
+        ['{"X-Null": null}', 'X-Null'],
+        ['{"X-Object": {}}', 'X-Object'],
+        ['{"X-Array": []}', 'X-Array'],
+      ] as const) {
+        const result = schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: json,
+        });
+        assert.strictEqual(result.success, false);
+        assert.strictEqual(
+          result.error.issues[0].message,
+          `Header "${headerName}" must have a string value`,
+        );
+      }
+    });
   });
 
   describe('colorScheme', () => {
