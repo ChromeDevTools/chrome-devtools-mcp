@@ -39,7 +39,14 @@ function headerStringTransform(
     ) {
       throw new Error('Headers must be a JSON object');
     }
-    return parsed as Record<string, string>;
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== 'string') {
+        throw new Error(`Header "${key}" must have a string value`);
+      }
+      headers[key] = value;
+    }
+    return headers;
   } catch (error) {
     throw new Error(
       `Invalid JSON for headers: ${error instanceof Error ? error.message : String(error)}`,

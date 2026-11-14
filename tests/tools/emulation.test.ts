@@ -565,6 +565,39 @@ describe('emulation', () => {
       );
     });
 
+    for (const {type, key, value} of [
+      {type: 'number', key: 'X-Count', value: 42},
+      {type: 'boolean', key: 'X-Enabled', value: true},
+      {type: 'nested object', key: 'X-Nested', value: {value: 'test'}},
+    ]) {
+      it(`rejects a ${type} extraHttpHeaders value in schema`, () => {
+        const {args} = createHandlerMocks();
+        const schema = zod.object(emulate(args).schema);
+        const result = schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: JSON.stringify({[key]: value}),
+        });
+        assert.strictEqual(result.success, false);
+        assert.strictEqual(
+          result.error.issues[0].message,
+          `Invalid JSON for headers: Header "${key}" must have a string value`,
+        );
+      });
+    }
+
+    it('parses an all-string extraHttpHeaders map in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      const headers = {'X-Count': '42', 'X-Enabled': 'true'};
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: JSON.stringify(headers),
+        }),
+        {success: true, data: {pageId: 1, extraHttpHeaders: headers}},
+      );
+    });
+
     it('reports validation issues instead of throwing for invalid transform inputs', () => {
       const {args} = createHandlerMocks();
       const schema = zod.object(emulate(args).schema);
