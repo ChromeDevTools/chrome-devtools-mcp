@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import {PipeTransport} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
+import {getErrorMessage} from '../utils/errorHandling.js';
 import {getTempFilePath} from '../utils/files.js';
 import {
   logger,
@@ -232,8 +233,17 @@ export async function stopDaemon(sessionId: string): Promise<void> {
     if (pid) {
       try {
         process.kill(pid, 'SIGKILL');
-      } catch {
-        // Ignore if process already exited.
+      } catch (killError) {
+        if (!(
+          killError instanceof Error &&
+          'code' in killError &&
+          killError.code === 'ESRCH'
+        )) {
+          throw new Error(
+            `Failed to stop daemon (pid ${pid}): ${getErrorMessage(killError)}`,
+            {cause: killError},
+          );
+        }
       }
     }
     try {
