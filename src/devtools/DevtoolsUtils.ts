@@ -182,7 +182,7 @@ export async function createTargetUniverse(
   );
   skipAllPausesSetting.set(true);
 
-  // @ts-expect-error devtools-frontend has diffrent types.
+  // @ts-expect-error devtools-frontend has different types.
   const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
