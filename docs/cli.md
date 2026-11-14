@@ -1,4 +1,8 @@
+
+npm i chrome-devtools-mcp@latest -g
+chrome-devtools status # check if install worked.
 # Chrome DevTools CLI
+
 
 The `chrome-devtools-mcp` package includes a CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
 
@@ -141,3 +145,4 @@ generation such as `wait_for` and `fill_form`.
 
 `chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
 because not all args make sense in a CLI interface.
+
