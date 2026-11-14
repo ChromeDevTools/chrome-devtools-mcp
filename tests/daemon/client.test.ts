@@ -5,11 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import childProcess, {spawn} from 'node:child_process';
 import crypto from 'node:crypto';
-import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import fs, {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import net from 'node:net';
 import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
+
+import sinon from 'sinon';
 
 import {
   handleResponse,
@@ -24,6 +27,57 @@ import {
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
+import {createTempDir} from '../utils.js';
+
+describe('stopDaemon signal failures', () => {
+  for (const code of ['EPERM', 'ESRCH']) {
+    it(`handles SIGKILL ${code} without losing a live daemon's PID`, async () => {
+      using dir = createTempDir('cdm-stop-denied-');
+      sinon
+        .stub(process, 'env')
+        .value({...process.env, XDG_RUNTIME_DIR: dir.path});
+      const sessionId = crypto.randomUUID();
+      const pid = 1234567895;
+      const pidFilePath = getPidFilePath(sessionId);
+      mkdirSync(dirname(pidFilePath), {recursive: true});
+      writeFileSync(pidFilePath, String(pid));
+      const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
+      sinon
+        .stub(fs, 'existsSync')
+        .callThrough()
+        .withArgs('/proc')
+        .returns(false);
+      sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
+      sinon
+        .stub(net, 'createConnection')
+        .throws(new Error('socket unreachable'));
+      const denied = Object.assign(new Error('kill EPERM'), {code: 'EPERM'});
+      const kill = sinon.stub(process, 'kill').throws(denied);
+      kill
+        .withArgs(pid, 'SIGKILL')
+        .throws(Object.assign(new Error(`kill ${code}`), {code}));
+      const remove = sinon.spy(fs, 'rmSync');
+      const unlink = sinon.spy(fs, 'unlinkSync');
+
+      const stopping = stopDaemon(sessionId);
+      const stopped =
+        code === 'EPERM'
+          ? assert.rejects(stopping, /EPERM/)
+          : assert.doesNotReject(stopping);
+      await Promise.all([clock.tickAsync(10_000), stopped]);
+
+      sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
+      sinon.assert.notCalled(remove);
+      if (code === 'EPERM') {
+        sinon.assert.notCalled(unlink);
+        assert.strictEqual(getDaemonPid(sessionId), pid);
+      } else {
+        sinon.assert.calledOnceWithExactly(unlink, pidFilePath);
+        assert.strictEqual(getDaemonPid(sessionId), null);
+      }
+    });
+  }
+});
 
 describe('daemon client', () => {
   let sessionId: string;
