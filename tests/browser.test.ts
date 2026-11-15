@@ -655,7 +655,7 @@ describe('browser', () => {
       });
     });
 
-    it('includes remote debugging hint and preserves cause when autoConnect fails without userDataDir', async () => {
+    it('suggests userDataDir when the default port file is missing', async () => {
       const enoentError = Object.assign(
         new Error(
           "ENOENT: no such file or directory, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
@@ -679,12 +679,64 @@ describe('browser', () => {
         assert.ok(err instanceof Error);
         assert.strictEqual(
           err.message,
-          'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+          'Could not connect to Chrome. ' +
+            'Check if Chrome is running and remote debugging is enabled ' +
+            'by going to chrome://inspect/#remote-debugging. ' +
+            'If Chrome uses a custom profile directory, ' +
+            'pass --user-data-dir with that directory.',
         );
         assert.strictEqual(err.cause, puppeteerError);
         return true;
       });
     });
+
+    for (const {name, message, cause} of [
+      {
+        name: 'a permission error (EPERM)',
+        message:
+          'Could not read DevToolsActivePort for chrome ' +
+          'at /profile/DevToolsActivePort: permission denied',
+        cause: Object.assign(new Error('permission denied'), {code: 'EPERM'}),
+      },
+      {
+        name: 'a permission error (EACCES)',
+        message:
+          'Could not read DevToolsActivePort for chrome ' +
+          'at /profile/DevToolsActivePort: permission denied',
+        cause: Object.assign(new Error('permission denied'), {code: 'EACCES'}),
+      },
+      {
+        name: 'a malformed port file',
+        message:
+          'Could not find DevToolsActivePort for chrome ' +
+          'at /profile/DevToolsActivePort',
+        cause: new Error('Invalid port found'),
+      },
+      {
+        name: 'a refused connection',
+        message:
+          'Could not find DevToolsActivePort for chrome ' +
+          'at /profile/DevToolsActivePort',
+        cause: Object.assign(new Error('connect ECONNREFUSED'), {
+          code: 'ECONNREFUSED',
+        }),
+      },
+    ]) {
+      it(`does not suggest a custom profile for ${name}`, async () => {
+        const puppeteerError = new Error(message, {cause});
+        sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+        const manager = new BrowserManager(
+          createMockServerConfig({autoConnect: true, channel: 'stable'}),
+        );
+
+        await assert.rejects(manager.ensureBrowser(), error => {
+          assert.ok(error instanceof Error);
+          assert.doesNotMatch(error.message, /--user-data-dir/);
+          assert.strictEqual(error.cause, puppeteerError);
+          return true;
+        });
+      });
+    }
   });
 
   describe('rootSandboxLaunchError', () => {

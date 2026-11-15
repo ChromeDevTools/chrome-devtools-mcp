@@ -468,12 +468,26 @@ export class BrowserManager {
       connected.once('disconnected', () => this.#evictIfCurrent(connected));
       return connected;
     } catch (err) {
-      throw new Error(
-        `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
-        {
-          cause: err,
-        },
-      );
+      let hint = autoConnect
+        ? 'Check if Chrome is running and remote debugging is enabled ' +
+          'by going to chrome://inspect/#remote-debugging.'
+        : 'Check if Chrome is running.';
+      if (
+        connectOptions.channel &&
+        err instanceof Error &&
+        err.message.startsWith('Could not find DevToolsActivePort for ') &&
+        typeof err.cause === 'object' &&
+        err.cause !== null &&
+        'code' in err.cause &&
+        err.cause.code === 'ENOENT'
+      ) {
+        hint +=
+          ' If Chrome uses a custom profile directory, ' +
+          'pass --user-data-dir with that directory.';
+      }
+      throw new Error(`Could not connect to Chrome. ${hint}`, {
+        cause: err,
+      });
     }
   }
 
