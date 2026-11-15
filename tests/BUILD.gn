@@ -110,6 +110,7 @@ ts_library("tests") {
     "utils/WaitForHelper.test.ts",
     "utils/bytes.test.ts",
     "utils/check-for-updates.test.ts",
+    "utils/cookies.test.ts",
     "utils/errorHandling.test.ts",
     "utils/files.test.ts",
     "utils/id.test.ts",

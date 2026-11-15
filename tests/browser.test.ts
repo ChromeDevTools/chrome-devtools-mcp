@@ -5,14 +5,20 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import util from 'node:util';
 
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
-import {puppeteer, type Browser} from '../src/third_party/browser.js';
+import {
+  puppeteer,
+  type Browser,
+  type CookieData,
+} from '../src/third_party/browser.js';
 
 import {
   createMockPuppeteerBrowser,
@@ -20,7 +26,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks} from './server.js';
-import {getExecutablePath} from './utils.js';
+import {createTempFile, getExecutablePath} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -63,6 +69,234 @@ describe('browser', () => {
   });
 
   describe('BrowserManager', () => {
+    it('loads cookies once when initializing a launched browser', async () => {
+      const cookies: CookieData[] = [
+        {
+          name: 'session',
+          value: 'COOKIE_VALUE',
+          domain: '.example.test',
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'None',
+          expires: 1900000000,
+          priority: 'High',
+          sourceScheme: 'Secure',
+          partitionKey: {
+            sourceOrigin: 'https://example.test',
+            hasCrossSiteAncestor: true,
+          },
+        },
+      ];
+      using file = createTempFile(JSON.stringify(cookies), 'cookies.json');
+      const browser = createMockPuppeteerBrowser();
+      sinon.stub(puppeteer, 'launch').resolves(browser);
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          headless: true,
+          isolated: true,
+          cookiesFile: file.path,
+        }),
+      );
+
+      await manager.ensureBrowser();
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithExactly(browser.setCookie, ...cookies);
+    });
+
+    it('loads cookies when connecting to an existing browser', async () => {
+      const cookies: CookieData[] = [
+        {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
+      ];
+      using file = createTempFile(JSON.stringify(cookies), 'cookies.json');
+      const browser = createMockPuppeteerBrowser();
+      sinon.stub(puppeteer, 'connect').resolves(browser);
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          browserUrl: 'http://localhost:9222',
+          cookiesFile: file.path,
+        }),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithExactly(browser.setCookie, ...cookies);
+    });
+
+    it('cleans up a launched browser without exposing a cookie import error', async () => {
+      using file = createTempFile(
+        JSON.stringify([
+          {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
+        ]),
+        'cookies.json',
+      );
+      const browser = createMockPuppeteerBrowser();
+      browser.setCookie.rejects(new Error('invalid COOKIE_VALUE'));
+      sinon.stub(puppeteer, 'launch').resolves(browser);
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          headless: true,
+          isolated: true,
+          cookiesFile: file.path,
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), error => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Unable to import cookies/);
+        assert.doesNotMatch(error.stack ?? error.message, /COOKIE_VALUE/);
+        assert.strictEqual(error.cause, undefined);
+        return true;
+      });
+      sinon.assert.calledOnceWithExactly(browser.close);
+    });
+
+    it('disconnects an attached browser after a failed cookie import and retries with the updated file', async () => {
+      using file = createTempFile('invalid JSON', 'cookies.json');
+      const firstBrowser = createMockPuppeteerBrowser();
+      const secondBrowser = createMockPuppeteerBrowser();
+      sinon
+        .stub(puppeteer, 'connect')
+        .onFirstCall()
+        .resolves(firstBrowser)
+        .onSecondCall()
+        .resolves(secondBrowser);
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          browserUrl: 'http://localhost:9222',
+          cookiesFile: file.path,
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), /must contain valid JSON/);
+      sinon.assert.calledOnceWithExactly(firstBrowser.disconnect);
+      sinon.assert.notCalled(firstBrowser.close);
+      sinon.assert.notCalled(firstBrowser.setCookie);
+
+      const cookie = {name: 'session', value: 'new', domain: 'example.test'};
+      fs.writeFileSync(file.path, JSON.stringify([cookie]));
+      assert.strictEqual(await manager.ensureBrowser(), secondBrowser);
+      sinon.assert.calledOnceWithExactly(secondBrowser.setCookie, cookie);
+    });
+
+    it('does not set cookies for an empty file array', async () => {
+      using file = createTempFile('[]', 'cookies.json');
+      const browser = createMockPuppeteerBrowser();
+      sinon.stub(puppeteer, 'launch').resolves(browser);
+      const manager = new BrowserManager(
+        createMockServerConfig({isolated: true, cookiesFile: file.path}),
+      );
+
+      assert.strictEqual(await manager.ensureBrowser(), browser);
+      sinon.assert.notCalled(browser.setCookie);
+    });
+
+    for (const action of ['abandon', 'close']) {
+      it(`does not import cookies when ${action} happens while reading the file`, async () => {
+        const readStarted = Promise.withResolvers<void>();
+        const contents = Promise.withResolvers<string>();
+        sinon.stub(fs.promises, 'readFile').callsFake(async () => {
+          readStarted.resolve();
+          return await contents.promise;
+        });
+        const browser = createMockPuppeteerBrowser();
+        sinon.stub(puppeteer, 'launch').resolves(browser);
+        const manager = new BrowserManager(
+          createMockServerConfig({isolated: true, cookiesFile: 'cookies.json'}),
+        );
+
+        const pending = manager.ensureBrowser();
+        await readStarted.promise;
+        const closed = action === 'close' ? manager.close() : undefined;
+        if (action === 'abandon') {
+          manager.abandonPendingAttempt();
+        }
+        contents.resolve(
+          JSON.stringify([
+            {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
+          ]),
+        );
+
+        await assert.rejects(pending, /was closed|was abandoned/);
+        await closed;
+        sinon.assert.notCalled(browser.setCookie);
+        sinon.assert.calledOnceWithExactly(browser.close);
+      });
+    }
+
+    it('suppresses protocol logging during cookie import and restores it after a failure', async () => {
+      using file = createTempFile(
+        JSON.stringify([
+          {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
+        ]),
+        'cookies.json',
+      );
+      const debugLog = Object.assign(sinon.stub(), {enabled: true});
+      sinon.stub(util, 'debuglog').returns(debugLog);
+      const browser = createMockPuppeteerBrowser();
+      const launch = sinon.stub(puppeteer, 'launch').resolves(browser);
+      browser.setCookie.callsFake(async () => {
+        const log = launch.firstCall.args[0]?.logger?.('puppeteer:protocol');
+        assert.ok(log);
+        log('Storage.setCookies COOKIE_VALUE');
+        log('Protocol error COOKIE_VALUE');
+        throw new Error('COOKIE_VALUE');
+      });
+      const manager = new BrowserManager(
+        createMockServerConfig({isolated: true, cookiesFile: file.path}),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), /Unable to import cookies/);
+      sinon.assert.notCalled(debugLog);
+      const log = launch.firstCall.args[0]?.logger?.('puppeteer:protocol');
+      assert.ok(log);
+      log('visible');
+      sinon.assert.calledOnceWithExactly(
+        debugLog,
+        '%s %s',
+        sinon.match.string,
+        'visible',
+      );
+    });
+
+    it('imports HttpOnly cookies into the default context and leaves new isolated contexts empty', async () => {
+      using file = createTempFile(
+        JSON.stringify([
+          {
+            name: 'session',
+            value: 'COOKIE_VALUE',
+            domain: '127.0.0.1',
+            path: '/',
+            httpOnly: true,
+            sameSite: 'Lax',
+          },
+        ]),
+        'cookies.json',
+      );
+      await using manager = new BrowserManager(
+        createMockServerConfig({
+          isolated: true,
+          headless: true,
+          executablePath: await getExecutablePath(),
+          cookiesFile: file.path,
+        }),
+      );
+
+      const browser = await manager.ensureBrowser();
+      const cookies = await browser.cookies();
+      assert.strictEqual(cookies.length, 1);
+      assert.strictEqual(cookies[0].value, 'COOKIE_VALUE');
+      assert.strictEqual(cookies[0].httpOnly, true);
+      assert.strictEqual(cookies[0].sameSite, 'Lax');
+      const isolatedContext = await browser.createBrowserContext();
+      try {
+        assert.deepStrictEqual(await isolatedContext.cookies(), []);
+      } finally {
+        await isolatedContext.close();
+      }
+    });
+
     it('preserves WebSocket connection credentials for Puppeteer while redacting logs', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const connectStub = sinon
@@ -110,6 +344,7 @@ describe('browser', () => {
 
       assert.strictEqual(browser1, pptrBrowser);
       assert.strictEqual(browser2, pptrBrowser);
+      sinon.assert.notCalled(pptrBrowser.setCookie);
       sinon.assert.calledOnce(launchStub);
       sinon.assert.notCalled(connectStub);
       sinon.assert.calledWithMatch(launchStub, {

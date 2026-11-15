@@ -22,6 +22,7 @@ import {
   puppeteerLogger,
   redactConnectOptionsForLogging,
 } from './utils/logger.js';
+import {readCookiesFile} from './utils/cookies.js';
 import {isAllowedUrl} from './utils/url.js';
 
 export interface BrowserManagerOptions {
@@ -43,6 +44,19 @@ export class BrowserManager {
   #closingCount = 0;
   #config: ReadonlyServerConfig;
   #options: BrowserManagerOptions;
+  #importingCookies = false;
+
+  #puppeteerLogger = (prefix: string): ReturnType<typeof puppeteerLogger> => {
+    const log = puppeteerLogger(prefix);
+    if (!log) {
+      return;
+    }
+    return (...args: unknown[]): void => {
+      if (!this.#importingCookies) {
+        log(...args);
+      }
+    };
+  };
 
   #browserAttempt: BrowserAttempt = new BrowserAttempt();
 
@@ -182,7 +196,34 @@ export class BrowserManager {
       throw new Error('Connection attempt was abandoned before it completed.');
     }
     if (!this.#browser?.connected) {
-      await this.#initBrowser();
+      const browser = await this.#initBrowser();
+      const {cookiesFile} = this.#config.resolved;
+      if (cookiesFile !== undefined) {
+        try {
+          const cookies = await readCookiesFile(cookiesFile);
+          if (
+            this.#closingCount === 0 &&
+            this.#browserAttempt === attempt &&
+            this.#browser === browser &&
+            cookies.length > 0
+          ) {
+            this.#importingCookies = true;
+            try {
+              await browser.setCookie(...cookies);
+            } catch {
+              // Protocol errors can contain cookie values.
+              throw new Error(
+                `Unable to import cookies from "${cookiesFile}".`,
+              );
+            } finally {
+              this.#importingCookies = false;
+            }
+          }
+        } catch (error) {
+          await this.#closeBrowser();
+          throw error;
+        }
+      }
     }
     if (
       this.#closingCount > 0 ||
@@ -312,7 +353,7 @@ export class BrowserManager {
         enableExtensions,
         blocklist,
         allowlist,
-        logger: puppeteerLogger,
+        logger: this.#puppeteerLogger,
         // The entry points own signal handling and call close(), which
         // closes the browser gracefully. Puppeteer's handlers would SIGKILL
         // Chrome synchronously on the same signal and win the race.
@@ -391,7 +432,7 @@ export class BrowserManager {
       handleDevToolsAsPage: true,
       blocklist,
       allowlist,
-      logger: puppeteerLogger,
+      logger: this.#puppeteerLogger,
       // Detects a transport that died without a close frame (e.g. an adb
       // port-forward torn down mid-call). Puppeteer pings the socket
       // periodically and terminates it on a missed pong, which rejects the

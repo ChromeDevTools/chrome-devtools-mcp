@@ -15,6 +15,7 @@ export interface BrowserArguments {
   executablePath?: string;
   isolated: boolean;
   userDataDir?: string;
+  cookiesFile?: string;
   channel?: 'canary' | 'dev' | 'beta' | 'stable';
   proxyServer?: string;
   chromeArg?: string[];
@@ -133,6 +134,17 @@ export const browserOptions: BrowserOptions = {
     type: 'string',
     description:
       'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+  },
+  cookiesFile: {
+    type: 'string',
+    description:
+      'Load a Puppeteer CookieData JSON array from a local file into the default browser context when initializing the browser. Relative paths use the server working directory. Newly created isolated contexts remain empty. Restart the server to reload the file.',
+    coerce: (filePath: string | undefined): string | undefined => {
+      if (filePath !== undefined && filePath.trim() === '') {
+        throw new Error('cookiesFile must be a non-empty file path.');
+      }
+      return filePath;
+    },
   },
   channel: {
     type: 'string',
