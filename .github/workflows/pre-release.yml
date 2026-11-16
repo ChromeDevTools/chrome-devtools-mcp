@@ -25,7 +25,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
-          submodules: true
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -39,17 +38,15 @@ jobs:
         shell: bash
         run: npm install -g npm@latest
 
-      - name: Install dependencies
+      - name: Install and sync dependencies
         shell: bash
-        run: npm ci
+        run: npm run sync
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
-      - name: Build and bundle
+      - name: Build
         shell: bash
-        run: npm run bundle
-        env:
-          NODE_ENV: 'production'
+        run: npm run build:release
 
       - name: Verify server.json
         if: runner.os == 'Linux'
@@ -60,12 +57,12 @@ jobs:
         shell: bash
         run: npm run verify-npm-package
 
-      - name: Remove node_modules
+      - name: Remove unbundled dependencies
         shell: bash
-        run: rm -rf node_modules
+        run: rm -rf node_modules out/Default/gen/third_party
 
       - name: Smoke test bundled binaries
         shell: bash
         run: |
-          node ./build/src/bin/chrome-devtools-mcp.js --version
-          node ./build/src/bin/chrome-devtools.js --version
+          node ./out/Default/gen/src/bin/chrome-devtools-mcp.js --version
+          node ./out/Default/gen/src/bin/chrome-devtools.js --version

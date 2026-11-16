@@ -137,6 +137,25 @@ describe('sanitizeParams', () => {
     });
   });
 
+  it('skips undefined parameter values', () => {
+    const schema = {
+      myString: zod.string(),
+      optionalString: zod.string().optional(),
+    };
+
+    const sanitized = sanitizeParams(
+      {
+        myString: 'hello',
+        optionalString: undefined,
+      },
+      schema,
+    );
+
+    assert.deepStrictEqual(sanitized, {
+      my_string_length: 5,
+    });
+  });
+
   it('bucketizes string lengths correctly', () => {
     const schema = {
       str0: zod.string(),

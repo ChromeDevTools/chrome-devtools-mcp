@@ -226,6 +226,10 @@ export type ExceptionDetailsLike =
   | Protocol.Runtime.ExceptionDetails
   | DevTools.Protocol.Runtime.ExceptionDetails;
 
+// Only `send()` is used, so the session of a handle from any copy of
+// Puppeteer qualifies.
+export type SessionLike = Pick<CDPSession, 'send'>;
+
 export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
@@ -264,7 +268,7 @@ export class SymbolizedError {
     devTools?: TargetUniverse;
     // The session that reported `details`. Remote object ids are scoped to
     // the session that issued them, so the cause has to be resolved there.
-    session?: CDPSession;
+    session?: SessionLike;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
     resolvedCauseForTesting?: SymbolizedError;
@@ -335,7 +339,7 @@ export class SymbolizedError {
     error: RemoteObjectLike;
     targetId: string;
     devTools?: TargetUniverse;
-    session?: CDPSession;
+    session?: SessionLike;
   }): Promise<SymbolizedError> {
     return await SymbolizedError.#fromError(opts, 0);
   }
@@ -405,7 +409,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<ExceptionDetailsLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
@@ -442,7 +446,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<RemoteObjectLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
@@ -532,15 +536,10 @@ export async function createStackTrace(
   }
 
   const signal = AbortSignal.timeout(1_000);
-  await Promise.all(
-    [...scriptIds].map(id =>
-      waitForScript(model, id, signal)
-        .then(script =>
-          model.sourceMapManager().sourceMapForClientPromise(script),
-        )
-        .catch(),
-    ),
+  const scripts = await Promise.all(
+    [...scriptIds].map(id => waitForScript(model, id, signal)),
   );
+  await waitForSourceMaps(model, scripts, signal);
 
   const binding = devTools.universe.context.get(
     DevTools.DebuggerWorkspaceBinding,
@@ -554,12 +553,49 @@ export async function createStackTrace(
   );
 }
 
+/**
+ * Waits for the source maps of `scripts` to load, so that their original
+ * sources are in the workspace. Scripts without a source map are skipped.
+ * Non-trivial pages have hundreds of source maps, so the wait ends when
+ * `signal` aborts; loads still pending then continue in the background and
+ * resolve later.
+ */
+export async function waitForSourceMaps(
+  model: DevTools.DebuggerModel,
+  scripts: Iterable<DevToolsScript>,
+  signal: AbortSignal,
+): Promise<void> {
+  const manager = model.sourceMapManager();
+  const aborted = new Promise<void>(resolve => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener('abort', () => resolve(), {once: true});
+  });
+  await Promise.all(
+    [...scripts].map(script => {
+      if (!script.sourceMapURL) {
+        return undefined;
+      }
+      return Promise.race([
+        manager.sourceMapForClientPromise(script).then(() => undefined),
+        aborted,
+      ]);
+    }),
+  );
+}
+
+type DevToolsScript = NonNullable<
+  ReturnType<DevTools.DebuggerModel['scriptForId']>
+>;
+
 // Waits indefinitely for the script so pair it with Promise.race.
 async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: string,
   signal: AbortSignal,
-): Promise<NonNullable<ReturnType<DevTools.DebuggerModel['scriptForId']>>> {
+): Promise<DevToolsScript> {
   while (true) {
     if (signal.aborted) {
       throw signal.reason;

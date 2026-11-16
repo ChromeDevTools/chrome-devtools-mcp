@@ -121,6 +121,9 @@ chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from load
 
 ## Network
 
+Network mocking commands require `--categoryNetworkMocks=true` at server startup.
+Changing this flag requires a server restart.
+
 ```bash
 chrome-devtools get_network_request 1 # Get the currently selected network request for page 1
 chrome-devtools get_network_request 1 --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
@@ -129,6 +132,14 @@ chrome-devtools list_network_requests 1 # List all network requests for page 1
 chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
 chrome-devtools list_network_requests 1 --resourceTypes fetch # Filter requests by resource type
 chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
+chrome-devtools mock_network 1 --route 'https://example.com/app.js*' \
+  --body /tmp/app.js # Replace a response with a local file
+chrome-devtools mock_network 1 --route 'https://example.com/app.js*' \
+  --upstream https://example.com/dev.js # Use an upstream URL instead
+chrome-devtools mock_network 1 # Inspect all mocks
+chrome-devtools mock_network 1 --resourceType script # Inspect script mocks
+chrome-devtools remove_network_mock 1 --route 'https://example.com/app.js*'
+chrome-devtools remove_network_mock 1 # Clear all mocks for page 1
 ```
 
 ## Debugging & Inspection
@@ -159,7 +170,7 @@ chrome-devtools screencast_stop 1 # Stops the active screencast on page 1
 ## Extensions
 
 ```bash
-chrome-devtools list_extensions # Lists all the Chrome extensions installed in the browser
+chrome-devtools list_extensions # Lists the unpacked Chrome extensions loaded in the browser
 chrome-devtools install_extension "/path/to/extension" # Installs a Chrome extension from the given path
 chrome-devtools uninstall_extension "extension_id" # Uninstalls a Chrome extension by its ID
 chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome extension by its ID

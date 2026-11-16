@@ -6,10 +6,11 @@
 
 import assert from 'node:assert';
 import {spawn, type ChildProcessByStdio} from 'node:child_process';
+import path from 'node:path';
 import type {Readable, Writable} from 'node:stream';
 import {describe, it} from 'node:test';
 
-import {executablePath} from 'puppeteer';
+import {getExecutablePath} from './utils.js';
 
 type Server = ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -23,13 +24,13 @@ const EXIT_TIMEOUT_MS = 15000;
 
 async function spawnServer(): Promise<Server> {
   const child = spawn(
-    'node',
+    process.execPath,
     [
-      'build/src/bin/chrome-devtools-mcp.js',
+      path.resolve(import.meta.dirname, '../src/bin/chrome-devtools-mcp.js'),
       '--headless',
       '--isolated',
       '--executable-path',
-      await executablePath(),
+      await getExecutablePath(),
     ],
     {
       env: {

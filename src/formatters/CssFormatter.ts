@@ -72,6 +72,7 @@ export type AncestorCSSRule =
 export interface StructuredCssProperty {
   name: string;
   value: string;
+  resolvedValue?: string;
   status: CssPropertyStatus;
   important?: boolean;
 }
@@ -467,7 +468,10 @@ function formatPropertyLine(prop: StructuredCssProperty): string {
     prop.important && !/\s*!\s*important$/i.test(prop.value)
       ? ' !important'
       : '';
-  return `${stateStr}${prop.name}: ${prop.value}${imp};`;
+  const resolved = prop.resolvedValue
+    ? ` /* ${prop.resolvedValue.replaceAll('*/', '*\\/')} */`
+    : '';
+  return `${stateStr}${prop.name}: ${prop.value}${imp};${resolved}`;
 }
 
 /**
@@ -1102,6 +1106,30 @@ export class CssFormatter {
     );
   }
 
+  static #resolveVariableValue(
+    prop: DevTools.CSSProperty.CSSProperty,
+    value: string,
+    matchedStyles: MatchedStyles,
+  ): string | undefined {
+    if (
+      !prop.parsedOk ||
+      prop.disabled ||
+      !value.includes('var(') ||
+      prop.ownerStyle.parentRule instanceof DevTools.CSSRule.CSSFunctionRule
+    ) {
+      return undefined;
+    }
+    const matching = prop.parseValue(matchedStyles, null);
+    if (!matching || matching.hasUnresolvedSubstitutions(matching.ast.tree)) {
+      return undefined;
+    }
+    const resolved = matching.getComputedPropertyValueText().trim();
+    if (!resolved || resolved === value) {
+      return undefined;
+    }
+    return resolved;
+  }
+
   static #formatStructuredProperty(
     prop: DevTools.CSSProperty.CSSProperty,
     matchedStyles: MatchedStyles,
@@ -1123,10 +1151,16 @@ export class CssFormatter {
     if (isImportant) {
       value = value.replace(/\s*!\s*important$/i, '').trimEnd();
     }
+    const resolvedValue = CssFormatter.#resolveVariableValue(
+      prop,
+      value,
+      matchedStyles,
+    );
 
     return {
       name: prop.name,
       value,
+      ...(resolvedValue ? {resolvedValue} : {}),
       status,
       ...(isImportant ? {important: true} : {}),
     };

@@ -80,6 +80,25 @@ describe('emulation', () => {
         assert.throws(() => viewportTransform('800x0'));
       });
 
+      it('throws when width or height is not an integer', () => {
+        assert.throws(
+          () => viewportTransform('1280.5x720'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280x720.5'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280.0x720'),
+          /Expected an integer/,
+        );
+        assert.throws(
+          () => viewportTransform('1280x720.'),
+          /Expected an integer/,
+        );
+      });
+
       it('throws when devicePixelRatio is not positive', () => {
         assert.throws(() => viewportTransform('1024x768x0'));
       });
@@ -557,11 +576,81 @@ describe('emulation', () => {
         'Invalid geolocation "0x0". Expected \'<latitude>,<longitude>\'.',
       );
 
+      const nonNumericGeoResult = schema.safeParse({
+        pageId: 1,
+        geolocation: 'abc,11.5',
+      });
+      assert.strictEqual(nonNumericGeoResult.success, false);
+      assert.deepStrictEqual(nonNumericGeoResult.error.issues[0].path, [
+        'geolocation',
+        'latitude',
+      ]);
+      assert.strictEqual(
+        nonNumericGeoResult.error.issues[0].message,
+        'Expected a number',
+      );
+
       const viewportResult = schema.safeParse({pageId: 1, viewport: '0x0'});
       assert.strictEqual(viewportResult.success, false);
+      assert.deepStrictEqual(viewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
       assert.strictEqual(
         viewportResult.error.issues[0].message,
-        'Invalid viewport width "0". Expected format \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\' with a positive width.',
+        'Too small: expected number to be >0',
+      );
+
+      const nonNumericViewportResult = schema.safeParse({
+        pageId: 1,
+        viewport: 'abcx720',
+      });
+      assert.strictEqual(nonNumericViewportResult.success, false);
+      assert.deepStrictEqual(nonNumericViewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
+      assert.strictEqual(
+        nonNumericViewportResult.error.issues[0].message,
+        'Expected an integer',
+      );
+
+      const fractionalViewportResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280.5x720',
+      });
+      assert.strictEqual(fractionalViewportResult.success, false);
+      assert.deepStrictEqual(fractionalViewportResult.error.issues[0].path, [
+        'viewport',
+        'width',
+      ]);
+      assert.strictEqual(
+        fractionalViewportResult.error.issues[0].message,
+        'Expected an integer',
+      );
+
+      const invalidTagResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280x720,bogus',
+      });
+      assert.strictEqual(invalidTagResult.success, false);
+      assert.deepStrictEqual(invalidTagResult.error.issues[0].path, [
+        'viewport',
+      ]);
+      assert.strictEqual(
+        invalidTagResult.error.issues[0].message,
+        'Invalid viewport option "bogus". Expected "mobile", "touch", or "landscape" in \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\'.',
+      );
+
+      const emptyTagResult = schema.safeParse({
+        pageId: 1,
+        viewport: '1280x720,',
+      });
+      assert.strictEqual(emptyTagResult.success, false);
+      assert.deepStrictEqual(emptyTagResult.error.issues[0].path, ['viewport']);
+      assert.strictEqual(
+        emptyTagResult.error.issues[0].message,
+        'Invalid viewport option "". Expected "mobile", "touch", or "landscape" in \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\'.',
       );
 
       const invalidJsonResult = schema.safeParse({

@@ -146,6 +146,20 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('rejects browser urls without an http or https scheme', async () => {
+    for (const value of [
+      'localhost:9222',
+      'ws://127.0.0.1:9222',
+      'file:///tmp/chrome',
+      'chrome://inspect',
+    ]) {
+      assert.throws(
+        () => parseConfig(['--browserUrl', value]),
+        /must use http:\/\/ or https:\/\/ protocol/,
+      );
+    }
+  });
+
   it('parses with executable path', async () => {
     const args = parseConfig(['--executablePath', '/tmp/test 123/chrome']);
     assert.deepStrictEqual(args, {

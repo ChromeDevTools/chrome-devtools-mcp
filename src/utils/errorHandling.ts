@@ -11,6 +11,10 @@ export function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+export function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 export function setupUnhandledRejectionHandler(onCrash: () => void): void {
   process.on('unhandledRejection', (reason, promise) => {
     logger?.('Unhandled promise rejection:', promise, reason);

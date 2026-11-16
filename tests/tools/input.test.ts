@@ -11,7 +11,7 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {TimeoutError} from '../../src/third_party/index.js';
+import {TimeoutError, zod} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1731,6 +1731,104 @@ describe('input', () => {
       });
     });
 
+    it('uploads multiple files when clicking an element opens a multi-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload files</button>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile(args).handler(
+          {
+            params: {
+              uid: '1_1',
+              filePaths: [firstFile.path, secondFile.path],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          `File uploaded from ${firstFile.path}, ${secondFile.path}.`,
+        );
+        const uploadedFileNames = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return Array.from(input.files ?? []).map(file => file.name);
+        });
+        assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+      });
+    });
+
+    it('throws an error if multiple files are uploaded through an element that opens a single-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_1',
+                filePaths: [firstFile.path, secondFile.path],
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {
+            message:
+              'Multiple file uploads only work with <input type=file multiple>',
+          },
+        );
+        const uploadedFileCount = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return input.files?.length ?? 0;
+        });
+        assert.strictEqual(uploadedFileCount, 0);
+      });
+    });
+
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
       using testFile = createTempFile('test file content', 'test.txt');
 
@@ -1764,7 +1862,7 @@ describe('input', () => {
       });
     });
 
-    it('throws an error if multiple files are uploaded to an input without multiple attribute', async () => {
+    it('throws an error without opening a file chooser if multiple files are uploaded to an input without multiple attribute', async () => {
       using firstFile = createTempFile('first file content', 'first.txt');
       using secondFile = createTempFile('second file content', 'second.txt');
 
@@ -1782,6 +1880,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
 
+        const waitForFileChooser = sinon.spy(page, 'waitForFileChooser');
         await assert.rejects(
           uploadFile(args).handler(
             {
@@ -1799,6 +1898,7 @@ describe('input', () => {
               'Multiple file uploads only work with <input type=file multiple>',
           },
         );
+        sinon.assert.notCalled(waitForFileChooser);
       });
     });
   });
@@ -1821,7 +1921,7 @@ describe('input', () => {
         await pressKey(args).handler(
           {
             params: {
-              key: 'Control+Shift+C',
+              key: ['C', 'Control', 'Shift'],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1829,6 +1929,10 @@ describe('input', () => {
           context,
         );
 
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+Shift+C',
+        );
         assert.deepStrictEqual(await page.evaluate('logs'), [
           'dControl',
           'dShift',
@@ -1838,6 +1942,68 @@ describe('input', () => {
           'uControl',
         ]);
       });
+    });
+
+    it('parses valid keys and rejects invalid keys in press_key and type_text schemas', () => {
+      const {args} = createHandlerMocks();
+      const pressKeySchema = zod.object(pressKey(args).schema);
+      assert.deepStrictEqual(
+        pressKeySchema.safeParse({pageId: 1, key: 'Control+Shift+C'}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            key: ['C', 'Control', 'Shift'],
+          },
+        },
+      );
+      const invalidPressKey = pressKeySchema.safeParse({
+        pageId: 1,
+        key: 'NotAKey',
+      });
+      assert.strictEqual(invalidPressKey.success, false);
+      assert.match(
+        invalidPressKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
+
+      const typeTextSchema = zod.object(typeText(args).schema);
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({
+          pageId: 1,
+          text: 'hello',
+          submitKey: 'Enter',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: 'Enter',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        typeTextSchema.safeParse({pageId: 1, text: 'hello', submitKey: ''}),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            text: 'hello',
+            submitKey: undefined,
+          },
+        },
+      );
+      const invalidSubmitKey = typeTextSchema.safeParse({
+        pageId: 1,
+        text: 'hello',
+        submitKey: 'NotAKey',
+      });
+      assert.strictEqual(invalidSubmitKey.success, false);
+      assert.match(
+        invalidSubmitKey.error.issues[0].message,
+        /^NotAKey is invalid\. Valid keys are: /,
+      );
     });
 
     it('releases held modifiers when the main key press fails', async () => {
@@ -1865,7 +2031,7 @@ describe('input', () => {
             pressKey(args).handler(
               {
                 params: {
-                  key: 'Control+Shift+C',
+                  key: ['C', 'Control', 'Shift'],
                 },
                 page: context.getSelectedMcpPage(),
               },

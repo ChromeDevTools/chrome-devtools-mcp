@@ -3,7 +3,8 @@ This repository contains an MCP server and CLI for Chrome DevTools.
 # Instructions
 
 - Use only scripts from `package.json` to run commands.
-- Use `npm run build` to run tsc and test build.
+- Use `npm run build` to compile the project and tests with GN and Ninja.
+- Update `src/BUILD.gn` or `tests/BUILD.gn` whenever adding, renaming, or removing `.ts` files in `src/` or `tests/`.
 - Use `npm run test` to build and run tests, run all tests to verify correctness.
 - Use `npm run test path-to-test.ts` to build and run a single test file, for example, `npm run test tests/McpContext.test.ts`.
 - Use `npm run format` to fix formatting and get linting errors.

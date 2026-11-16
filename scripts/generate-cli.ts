@@ -10,13 +10,16 @@ import path from 'node:path';
 import {
   isCategoryOffByDefault,
   categoryToFlagName,
-} from '../build/src/config/category-options.js';
-import {mcpOptions} from '../build/src/config/mcp-options.js';
-import {ServerConfig} from '../build/src/config/ServerConfig.js';
-import {zod} from '../build/src/third_party/index.js';
-import {labels, ToolCategory} from '../build/src/tools/categories.js';
-import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
-import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
+} from '../out/Default/gen/src/config/category-options.js';
+import {mcpOptions} from '../out/Default/gen/src/config/mcp-options.js';
+import {ServerConfig} from '../out/Default/gen/src/config/ServerConfig.js';
+import {zod} from '../out/Default/gen/src/third_party/index.js';
+import {labels, ToolCategory} from '../out/Default/gen/src/tools/categories.js';
+import {isSlimTool} from '../out/Default/gen/src/tools/ToolDefinition.js';
+import {
+  createTools,
+  requiresHiddenFlag,
+} from '../out/Default/gen/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
   import.meta.dirname,

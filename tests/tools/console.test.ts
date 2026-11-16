@@ -32,9 +32,8 @@ import {
   stabilizeResponseOutput,
 } from '../utils.js';
 
-const EXTENSION_LOGGING_PATH = path.join(
-  import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-logging',
+const EXTENSION_LOGGING_PATH = path.resolve(
+  'tests/tools/fixtures/extension-logging',
 );
 
 describe('console', () => {
@@ -461,6 +460,40 @@ describe('console', () => {
           textContent.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
         );
+      });
+    });
+
+    it('resolves Error arguments after evaluateHandle', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent('<p>page</p>');
+        await listConsoleMessages(args).handler(
+          {params: {}, page},
+          response,
+          context,
+        );
+        // Object ids are numbered per session. So far Puppeteer's session and
+        // the DevTools universe's session have wrapped the same objects, so
+        // the Error below would get the same objectId on both, and a lookup
+        // on the wrong session would still find it. Wrapping this object on
+        // Puppeteer's session only makes the ids differ, as they do after any
+        // evaluate_script call.
+        await page.pptrPage.evaluateHandle(() => ({}));
+        await page.pptrPage.evaluate(() => {
+          function logError() {
+            console.error('failed', new Error('boom'));
+          }
+          logError();
+        });
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /Arg #1: Error: boom\nat logError /);
       });
     });
 

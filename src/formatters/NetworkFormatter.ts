@@ -113,9 +113,22 @@ export class NetworkFormatter {
             'Unable to save the request body to a file: no saveFile callback was configured.',
           );
         }
-        if (data) {
+        // postData() is UTF-8 decoded, so binary bodies lose bytes; content()
+        // returns the raw bytes.
+        let bytes: Uint8Array | undefined;
+        try {
+          bytes = await this.#request.content();
+        } catch {
+          // Fall back to the decoded string below.
+        }
+        const body = bytes?.length
+          ? bytes
+          : data
+            ? Buffer.from(data)
+            : undefined;
+        if (body) {
           const result = await this.#options.saveFile(
-            Buffer.from(data),
+            body,
             this.#options.requestFilePath,
             '.network-request',
           );
