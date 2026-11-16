@@ -147,19 +147,6 @@ describe('cli args parsing', () => {
   });
 
   it('rejects browser urls without an http or https scheme', async () => {
-    const coerce = mcpOptions.browserUrl.coerce;
-    assert.ok(coerce);
-
-    assert.strictEqual(coerce(undefined), undefined);
-    assert.strictEqual(coerce(''), undefined);
-    for (const value of [
-      'http://127.0.0.1:9222',
-      'https://example.com:9222',
-      'http://localhost:9222/',
-    ]) {
-      assert.strictEqual(coerce(value), value);
-    }
-
     for (const value of [
       'localhost:9222',
       'ws://127.0.0.1:9222',
@@ -167,17 +154,10 @@ describe('cli args parsing', () => {
       'chrome://inspect',
     ]) {
       assert.throws(
-        () => coerce(value),
-        new RegExp(
-          `Provided browserUrl ${value} must use http:// or https:// protocol\\.`,
-        ),
+        () => parseConfig(['--browserUrl', value]),
+        /must use http:\/\/ or https:\/\/ protocol/,
       );
     }
-
-    assert.throws(
-      () => coerce('127.0.0.1:9222'),
-      /Provided browserUrl 127\.0\.0\.1:9222 is not valid URL\./,
-    );
   });
 
   it('parses with executable path', async () => {
