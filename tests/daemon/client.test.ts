@@ -341,7 +341,9 @@ describe('daemon response deadline', () => {
       .stub(fs, 'readFileSync')
       .callThrough()
       .withArgs(pidFile, 'utf-8')
-      .returns(String(process.pid));
+      .returns(String(process.pid))
+      .withArgs(`/proc/${process.pid}/cmdline`, 'utf-8')
+      .returns(`node\0${DAEMON_SCRIPT_PATH}\0`);
     sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
     socket = new net.Socket();
     sinon.stub(socket, 'write').returns(true);
@@ -379,7 +381,36 @@ describe('daemon response deadline', () => {
     await assertion;
   });
 
-  for (const timeout of [undefined, 0, -1, NaN, Infinity, '120000']) {
+  it('status still times out at exactly 60 seconds', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const assertion = assert.rejects(
+      sendCommand({method: 'status'}, ''),
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(59_999);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
+  });
+
+  it('adds the response grace period to a short tool timeout', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const assertion = assert.rejects(
+      sendCommand(
+        {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 5000}},
+        '',
+      ),
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(64_999);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
+  });
+
+  for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
     it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
       const clock = sinon.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],

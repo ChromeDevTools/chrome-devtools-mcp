@@ -152,6 +152,9 @@ export async function startDaemon(
 }
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+// Allow browser connection (up to TOOL_CALL_TIMEOUT_MS) and response construction.
+const RESPONSE_GRACE_MS = 60_000;
 
 function getCommandResponseTimeout(command: DaemonMessage): number {
   if (command.method !== 'invoke_tool') {
@@ -165,8 +168,7 @@ function getCommandResponseTimeout(command: DaemonMessage): number {
   ) {
     return SEND_COMMAND_TIMEOUT;
   }
-  // Leave time for the daemon to return the tool result without overflowing timers.
-  return Math.min(toolTimeout + SEND_COMMAND_TIMEOUT, 2 ** 31 - 1);
+  return Math.min(toolTimeout + RESPONSE_GRACE_MS, MAX_TIMER_DELAY_MS);
 }
 
 /**
