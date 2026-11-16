@@ -34,10 +34,12 @@
 ### Task 1: Restore the reachable upstream DevTools pin
 
 **Files:**
+
 - Modify: `third_party/devtools-frontend` (superproject gitlink only)
 - No DevTools source files may change.
 
 **Interfaces:**
+
 - Consumes: the verified upstream commit `1e16983d27a40f1e449fe73503e6fdbb797c31d4`.
 - Produces: a reproducible DevTools submodule state that `npm run sync` can fetch from the configured official remote.
 
@@ -92,10 +94,12 @@ Expected: one commit changing only the superproject gitlink.
 ### Task 2: Validate the corrected MCP build and flag telemetry
 
 **Files:**
+
 - No source files should change in this validation task.
 - Test: `tests/telemetry/flagUtils.test.ts` (existing regression coverage)
 
 **Interfaces:**
+
 - Consumes: Task 1's synchronized dependency tree and the existing npm scripts.
 - Produces: a verified build and telemetry test result that establishes whether further source work is needed.
 
@@ -138,6 +142,7 @@ If a command fails, record its full diagnostic and whether it originates in MCP-
 ### Task 3: Review the final change set
 
 **Files:**
+
 - Review: the nested MCP repository's complete diff.
 
 - [ ] **Step 1: Confirm the diff contains only the approved pin and repair documents**

@@ -35,12 +35,14 @@
 ### Task 1: Finalize and commit the approved integration documents
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-11-16-chrome-devtools-mcp-repair-design.md`
 - Modify: `docs/superpowers/plans/2026-11-16-chrome-devtools-mcp-repair.md`
 - Modify: `docs/superpowers/specs/2026-11-16-chrome-devtools-mcp-upstream-integration-design.md`
 - Create: `docs/superpowers/plans/2026-11-16-chrome-devtools-mcp-upstream-integration.md`
 
 **Interfaces:**
+
 - Consumes: the approved upstream-integration spec and the completed pin-repair findings.
 - Produces: a clean, committed documentation state before the merge; the old pin-only repair artifacts clearly identify their status and successor.
 
@@ -83,10 +85,12 @@ Expected: one documentation-only commit and a clean worktree.
 ### Task 2: Merge the approved upstream commit and preserve local behavior
 
 **Files:**
+
 - Merge: all paths changed by upstream commit `dc0055828a9fcdcf8c3e65f7ecd1847c53fd972a`
 - Resolve only if needed: `src/BrowserManager.ts`, `tests/browser.test.ts`, and `third_party/devtools-frontend`
 
 **Interfaces:**
+
 - Consumes: Task 1's clean branch and exact upstream commit.
 - Produces: one non-fast-forward merge commit with the Task 1 branch head as first parent and the approved upstream SHA as second parent.
 
@@ -141,11 +145,13 @@ Expected: both the superproject gitlink and checked-out submodule resolve to `08
 ### Task 3: Synchronize, build, and run regression tests
 
 **Files:**
+
 - Test: `tests/browser.test.ts`
 - Test: `tests/telemetry/flagUtils.test.ts`
 - No source changes are expected unless a merge conflict exposed a behavior change covered by Task 2's test-first rule.
 
 **Interfaces:**
+
 - Consumes: Task 2's merge commit and its upstream GN/Ninja scripts.
 - Produces: sync, build, focused regression, and complete package test results for the merged tree.
 
@@ -202,9 +208,11 @@ Expected: the build and complete Node.js test suite pass. If any step fails, ret
 ### Task 4: Review the final integration state
 
 **Files:**
+
 - Review: the complete MCP repository diff and merge history.
 
 **Interfaces:**
+
 - Consumes: Tasks 1-3's committed documentation, merge commit, and validation results.
 - Produces: a clean and auditable branch state ready for the user to decide how to integrate it; no push is performed.
 
