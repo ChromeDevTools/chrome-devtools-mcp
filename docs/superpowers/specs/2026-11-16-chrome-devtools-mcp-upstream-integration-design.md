@@ -6,12 +6,12 @@ Restore a working and reproducible Chrome DevTools MCP package on the isolated r
 
 ## Current state
 
-- The isolated repair branch is `fix/devtools-mcp-flags-errors`, currently at `86cf6b8dee66bbaabe38ab7d427ffaf04e3a2a19`.
+- The isolated repair branch is `fix/devtools-mcp-flags-errors`, currently at `544f2ee1` after the upstream-integration design commit; the reproducible parent-pin repair is commit `86cf6b8dee66bbaabe38ab7d427ffaf04e3a2a19`.
 - The invalid local-only DevTools gitlink was replaced with reachable upstream parent `1e16983d27a40f1e449fe73503e6fdbb797c31d4`; `npm run sync` now succeeds.
 - This source branch still fails its direct TypeScript build with compiler errors across MCP source, tests, and mocks, plus errors in the unchanged DevTools mirror. The focused telemetry test cannot load the generated `intl-messageformat.esm.js` artifact because the build does not reach post-build.
 - The official MCP `main` is `dc0055828a9fcdcf8c3e65f7ecd1847c53fd972a` and pins DevTools `08f67fe94eef8c632a069c37b82d08606386c86f`.
 - Testing that official pin alone in a disposable worktree produced 339 TypeScript diagnostics: the current branch's direct `tsc` build does not generate DevTools protocol modules required by that revision. Official `main` uses a coordinated GN/Ninja build pipeline and contains fixes in several of the failing MCP files.
-- The local feature history contains 11 commits not in refreshed `origin/main`; refreshed official `main` is 74 commits ahead. The upstream integration changes many files and is not a pin-only repair.
+- At current HEAD, 12 commits are unique to the repair branch and 74 commits are unique to refreshed `origin/main`, with merge base `63170b11a2fa74d5ceea757194d7b25f3e145f68`. The upstream integration changes many files and is not a pin-only repair.
 
 ## Approved direction
 
