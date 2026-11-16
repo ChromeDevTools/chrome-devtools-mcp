@@ -76,6 +76,8 @@ export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
+export {CdpHTTPRequest} from 'puppeteer-core/internal/cdp/HTTPRequest.js';
+export {CdpJSHandle} from 'puppeteer-core/internal/cdp/JSHandle.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export {CdpScreenRecording} from 'puppeteer-core/internal/cdp/ScreenRecording.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';

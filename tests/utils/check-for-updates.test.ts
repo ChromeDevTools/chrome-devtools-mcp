@@ -141,6 +141,32 @@ describe('checkForUpdates', () => {
     sinon.assert.calledOnce(unrefSpy);
   });
 
+  it('ignores a cached version that is not valid semver and refreshes it', async () => {
+    sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').resolves({
+      mtimeMs: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago
+    } as unknown as Stats);
+    sinon.stub(fs, 'readFile').callsFake(async filePath => {
+      if (filePath.toString().includes('latest.json')) {
+        return JSON.stringify({
+          version: 'not-a-version',
+        });
+      }
+      throw new Error(`File not found: ${filePath}`);
+    });
+    const warnStub = sinon.stub(console, 'warn');
+    const unrefSpy = sinon.spy();
+    const spawnStub = sinon.stub(child_process, 'spawn').returns({
+      unref: unrefSpy,
+    } as unknown as child_process.ChildProcess);
+
+    await checkForUpdates('Run `npm update` to update.');
+
+    sinon.assert.notCalled(warnStub);
+    sinon.assert.calledOnce(spawnStub);
+    sinon.assert.calledOnce(unrefSpy);
+  });
+
   it('spawns detached process if cache is missing', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
     sinon.stub(fs, 'stat').rejects(new Error('File not found'));

@@ -5,7 +5,7 @@
  */
 
 import {execFileSync} from 'node:child_process';
-import {existsSync} from 'node:fs';
+import {existsSync, rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 import {getGnBinaryPath, runGnGen} from './gn-gen.ts';
@@ -13,6 +13,7 @@ import {getGnBinaryPath, runGnGen} from './gn-gen.ts';
 const projectRoot = process.cwd();
 const outDir = resolve(projectRoot, 'out', 'Default');
 
+rmSync(resolve(outDir, 'args.gn'), {force: true});
 if (existsSync(resolve(outDir, 'build.ninja'))) {
   execFileSync(getGnBinaryPath(), ['clean', 'out/Default'], {
     cwd: projectRoot,

@@ -642,12 +642,7 @@ export default defineConfig([
   },
   {
     name: 'Config files',
-    files: [
-      'eslint.config.js',
-      'prettier.config.js',
-      'puppeteer.config.js',
-      'rollup.config.js',
-    ],
+    files: ['eslint.config.js', 'prettier.config.js', 'puppeteer.config.js'],
     rules: {
       // The config operate on the default export
       // So allow it for them

@@ -22,6 +22,7 @@ import {mcpOptions} from '../src/config/mcp-options.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {ToolHandler} from '../src/ToolHandler.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 import {saveLogsToFile} from '../src/utils/logger.js';
@@ -116,6 +117,43 @@ describe('McpServer', () => {
   });
 
   describe('callTool', () => {
+    it('forwards the MCP request signal through the dispatcher', async () => {
+      const started = Promise.withResolvers<AbortSignal>();
+      const aborted = Promise.withResolvers<void>();
+      const handle = sinon
+        .stub(ToolHandler.prototype, 'handle')
+        .callsFake(async (_args, options) => {
+          const signal = options?.signal;
+          assert.ok(signal);
+          signal.addEventListener('abort', () => aborted.resolve(), {
+            once: true,
+          });
+          started.resolve(signal);
+          await aborted.promise;
+          signal.throwIfAborted();
+          return {content: []};
+        });
+      const {server} = await createTestServer();
+      const client = await connectClient(server);
+      try {
+        const controller = new AbortController();
+        const pending = client.callTool(
+          {name: 'list_pages', arguments: {}},
+          {signal: controller.signal},
+        );
+        const signal = await started.promise;
+        sinon.assert.calledOnceWithExactly(handle, {}, {viaMcp: true, signal});
+        assert.strictEqual(signal.aborted, false);
+        controller.abort();
+        await assert.rejects(pending);
+        await aborted.promise;
+        assert.strictEqual(signal.aborted, true);
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
     it('returns an error for unknown tool names', async () => {
       const {server, browserManager} = await createTestServer();
 
@@ -341,6 +379,37 @@ describe('McpServer', () => {
       assert.deepStrictEqual(exposedNames, definedNames.sort());
     });
 
+    for (const mode of ['MCP', 'CLI']) {
+      it(`rejects network mocks by default in ${mode} mode`, async () => {
+        const {server, browserManager} = await createTestServer(
+          mode === 'CLI' ? ['--viaCli'] : [],
+        );
+        const names = await listServerToolNames(server);
+        assert.ok(names.includes('list_network_requests'));
+        for (const name of ['mock_network', 'remove_network_mock']) {
+          assert.strictEqual(names.includes(name), mode === 'CLI');
+          const result = await server.callTool(name, {pageId: 1});
+          assert.strictEqual(result.isError, true);
+          const content = result.content[0];
+          assert.strictEqual(content.type, 'text');
+          assert.match(content.text, /--categoryNetworkMocks=true/);
+        }
+        sinon.assert.notCalled(browserManager.ensureBrowser);
+        await server.close();
+      });
+    }
+
+    it('enables network mocks independently of network inspection', async () => {
+      const names = await listToolNames([
+        '--categoryNetworkMocks',
+        '--categoryNetwork=false',
+      ]);
+      assert.ok(names.includes('mock_network'));
+      assert.ok(names.includes('remove_network_mock'));
+      assert.ok(!names.includes('list_network_requests'));
+      assert.ok(!names.includes('get_network_request'));
+    });
+
     it('has experimental third-party developer tools', async () => {
       const names = await listToolNames([
         '--category-experimental-third-party',
@@ -547,6 +616,26 @@ describe('McpServer', () => {
 
       sinon.assert.calledOnce(errorStub);
     });
+
+    for (const enabled of [false, true]) {
+      it(`requires a restart to change network mocks from ${enabled}`, async () => {
+        const {server, config} = await createTestServer([
+          `--categoryNetworkMocks=${enabled}`,
+        ]);
+        const next = parseConfig([`--categoryNetworkMocks=${!enabled}`]);
+        assert.deepStrictEqual(config.getRestartRequiredChanges(next), [
+          'categoryNetworkMocks',
+        ]);
+
+        await server.applyConfig(next);
+
+        const names = await listServerToolNames(server);
+        assert.strictEqual(names.includes('mock_network'), enabled);
+        assert.strictEqual(names.includes('remove_network_mock'), enabled);
+        assert.strictEqual(config.resolved.categoryNetworkMocks, enabled);
+        await server.close();
+      });
+    }
 
     it('keeps restart-required options the server was started with', async () => {
       const {server} = await createTestServer();

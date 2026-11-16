@@ -182,6 +182,26 @@ describe('WaitForHelper', () => {
     });
   });
 
+  it('captures a reload that keeps the URL', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-reload', html`<main>reload</main>`);
+      const url = server.getRoute('/nav-reload');
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(url);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            setTimeout(() => location.reload(), 0);
+          });
+        },
+        {waitForStableDom: false, expectNavigationIn: 1000},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, url);
+    });
+  });
+
   it('captures navigatedToUrl for same-document navigation alone', async () => {
     await withMcpContext(async (response, context) => {
       server.addHtmlRoute('/nav-start-push', html`<main>start push</main>`);
@@ -201,6 +221,25 @@ describe('WaitForHelper', () => {
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
+    });
+  });
+
+  it('does not capture navigatedToUrl for same-document navigation to the same URL', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-replace', html`<main>replace</main>`);
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(server.getRoute('/nav-replace'));
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            history.replaceState({}, '', location.href);
+          });
+        },
+        {waitForStableDom: false},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, undefined);
     });
   });
 

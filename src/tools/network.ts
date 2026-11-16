@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+
 import type {ParsedArguments} from '../config/mcp-options.js';
+import type {NetworkMockInput} from '../NetworkOverrideManager.js';
+import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
 import {zod, type ResourceType} from '../third_party/index.js';
+import {validateUrlPatterns} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
@@ -151,5 +156,196 @@ export const getNetworkRequest: PageToolFactory = definePageTool(() => ({
         );
       }
     }
+  },
+}));
+
+const mockFilterSchema = {
+  route: zod
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      value => !value.startsWith('/'),
+      'route must be an absolute URLPattern, such as https://example.com/app.js or *://*:*/app.js.',
+    )
+    .superRefine((value, context) => {
+      try {
+        validateUrlPatterns([value], 'route');
+      } catch (error) {
+        context.addIssue({
+          code: 'custom',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })
+    .optional()
+    .describe(
+      'Absolute URLPattern, e.g. https://example.com/app.js ' +
+        'or `*://*:*/app.js`. Use `*` for wildcards; ' +
+        'omitted query strings match any query. Regex and `:name` groups ' +
+        'are rejected. Inspection and removal compare the stored pattern ' +
+        'exactly. Omit to inspect/remove all routes or match any URL.',
+    ),
+  resourceType: zod
+    .enum(FILTERABLE_RESOURCE_TYPES)
+    .optional()
+    .describe(
+      'Restrict requests and stored mock filters to this resource type. Omit to inspect/remove all types or configure a mock for any type.',
+    ),
+};
+
+const mockNetworkSchema = zod
+  // eslint-disable-next-line @local/enforce-zod-schema -- Flat parameters.
+  .object({
+    ...mockFilterSchema,
+    abort: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Abort matching requests when true. When false, use the stored ' +
+          'body or upstream source, or send the request to the network if ' +
+          'neither is set. A mock without a source still wins over older ' +
+          'matching mocks. Abortion takes precedence over body, upstream, ' +
+          'and allowOrigin.',
+      ),
+    allowOrigin: zod
+      .string()
+      .refine(value => {
+        if (value === '*' || value === 'null') {
+          return true;
+        }
+        try {
+          return new URL(value).origin === value;
+        } catch {
+          return false;
+        }
+      }, 'allowOrigin must be *, null, or a serialized origin such as https://example.com.')
+      .optional()
+      .describe(
+        'Set the Access-Control-Allow-Origin response header to `*`, `null`, or a serialized origin such as https://example.com. Requires body or upstream, either supplied now or already set on the mock. This does not configure preflight or credential headers.',
+      ),
+    body: zod
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
+      ),
+    upstream: zod
+      .url({protocol: /^https?$/})
+      .optional()
+      .describe(
+        'Absolute HTTP(S) replacement URL for GET/HEAD requests. URL allowlists and blocklists apply to this URL and every redirect. Mutually exclusive with body.',
+      ),
+  })
+  .refine(
+    params => params.body === undefined || params.upstream === undefined,
+    {
+      message: 'body and upstream are mutually exclusive.',
+      path: ['upstream'],
+    },
+  );
+
+export const mockNetwork: PageToolFactory = definePageTool(() => ({
+  name: 'mock_network',
+  description:
+    'Inspect or update network mocks for a page. With no actions, list mocks ' +
+    'matching the supplied filters, or all mocks when no filters are given. ' +
+    'Providing abort (including false), allowOrigin, body, or upstream updates ' +
+    'the exact route/resourceType pair; omitted actions keep existing settings. ' +
+    'Remove and recreate a mock to clear its source or allowOrigin. ' +
+    'An omitted route matches any URL. Other mocks are preserved. ' +
+    'abort=true suppresses its response and allowOrigin header. ' +
+    'The most recently updated matching mock wins and persists across ' +
+    'navigations. Configure before navigating or reloading; inspection shows ' +
+    'hit counts and replacement errors. allowOrigin requires a body or ' +
+    'upstream source. Upstream responses use server-side GET/HEAD fetches. ' +
+    'Changes are rejected during a performance trace. ' +
+    'Mocks disable the page HTTP cache and intercept ' +
+    'every request, affecting measurements. Service workers can bypass mocks. ' +
+    'Use remove_network_mock to remove mocks.',
+  annotations: {
+    category: ToolCategory.NETWORK_MOCKS,
+    readOnlyHint: false,
+  },
+  schema: mockNetworkSchema.shape,
+  blockedByDialog: false,
+  verifyFilesSchema: {body: true},
+  concurrency: 'page',
+  handler: async (request, response, context) => {
+    const params = mockNetworkSchema.parse(request.params);
+    const filter = {
+      urlPattern: params.route,
+      resourceType: params.resourceType,
+    };
+    let overrides;
+    if (
+      params.abort === undefined &&
+      params.allowOrigin === undefined &&
+      params.body === undefined &&
+      params.upstream === undefined
+    ) {
+      overrides = request.page.listNetworkMocks(filter);
+    } else {
+      let input: NetworkMockInput = {
+        ...filter,
+        abort: params.abort,
+        allowOrigin: params.allowOrigin,
+      };
+      if (params.upstream !== undefined) {
+        input = {...input, kind: 'upstream', upstreamUrl: params.upstream};
+      } else if (params.body !== undefined) {
+        const responseFilePath = params.body;
+        input = {
+          ...input,
+          kind: 'file',
+          responseFilePath,
+          loadResponseFile: async () => {
+            const validatedPath = await context.validatePath(responseFilePath);
+            return await fs.readFile(validatedPath);
+          },
+        };
+      }
+      overrides = [await request.page.mockNetwork(input)];
+      response.appendResponseLine(
+        'Network mock configured. Reload or navigate the page to apply it.',
+      );
+    }
+
+    if (overrides.length === 0) {
+      response.appendResponseLine('No network mocks match these filters.');
+      return;
+    }
+    response.appendResponseLine(
+      new NetworkOverridesFormatter(overrides).toString(),
+    );
+  },
+}));
+
+export const removeNetworkMock: PageToolFactory = definePageTool(() => ({
+  name: 'remove_network_mock',
+  description:
+    'Remove network mocks matching the supplied stored route and/or resource ' +
+    'type. Route patterns are compared exactly, not applied as wildcards to ' +
+    'other patterns. Omit both filters to remove all mocks for the page. ' +
+    'Removing the last mock restores the HTTP cache and stops interception. ' +
+    'Changes are rejected during a performance trace.',
+  annotations: {
+    category: ToolCategory.NETWORK_MOCKS,
+    readOnlyHint: false,
+  },
+  schema: mockFilterSchema,
+  blockedByDialog: false,
+  verifyFilesSchema: {},
+  concurrency: 'page',
+  handler: async (request, response) => {
+    const count = await request.page.removeNetworkMocks({
+      urlPattern: request.params.route,
+      resourceType: request.params.resourceType,
+    });
+    response.appendResponseLine(
+      `Removed ${count} network ${count === 1 ? 'mock' : 'mocks'}.`,
+    );
   },
 }));

@@ -19,5 +19,6 @@ export {
   string,
   toJSONSchema,
   unknown,
+  url,
   ZodError,
 } from 'zod';
