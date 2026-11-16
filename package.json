@@ -46,6 +46,7 @@
     "!**/*.js.map",
     "!**/*.d.ts",
     "!**/*-tsconfig*.json",
+    "!**/*.meta.json",
     "!**/*.stamp",
     "!**/*.d"
   ],

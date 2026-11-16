@@ -45,6 +45,7 @@ function verifyPackageContents() {
       '.tsbuildinfo',
       '-tsconfig.json',
       '-tsconfig.ref.json',
+      '.meta.json',
       '.stamp',
       '.d',
     ];

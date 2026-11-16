@@ -56,6 +56,7 @@ import {
   CdpExtension,
   CdpFrame,
   CdpHTTPRequest,
+  CdpJSHandle,
   CdpMouse,
   CdpPage,
   CDPSession,
@@ -436,6 +437,8 @@ export function createMockMcpPage(
     return {};
   });
   page.getWebMcpTools.returns([]);
+  page.getLatestConsoleMessageId.returns(0);
+  page.getConsoleDataAfter.returns([]);
   page.discoverThirdPartyDeveloperTools.resolves([]);
   page.getWebAuthnAuthenticator.returns(undefined);
   Object.defineProperty(page, 'pptrPage', {
@@ -463,6 +466,16 @@ export function createMockDialog(
   dialog.message.returns(options.message ?? '');
   sinon.stub(dialog, 'handled').get(() => options.handled ?? false);
   return dialog;
+}
+
+export function createMockCdpJSHandle(
+  remoteObject: Protocol.Runtime.RemoteObject,
+  session: CDPSession,
+): sinon.SinonStubbedInstance<CdpJSHandle> {
+  const handle = sinon.createStubInstance(CdpJSHandle);
+  handle.remoteObject.returns(remoteObject);
+  sinon.stub(handle, 'client').get(() => session);
+  return handle;
 }
 
 export function createMockElementHandle(): {
@@ -657,12 +670,23 @@ export function createMockCSSProperty(
   value: string,
   options: MockCSSPropertyOptions = {},
 ): MockCSSProperty {
-  const prop = sinon.createStubInstance(DevTools.CSSProperty.CSSProperty);
-  prop.name = name;
-  prop.value = value;
-  prop.important = options.important ?? false;
-  prop.parsedOk = options.parsedOk ?? true;
-  prop.disabled = options.disabled ?? false;
+  const ownerStyle = sinon.createStubInstance(
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+  );
+  ownerStyle.parentRule = null;
+  const prop = sinon.stub(
+    new DevTools.CSSProperty.CSSProperty(
+      ownerStyle,
+      0,
+      name,
+      value,
+      options.important ?? false,
+      options.disabled ?? false,
+      options.parsedOk ?? true,
+      false,
+    ),
+  );
+  prop.parseValue.callThrough();
   return prop;
 }
 
@@ -692,6 +716,9 @@ export function createMockCSSStyleDeclaration(
   style.animationName.returns(options.animationName ?? '');
   if (options.range) {
     Object.assign(style, {range: options.range});
+  }
+  for (const prop of properties) {
+    prop.ownerStyle = style;
   }
   return style;
 }
@@ -1017,6 +1044,7 @@ export interface MockCSSMatchedStylesParams {
   >;
   propertyStates?: Map<DevTools.CSSProperty.CSSProperty, string>;
   matchingSelectorsMap?: Map<unknown, number[]>;
+  cssVariables?: Record<string, string>;
 }
 
 export function createMockCSSMatchedStyles(
@@ -1072,6 +1100,18 @@ export function createMockCSSMatchedStyles(
   mock.getMatchingSelectors.callsFake(
     rule => params.matchingSelectorsMap?.get(rule) ?? [],
   );
+  mock.propertyMatchers.callThrough();
+  mock.computeCSSVariable.callsFake((_style, name) => {
+    const value = params.cssVariables?.[name];
+    return value !== undefined
+      ? {
+          value,
+          declaration: new DevTools.CSSMatchedStyles.CSSValueSource(
+            createMockCSSProperty(name, value),
+          ),
+        }
+      : null;
+  });
 
   return mock;
 }
