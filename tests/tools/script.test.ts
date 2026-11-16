@@ -24,6 +24,7 @@ import {
   assertNoServiceWorkerReported,
   createTempDir,
   extractExtensionId,
+  getTextContent,
   html,
   withMcpContext,
 } from '../utils.js';
@@ -168,6 +169,52 @@ describe('script', () => {
           'https://example.com/path',
         );
       });
+    });
+    it('lists errors the page raised while the function ran', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {
+              function: String(
+                () =>
+                  new Promise(resolve => {
+                    console.warn('warned in the function');
+                    setTimeout(() => {
+                      throw new Error('thrown in a timer');
+                    }, 0);
+                    setTimeout(() => resolve('done'), 50);
+                  }),
+              ),
+            },
+          },
+          response,
+          context,
+        );
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.ok(text.includes('"done"'));
+        assert.ok(text.includes('## Console errors during this call'));
+        assert.ok(text.includes('thrown in a timer'));
+        assert.ok(!text.includes('warned in the function'));
+      });
+    });
+    it('hands its page to the response before the function runs', async () => {
+      const {page, response, context, args} = createHandlerMocks();
+      page.waitForEventsAfterAction.callsFake(async () => {
+        sinon.assert.calledOnceWithExactly(
+          response.includeConsoleErrorsFrom,
+          page,
+        );
+        return {};
+      });
+
+      await evaluateScript(args).handler(
+        {params: {function: String(() => 1)}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
     });
     it('loads function source from a local file', async () => {
       const {page, response, context, args} = createHandlerMocks();

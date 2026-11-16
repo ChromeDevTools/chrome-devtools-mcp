@@ -37,6 +37,7 @@ import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type CallToolResult} from '../src/third_party/index.js';
+import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
@@ -608,6 +609,19 @@ export function createTempFile(
       } catch {
         // ignore
       }
+    },
+  };
+}
+
+export async function createDisposableTempFile(filename: string): Promise<{
+  path: string;
+  [Symbol.dispose]: () => void;
+}> {
+  const filepath = await getTempFilePath(filename);
+  return {
+    path: filepath,
+    [Symbol.dispose](): void {
+      fs.rmSync(path.dirname(filepath), {recursive: true, force: true});
     },
   };
 }

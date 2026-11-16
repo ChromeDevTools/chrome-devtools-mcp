@@ -67,6 +67,7 @@ import type {
   SnapshotParams,
   WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
+import {LIST_CONSOLE_MESSAGES_TOOL_NAME} from './tools/toolNames.js';
 import {
   type InsightName,
   type TraceResult,
@@ -81,6 +82,9 @@ import {truncateText} from './utils/text.js';
 import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+
+/** How many errors raised during a call the response lists. */
+const MAX_CONSOLE_ERRORS = 10;
 
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
@@ -156,6 +160,7 @@ export class McpResponse implements Response {
   #page?: McpPage;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
+  #consoleErrorsFrom?: {page: McpPage; lastMessageId: number};
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
   #webAuthnFormatter?: WebAuthnFormatter;
@@ -274,6 +279,13 @@ export class McpResponse implements Response {
       includePreservedMessages: options?.includePreservedMessages,
       includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
+    };
+  }
+
+  includeConsoleErrorsFrom(page: McpPage): void {
+    this.#consoleErrorsFrom = {
+      page,
+      lastMessageId: page.getLatestConsoleMessageId(),
     };
   }
 
@@ -671,8 +683,42 @@ export class McpResponse implements Response {
       );
     }
 
-    if (this.#consoleDataOptions.types?.length) {
-      const normalizedTypes = new Set(this.#consoleDataOptions.types);
+    return await this.#formatConsoleData(
+      messages,
+      page,
+      this.#consoleDataOptions,
+    );
+  }
+
+  async #handleConsoleErrors(): Promise<
+    Array<ConsoleFormatter | IssueFormatter> | undefined
+  > {
+    const errorsFrom = this.#consoleErrorsFrom;
+    // A tool that lists or shows console messages itself already covers these.
+    if (
+      !errorsFrom ||
+      this.#consoleDataOptions?.include ||
+      this.#attachedConsoleMessageId !== undefined ||
+      errorsFrom.page.isClosed()
+    ) {
+      return undefined;
+    }
+    return await this.#formatConsoleData(
+      errorsFrom.page.getConsoleDataAfter(errorsFrom.lastMessageId),
+      errorsFrom.page,
+      {types: ['error']},
+    );
+  }
+
+  async #formatConsoleData(
+    messages: Array<
+      ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
+    >,
+    page: McpPage | undefined,
+    options: {types?: string[]; includeStackTraces?: boolean},
+  ): Promise<Array<ConsoleFormatter | IssueFormatter>> {
+    if (options.types?.length) {
+      const normalizedTypes = new Set(options.types);
       messages = messages.filter(message => {
         if ('type' in message) {
           return normalizedTypes.has(message.type());
@@ -694,7 +740,7 @@ export class McpResponse implements Response {
               return await ConsoleFormatter.from(consoleMessage, {
                 id: consoleMessageStableId,
                 fetchDetailedData: false,
-                fetchStackTrace: this.#consoleDataOptions?.includeStackTraces,
+                fetchStackTrace: options.includeStackTraces,
                 devTools: page ? page.devtoolsUniverse : undefined,
               });
             }
@@ -808,6 +854,7 @@ export class McpResponse implements Response {
       thirdPartyDeveloperTools,
       webmcpTools,
       consoleMessages,
+      consoleErrors,
       networkRequests,
       commentsResult,
     ] = await Promise.all([
@@ -817,6 +864,7 @@ export class McpResponse implements Response {
       this.#handleThirdPartyDeveloperTools(),
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
+      this.#handleConsoleErrors(),
       this.#handleNetworkRequestList(context),
       this.#handleComments(),
     ]);
@@ -835,6 +883,7 @@ export class McpResponse implements Response {
       {
         detailedConsoleMessage,
         consoleMessages,
+        consoleErrors,
         snapshot,
         detailedNetworkRequest,
         networkRequests,
@@ -868,6 +917,7 @@ export class McpResponse implements Response {
     data: {
       detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
       consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
+      consoleErrors?: Array<ConsoleFormatter | IssueFormatter>;
       snapshot: SnapshotFormatter | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
@@ -894,6 +944,7 @@ export class McpResponse implements Response {
       networkRequests?: object[];
       consoleMessage?: object;
       consoleMessages?: object[];
+      consoleErrors?: object[];
       traceSummary?: string;
       traceInsights?: Array<{
         insightName: string;
@@ -1732,6 +1783,23 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         }
       } else {
         response.push('<no console messages found>');
+      }
+    }
+
+    if (data.consoleErrors?.length) {
+      const grouped = ConsoleFormatter.groupConsecutive(data.consoleErrors);
+      const shown = grouped.slice(0, MAX_CONSOLE_ERRORS);
+      structuredContent.consoleErrors = shown.map(item => item.toJSON());
+      response.push('## Console errors during this call');
+      if (compactEncode) {
+        response.push(compactEncode(structuredContent.consoleErrors));
+      } else {
+        response.push(...shown.map(item => item.toString()));
+      }
+      if (grouped.length > shown.length) {
+        response.push(
+          `${grouped.length - shown.length} more not shown. Call ${LIST_CONSOLE_MESSAGES_TOOL_NAME} to list them.`,
+        );
       }
     }
 
