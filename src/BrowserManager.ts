@@ -39,9 +39,9 @@ class BrowserAttempt {}
  * Retries connecting to Puppeteer via `puppeteer.connect` up to a specified
  * maximum number of attempts when transient connection or WebSocket failures occur.
  *
- * @param options - Parameters passed to `puppeteer.connect`.
- * @param retries - Maximum number of connection attempts before throwing (default: 3).
- * @param delayMs - Base delay in milliseconds between retry attempts (default: 500).
+ * @param options Parameters passed to `puppeteer.connect`.
+ * @param retries Maximum number of connection attempts before throwing (default: 3).
+ * @param delayMs Base delay in milliseconds between retry attempts (default: 500).
  * @returns Resolves with the connected `Browser` instance on success.
  * @throws Re-throws the final error if all retry attempts fail.
  */
