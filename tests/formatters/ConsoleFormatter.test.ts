@@ -17,7 +17,7 @@ import type {
   Protocol,
   DevTools,
 } from '../../src/third_party/index.js';
-import {createMockCDPSession} from '../mocks.js';
+import {createMockCDPSession, createMockCdpJSHandle} from '../mocks.js';
 
 interface MockConsoleMessage {
   type: () => string;
@@ -27,6 +27,7 @@ interface MockConsoleMessage {
     remoteObject: () => Protocol.Runtime.RemoteObject;
   }>;
   stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
+  _targetId?: () => string;
 }
 
 const createMockMessage = (
@@ -917,6 +918,52 @@ describe('ConsoleFormatter', () => {
       {errorObjectId: 'cause-id'},
     );
     t.assert.match(formatter.toStringDetailed(), /Caused by: root cause/);
+  });
+
+  it('resolves an Error argument on the session of its handle', async t => {
+    const session = createMockCDPSession();
+    const send: sinon.SinonStub = session.send;
+    send
+      .withArgs('Runtime.getExceptionDetails', {errorObjectId: 'arg-error-id'})
+      .resolves({
+        exceptionDetails: {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 0,
+          text: 'resolved on the handle session',
+        },
+      });
+    const message = createMockMessage({
+      type: () => 'error',
+      text: () => 'failed',
+      _targetId: () => '<mock target ID>',
+      args: () => [
+        createMockCdpJSHandle(
+          {
+            type: 'object',
+            subtype: 'error',
+            objectId: 'arg-error-id',
+            description: 'Error: boom',
+          },
+          session,
+        ),
+      ],
+    });
+
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 19,
+      fetchDetailedData: true,
+    });
+
+    sinon.assert.calledWithExactly(
+      send.firstCall,
+      'Runtime.getExceptionDetails',
+      {errorObjectId: 'arg-error-id'},
+    );
+    t.assert.match(
+      formatter.toStringDetailed(),
+      /Arg #0: resolved on the handle session/,
+    );
   });
 });
 
