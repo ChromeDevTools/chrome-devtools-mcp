@@ -1483,6 +1483,38 @@ describe('cli literal args', () => {
     assert.strictEqual(restored[6], '--weird');
   });
 
+  it('shields dash tokens that follow a free-form string option', () => {
+    for (const input of [
+      ['emulate', '1', '--geolocation', '-33.86,151.2'],
+      ['query_heapsnapshot_objects', 'a.heapsnapshot', '--selfSize', '-1MB'],
+      ['handle_dialog', '1', 'accept', '--promptText', '- item'],
+      ['type_text', '1', 'a', '--submitKey', '-'],
+      ['emulate', '1', '--user-agent', '--weird'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+  });
+
+  it('leaves other dash tokens that follow an option to yargs', () => {
+    for (const input of [
+      // A negative number, which yargs takes as the value.
+      ['handle_dialog', '1', 'accept', '--promptText', '-5'],
+      // A known option of the command.
+      ['emulate', '1', '--geolocation', '--userAgent', 'x'],
+      // After an option that takes a number or a fixed set of choices.
+      ['emulate', '1', '--cpuThrottlingRate', '-x'],
+      ['emulate', '1', '--colorScheme', '-x'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
+  });
+
   it('accepts kebab-case and negated forms of known options', () => {
     const input = ['click', '1', '1_1', '--dbl-click', '--no-dblClick'];
     assert.deepStrictEqual(shield(input).shielded, input);

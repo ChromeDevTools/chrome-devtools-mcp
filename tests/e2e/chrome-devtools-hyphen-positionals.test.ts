@@ -10,7 +10,7 @@ import {describe, it, after, before} from 'node:test';
 
 import {runCli, startCli, stopDaemonForCleanup} from '../utils.js';
 
-describe('chrome-devtools positional values starting with a hyphen', () => {
+describe('chrome-devtools values starting with a hyphen', () => {
   const fillCases: Array<{value: string[]; expected: string}> = [
     {value: ['-'], expected: '-'},
     {value: ['-5'], expected: '-5'},
@@ -126,6 +126,19 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
       `press_key command failed: ${result.stderr}`,
     );
     assert.match(result.stdout, /Successfully pressed key: -/);
+  });
+
+  it('emulate accepts a geolocation with a negative latitude', async () => {
+    const result = await runCli(
+      ['emulate', '1', '--geolocation', '-33.86,151.2'],
+      sessionId,
+    );
+    assert.strictEqual(
+      result.status,
+      0,
+      `emulate command failed: ${result.stderr}`,
+    );
+    assert.match(result.stdout, /Emulation configured successfully/);
   });
 
   it('rejects unknown flags that are not preceded by --', async () => {
