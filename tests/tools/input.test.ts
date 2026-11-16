@@ -1862,7 +1862,7 @@ describe('input', () => {
       });
     });
 
-    it('throws an error if multiple files are uploaded to an input without multiple attribute', async () => {
+    it('throws an error without opening a file chooser if multiple files are uploaded to an input without multiple attribute', async () => {
       using firstFile = createTempFile('first file content', 'first.txt');
       using secondFile = createTempFile('second file content', 'second.txt');
 
@@ -1880,6 +1880,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
 
+        const waitForFileChooser = sinon.spy(page, 'waitForFileChooser');
         await assert.rejects(
           uploadFile(args).handler(
             {
@@ -1897,6 +1898,7 @@ describe('input', () => {
               'Multiple file uploads only work with <input type=file multiple>',
           },
         );
+        sinon.assert.notCalled(waitForFileChooser);
       });
     });
   });
