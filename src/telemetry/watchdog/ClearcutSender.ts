@@ -9,15 +9,13 @@ import crypto from 'node:crypto';
 import {logger} from '../../utils/logger.js';
 import type {
   ChromeDevToolsMcpExtension,
+  LoggingAttrs,
   LogRequest,
   LogResponse,
   OsType,
 } from '../types.js';
 
-export interface ClearcutSenderConfig {
-  appVersion: string;
-  osType: OsType;
-  clearcutEndpoint?: string;
+export interface ClearcutSenderConfig extends LoggingAttrs {
   forceFlushIntervalMs?: number;
   includePidHeader?: boolean;
 }
@@ -124,12 +122,11 @@ export class ClearcutSender {
   constructor(config: ClearcutSenderConfig) {
     this.#appVersion = config.appVersion;
     this.#osType = config.osType;
-    this.#clearcutEndpoint =
-      config.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT;
+    this.#clearcutEndpoint = config.clearcutEndpoint;
     this.#flushIntervalMs =
       config.forceFlushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
     this.#includePidHeader = config.includePidHeader ?? false;
-    this.#sessionId = crypto.randomUUID();
+    this.#sessionId = config.sessionId;
     this.#sessionCreated = Date.now();
   }
 

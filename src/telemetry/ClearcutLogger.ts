@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
 import process from 'node:process';
 
 import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
@@ -24,10 +25,12 @@ import {
   type ChromeDevToolsMcpExtension,
   McpClient,
   type FlagUsage,
+  type LoggingAttrs,
   WatchdogMessageType,
   OsType,
   type ToolInvocation,
 } from './types.js';
+import {DEFAULT_CLEARCUT_ENDPOINT} from './watchdog/ClearcutSender.js';
 import {WatchdogClient} from './WatchdogClient.js';
 import type {DevToolsData} from '../tools/ToolDefinition.js';
 
@@ -88,6 +91,7 @@ let _clearcut_logger_instance: ClearcutLogger | undefined;
 
 export class ClearcutLogger {
   #persistence: Persistence;
+  #loggingAttrs: LoggingAttrs;
   #watchdog: WatchdogClient;
   #mcpClient: McpClient;
   #rawClientName?: string;
@@ -111,14 +115,18 @@ export class ClearcutLogger {
 
   private constructor(options: ClearcutLoggerOptions) {
     this.#persistence = options.persistence;
+    this.#loggingAttrs = {
+      appVersion: options.appVersion,
+      osType: detectOsType(),
+      sessionId: crypto.randomUUID(),
+      clearcutEndpoint: options.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT,
+    };
     this.#watchdog =
       options.watchdogClient ??
       new WatchdogClient({
+        ...this.#loggingAttrs,
         parentPid: process.pid,
-        appVersion: options.appVersion,
-        osType: detectOsType(),
         logFile: options.logFile,
-        clearcutEndpoint: options.clearcutEndpoint,
         clearcutForceFlushIntervalMs: options.clearcutForceFlushIntervalMs,
         clearcutIncludePidHeader: options.clearcutIncludePidHeader,
       });
