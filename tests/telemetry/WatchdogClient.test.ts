@@ -90,6 +90,24 @@ describe('WatchdogClient', () => {
     );
   });
 
+  it('passes session-id argument if provided', () => {
+    new WatchdogClient(
+      {
+        parentPid: 100,
+        appVersion: '1.0.0',
+        osType: OsType.OS_TYPE_LINUX,
+        sessionId: 'session-1',
+      },
+      {spawn: spawnStub},
+    );
+
+    const cmdArgs = spawnStub.firstCall.args[1];
+    assert.ok(
+      cmdArgs.includes('--session-id=session-1'),
+      'Arguments should include session id',
+    );
+  });
+
   it('sends IPC messages via stdin', () => {
     const client = new WatchdogClient(
       {

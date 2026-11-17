@@ -17,6 +17,7 @@ import type {
 export interface ClearcutSenderConfig {
   appVersion: string;
   osType: OsType;
+  sessionId?: string;
   clearcutEndpoint?: string;
   forceFlushIntervalMs?: number;
   includePidHeader?: boolean;
@@ -131,7 +132,7 @@ export class ClearcutSender {
     this.#flushIntervalMs =
       config.forceFlushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
     this.#includePidHeader = config.includePidHeader ?? false;
-    this.#sessionId = crypto.randomUUID();
+    this.#sessionId = config.sessionId ?? crypto.randomUUID();
     this.#sessionCreated = Date.now();
   }
 

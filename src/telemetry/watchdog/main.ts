@@ -20,6 +20,7 @@ interface WatchdogArgs {
   appVersion: string;
   osType: OsType;
   // Optional arguments
+  sessionId?: string;
   logFile?: string;
   clearcutEndpoint?: string;
   clearcutForceFlushIntervalMs?: number;
@@ -32,6 +33,7 @@ function parseWatchdogArgs(): WatchdogArgs {
       'parent-pid': {type: 'string'},
       'app-version': {type: 'string'},
       'os-type': {type: 'string'},
+      'session-id': {type: 'string'},
       'log-file': {type: 'string'},
       'clearcut-endpoint': {type: 'string'},
       'clearcut-force-flush-interval-ms': {type: 'string'},
@@ -52,6 +54,7 @@ function parseWatchdogArgs(): WatchdogArgs {
   }
 
   // Parse Optional Arguments
+  const sessionId = values['session-id'];
   const logFile = values['log-file'];
   const clearcutEndpoint = values['clearcut-endpoint'];
   const clearcutIncludePidHeader = values['clearcut-include-pid-header'];
@@ -67,6 +70,7 @@ function parseWatchdogArgs(): WatchdogArgs {
     parentPid,
     appVersion,
     osType,
+    sessionId,
     logFile,
     clearcutEndpoint,
     clearcutForceFlushIntervalMs,
@@ -79,6 +83,7 @@ function main(): void {
     parentPid,
     appVersion,
     osType,
+    sessionId,
     logFile,
     clearcutEndpoint,
     clearcutForceFlushIntervalMs,
@@ -116,6 +121,7 @@ function main(): void {
   const sender = new ClearcutSender({
     appVersion,
     osType,
+    sessionId,
     clearcutEndpoint,
     forceFlushIntervalMs: clearcutForceFlushIntervalMs,
     includePidHeader: clearcutIncludePidHeader,

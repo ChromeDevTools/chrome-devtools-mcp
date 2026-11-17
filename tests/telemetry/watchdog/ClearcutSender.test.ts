@@ -189,6 +189,25 @@ describe('ClearcutSender', () => {
     assert.strictEqual(event.os_type, OsType.OS_TYPE_MACOS);
   });
 
+  it('uses the provided session id', async () => {
+    const sender = new ClearcutSender({
+      appVersion: '1.0.0',
+      osType: OsType.OS_TYPE_MACOS,
+      sessionId: 'parent-session',
+      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
+    });
+
+    sender.enqueueEvent({});
+    await clock.tickAsync(FLUSH_INTERVAL_MS);
+    sender.stopForTesting();
+
+    const requestBody: LogRequest = JSON.parse(
+      fetchStub.firstCall.args[1].body,
+    );
+    const event = JSON.parse(requestBody.log_event[0].source_extension_json);
+    assert.strictEqual(event.session_id, 'parent-session');
+  });
+
   it('accumulates events in buffer without immediate send', async () => {
     const sender = new ClearcutSender({
       appVersion: '1.0.0',

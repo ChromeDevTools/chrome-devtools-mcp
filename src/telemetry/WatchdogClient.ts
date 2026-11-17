@@ -19,6 +19,7 @@ export class WatchdogClient {
       parentPid: number;
       appVersion: string;
       osType: OsType;
+      sessionId?: string;
       logFile?: string;
       clearcutEndpoint?: string;
       clearcutForceFlushIntervalMs?: number;
@@ -37,6 +38,9 @@ export class WatchdogClient {
       `--os-type=${config.osType}`,
     ];
 
+    if (config.sessionId) {
+      args.push(`--session-id=${config.sessionId}`);
+    }
     if (config.logFile) {
       args.push(`--log-file=${config.logFile}`);
     }
