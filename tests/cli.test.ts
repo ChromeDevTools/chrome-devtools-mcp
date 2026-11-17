@@ -1465,6 +1465,27 @@ describe('cli literal args', () => {
     }
   });
 
+  it('shields number-like tokens that yargs does not read as numbers', () => {
+    for (const input of [
+      ['fill', '1', '1_1', '-1e5'],
+      ['fill', '1', '1_1', '-5.'],
+      ['handle_dialog', '1', 'accept', '--promptText', '-1e5'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+  });
+
+  it('leaves tokens that yargs reads as negative numbers to yargs', () => {
+    const input = ['fill', '1', '1_1', '-.5'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
   it('leaves unknown dash tokens alone once positionals are filled', () => {
     const input = ['fill', '1', '1_1', 'x', '--pageid', '2'];
     assert.deepStrictEqual(shield(input).shielded, input);

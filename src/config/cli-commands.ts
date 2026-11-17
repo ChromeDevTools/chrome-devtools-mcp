@@ -102,8 +102,9 @@ export function toOptionKind(
 }
 
 const LITERAL_ARG_PREFIX = '\0literal:';
-// Mirrors yargs-parser's negative number detection.
-const NEGATIVE_NUMBER = /^-\d+(\.\d*)?(e-?\d+)?$/;
+// Mirrors yargs-parser's negative number detection. A token it does not match,
+// such as `-1e5` or `-5.`, is parsed by yargs as a group of short flags.
+const NEGATIVE_NUMBER = /^-([0-9]+(\.[0-9]+)?|\.[0-9]+)$/;
 
 function optionName(token: string): string {
   let name = token.replace(/^-+/, '');

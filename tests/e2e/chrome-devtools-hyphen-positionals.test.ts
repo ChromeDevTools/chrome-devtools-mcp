@@ -14,6 +14,7 @@ describe('chrome-devtools values starting with a hyphen', () => {
   const fillCases: Array<{value: string[]; expected: string}> = [
     {value: ['-'], expected: '-'},
     {value: ['-5'], expected: '-5'},
+    {value: ['-1e5'], expected: '-1e5'},
     {value: ['a-b'], expected: 'a-b'},
     {value: ['--weird'], expected: '--weird'},
     {value: ['- item'], expected: '- item'},
