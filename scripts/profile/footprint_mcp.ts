@@ -9,8 +9,8 @@
  *
  * The script launches the server over stdio, completes the MCP handshake
  * (`initialize` and `tools/list`), waits for the process tree to settle and
- * then reads the memory of every process in the tree from the OS. The tree
- * includes the telemetry watchdog when usage statistics are on.
+ * then reads the memory of every process in the tree from the OS. The idle
+ * tree has no telemetry watchdog: it starts on the first tool call.
  */
 
 import {execFile} from 'node:child_process';
@@ -88,15 +88,16 @@ interface FootprintOptions {
 const MiB = 1024 * 1024;
 
 // Budgets are strict: about 3% above the median measured on Linux x64
-// (default: 116.8 MiB, no-usage-statistics: 106.6 MiB). Raise a budget only
+// (no-usage-statistics: 106.6 MiB). The idle default tree has no watchdog and
+// measured 1.5 MiB above no-usage-statistics locally. Raise a budget only
 // together with a change that needs the memory.
 const CONFIGURATIONS: FootprintConfiguration[] = [
   {
     name: 'default',
-    description: 'usage statistics on (server + telemetry watchdog)',
+    description: 'usage statistics on (server only until the first tool call)',
     serverArgs: ['--usage-statistics'],
     usageStatistics: true,
-    maxPrivateBytes: 120 * MiB,
+    maxPrivateBytes: 112 * MiB,
   },
   {
     name: 'no-usage-statistics',
@@ -345,7 +346,7 @@ async function launchAndMeasure(
   env.CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY = 'true';
   if (configuration.usageStatistics) {
     // CI and the env var below force usage statistics off. The flag on the
-    // command line must win so that the watchdog is part of the measurement.
+    // command line must win so that telemetry is part of the measurement.
     delete env.CI;
     delete env.CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS;
   } else {
