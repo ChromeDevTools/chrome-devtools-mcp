@@ -15,6 +15,7 @@ const BROWSER_BUNDLE = path.join(BUILD_SRC, 'third_party', 'browser.js');
 const LIGHT_ENTRIES = [
   'config/ConfigWatcher.js',
   'telemetry/flagUtils.js',
+  'tools/emulation.js',
   'utils/text.js',
 ];
 

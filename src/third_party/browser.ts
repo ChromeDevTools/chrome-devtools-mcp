@@ -17,7 +17,6 @@ export {
   ElementHandle,
   Frame,
   Locator,
-  PredefinedNetworkConditions,
   KnownDevices,
   CDPSession,
   CDPSessionEvent,
