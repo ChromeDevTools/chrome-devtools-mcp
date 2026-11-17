@@ -12,7 +12,7 @@ import {BUILD_SRC, findImportPath} from './importGraph.js';
 
 const BROWSER_BUNDLE = path.join(BUILD_SRC, 'third_party', 'browser.js');
 
-const LIGHT_ENTRIES = ['telemetry/flagUtils.js'];
+const LIGHT_ENTRIES = ['telemetry/flagUtils.js', 'utils/text.js'];
 
 describe('browser bundle imports', () => {
   for (const entry of LIGHT_ENTRIES) {
