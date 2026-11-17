@@ -10,6 +10,24 @@ This repository contains an MCP server and CLI for Chrome DevTools.
 - Use `npm run format` to fix formatting and get linting errors.
 - Never modify `third_party/devtools-frontend` except for experimentation: it is a git submodule, a mirror of the actual codebase.
 
+## Third-party bundles
+
+- `src/third_party/index.ts` is the light bundle loaded at startup (MCP SDK,
+  zod, ajv). `src/third_party/browser.ts` is the heavy bundle (Puppeteer,
+  `@puppeteer/browsers`, DevTools frontend) and should only load once a tool
+  call needs it.
+- Import types from `browser.js` with `import type` anywhere.
+- Tool definitions (`src/tools/`), config and telemetry modules must not import
+  values from `browser.js`. Get them inside the handler with
+  `await loadBrowser()` (cached), with a dynamic `import()` of the module that
+  needs them, or through page and context objects. Values used when the module
+  loads (for example in a schema) must come from modules without browser code.
+- Classes checked with `instanceof` (for example `TimeoutError`) come only from
+  `browser.js`; never re-export them from `index.ts`. Small pure modules may be
+  re-exported from `index.ts` by their direct file path.
+- `tests/browser-imports.test.ts` lists the modules that must not reach
+  `browser.js`. Add new tool, config and telemetry modules to it.
+
 ## Rules for TypeScript
 
 - Do not use `any` type.
@@ -91,6 +109,8 @@ Complete every item before you upload a PR or push a new revision.
 - [ ] If Puppeteer or devtools-frontend owns the bug, fix it there first. Do
       not copy or re-implement upstream code in this repository.
 - [ ] Puppeteer internals are imported only through `src/third_party/`.
+- [ ] Tool, config and telemetry modules do not import values from
+      `src/third_party/browser.js`.
 - [ ] Repeated code is one helper. Extract a helper when the same block
       appears two or more times. Prefer an existing helper or a Puppeteer
       utility (for example `Deferred`) over a new one.
