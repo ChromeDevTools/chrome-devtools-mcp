@@ -2149,6 +2149,14 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
+      selector: {
+        name: 'selector',
+        type: 'string',
+        description:
+          'Limit this snapshot to the subtree of the first element matching this selector in the main frame. Omit to snapshot the whole page. Includes all accessibility nodes within that subtree, but not nested iframe documents. Returns an error if no element matches or it has no accessibility node.',
+        required: false,
+        positional: false,
+      },
       verbose: {
         name: 'verbose',
         type: 'boolean',

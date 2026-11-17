@@ -295,6 +295,74 @@ describe('McpResponse', () => {
     t.assert.snapshot(stabilizeResponseOutput(content));
   });
 
+  it('scopes snapshots and files while keeping UIDs usable across full-page snapshots', async () => {
+    using tmpDir = createTempDir();
+    const filePath = join(tmpDir.path, 'subtree.txt');
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <button>Outside</button>
+        <div id="component">
+          <button onclick="this.textContent = 'Clicked'">First</button>
+          <button>Second</button>
+          <iframe srcdoc="<button>Inside frame</button>"></iframe>
+        </div>
+      `);
+      response.includeSnapshot();
+      await response.handle(context);
+      assert.ok(page.textSnapshot);
+      const first = [...page.textSnapshot.idToNode.values()].find(
+        node => node.name === 'First',
+      );
+      const outside = [...page.textSnapshot.idToNode.values()].find(
+        node => node.name === 'Outside',
+      );
+      assert.ok(first);
+      assert.ok(outside);
+
+      response.includeSnapshot({selector: '#component'});
+      const scoped = await response.handle(context);
+      const text = getTextContent(scoped.content[0]);
+      assert.match(text, /First/);
+      assert.match(text, /Second/);
+      assert.doesNotMatch(text, /Outside|Inside frame/);
+      assert.doesNotMatch(
+        JSON.stringify(scoped.structuredContent),
+        /Outside|Inside frame/,
+      );
+      assert.strictEqual(page.getAXNodeByUid(first.id)?.name, 'First');
+      await using button = await page.getElementByUid(first.id);
+      await button.click();
+      assert.strictEqual(
+        await button.evaluate(el => el.textContent),
+        'Clicked',
+      );
+
+      response.includeSnapshot({
+        selector: '#component',
+        verbose: true,
+        filePath,
+      });
+      await response.handle(context);
+      const saved = await readFile(filePath, 'utf-8');
+      assert.match(saved, /Clicked/);
+      assert.match(saved, /Second/);
+      assert.doesNotMatch(saved, /Outside|Inside frame/);
+
+      const scopedSnapshot = page.textSnapshot;
+      response.includeSnapshot({selector: '#missing'});
+      await assert.rejects(response.handle(context), /No element matches/);
+      assert.strictEqual(page.textSnapshot, scopedSnapshot);
+
+      response.includeSnapshot();
+      const full = await response.handle(context);
+      assert.match(getTextContent(full.content[0]), /Outside/);
+      assert.match(getTextContent(full.content[0]), /Inside frame/);
+      assert.strictEqual(page.getAXNodeByUid(first.id)?.name, 'Clicked');
+      assert.strictEqual(page.getAXNodeByUid(outside.id)?.name, 'Outside');
+    });
+  });
+
   it('preserves mapping ids across multiple snapshots', async () => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedMcpPage().pptrPage;

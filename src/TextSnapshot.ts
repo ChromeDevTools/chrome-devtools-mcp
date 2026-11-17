@@ -59,16 +59,24 @@ export class TextSnapshot {
   static async create(
     page: McpPage,
     options: {
+      selector?: string;
       verbose?: boolean;
       devtoolsData?: DevToolsData;
       extraHandles?: ElementHandle[];
     } = {},
   ): Promise<TextSnapshot> {
     const verbose = options.verbose ?? false;
+    await using root = options.selector
+      ? await page.pptrPage.$(options.selector)
+      : undefined;
+    if (options.selector && !root) {
+      throw new Error(`No element matches selector "${options.selector}".`);
+    }
     const rootNode = await withTimeout(
       page.pptrPage.accessibility.snapshot({
-        includeIframes: true,
-        interestingOnly: !verbose,
+        ...(root ? {root} : {}),
+        includeIframes: !root,
+        interestingOnly: !root && !verbose,
       }),
       {
         timeout: ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS,
@@ -76,7 +84,11 @@ export class TextSnapshot {
       },
     );
     if (!rootNode) {
-      throw new Error('Failed to create accessibility snapshot');
+      throw new Error(
+        options.selector
+          ? `No accessibility node for selector "${options.selector}".`
+          : 'Failed to create accessibility snapshot',
+      );
     }
 
     const {uniqueBackendNodeIdToMcpId} = page;
@@ -144,6 +156,7 @@ export class TextSnapshot {
       rootNodeWithId,
       seenBackendNodeIds,
       options.extraHandles ?? [],
+      Boolean(root),
     );
 
     const snapshot = new TextSnapshot({
@@ -156,16 +169,19 @@ export class TextSnapshot {
 
     const data = options.devtoolsData ?? (await page.getDevToolsData());
     if (data?.cdpBackendNodeId) {
-      snapshot.hasSelectedElement = true;
       snapshot.selectedElementUid = snapshot.resolveCdpElementId(
         data.cdpBackendNodeId,
       );
+      snapshot.hasSelectedElement =
+        !root || Boolean(snapshot.selectedElementUid);
     }
 
-    // Clean up unique IDs that we did not see anymore.
-    for (const key of uniqueBackendNodeIdToMcpId.keys()) {
-      if (!seenUniqueIds.has(key)) {
-        uniqueBackendNodeIdToMcpId.delete(key);
+    // Only a full-page snapshot can establish that an old node is gone.
+    if (!root) {
+      for (const key of uniqueBackendNodeIdToMcpId.keys()) {
+        if (!seenUniqueIds.has(key)) {
+          uniqueBackendNodeIdToMcpId.delete(key);
+        }
       }
     }
 
@@ -204,6 +220,7 @@ export class TextSnapshot {
     rootNodeWithId: TextSnapshotNode,
     seenBackendNodeIds: Set<number>,
     extraHandles: ElementHandle[],
+    scoped: boolean,
   ): Promise<void> {
     const {uniqueBackendNodeIdToMcpId} = page;
 
@@ -351,12 +368,17 @@ export class TextSnapshot {
     }> = [];
 
     for (const handle of page.extraHandles) {
+      const ancestor = scoped ? await findAncestorNode(handle) : null;
+      if (scoped && !ancestor) {
+        continue;
+      }
       const extraNode = await createExtraNode(handle);
       if (!extraNode) {
         continue;
       }
       idToNode.set(extraNode.id, extraNode);
-      const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
+      const attachTarget =
+        ancestor || (await findAncestorNode(handle)) || rootNodeWithId;
       const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
       reorgInfo.push({extraNode, attachTarget, descendantIds});
     }

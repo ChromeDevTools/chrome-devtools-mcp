@@ -20,6 +20,7 @@ describe('snapshot', () => {
       const {page, context, response, args} = createHandlerMocks();
       await takeSnapshot(args).handler({params: {}, page}, response, context);
       sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        selector: undefined,
         verbose: false,
         filePath: undefined,
       });
@@ -28,11 +29,19 @@ describe('snapshot', () => {
     it('includes a snapshot with parameters', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await takeSnapshot(args).handler(
-        {params: {verbose: true, filePath: 'custom/path.txt'}, page},
+        {
+          params: {
+            selector: '#main-nav',
+            verbose: true,
+            filePath: 'custom/path.txt',
+          },
+          page,
+        },
         response,
         context,
       );
       sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        selector: '#main-nav',
         verbose: true,
         filePath: 'custom/path.txt',
       });
