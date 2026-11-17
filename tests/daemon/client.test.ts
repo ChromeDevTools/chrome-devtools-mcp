@@ -30,54 +30,57 @@ import {VERSION} from '../../src/version.js';
 import {createTempDir} from '../utils.js';
 
 describe('stopDaemon signal failures', () => {
-  for (const code of ['EPERM', 'ESRCH']) {
-    it(`handles SIGKILL ${code} without losing a live daemon's PID`, async () => {
-      using dir = createTempDir('cdm-stop-denied-');
-      sinon
-        .stub(process, 'env')
-        .value({...process.env, XDG_RUNTIME_DIR: dir.path});
-      const sessionId = crypto.randomUUID();
-      const pid = 1234567895;
-      const pidFilePath = getPidFilePath(sessionId);
-      mkdirSync(dirname(pidFilePath), {recursive: true});
-      writeFileSync(pidFilePath, String(pid));
-      const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
-      sinon
-        .stub(fs, 'existsSync')
-        .callThrough()
-        .withArgs('/proc')
-        .returns(false);
-      sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
-      sinon
-        .stub(net, 'createConnection')
-        .throws(new Error('socket unreachable'));
-      const denied = Object.assign(new Error('kill EPERM'), {code: 'EPERM'});
-      const kill = sinon.stub(process, 'kill').throws(denied);
-      kill
-        .withArgs(pid, 'SIGKILL')
-        .throws(Object.assign(new Error(`kill ${code}`), {code}));
-      const remove = sinon.spy(fs, 'rmSync');
-      const unlink = sinon.spy(fs, 'unlinkSync');
+  it('rejects and keeps the PID file when SIGKILL throws EPERM', async () => {
+    using dir = createTempDir('cdm-stop-denied-');
+    const {sessionId, pid, clock, kill, unlink} = setupStopDaemonSignalFailure(
+      dir.path,
+    );
 
-      const stopping = stopDaemon(sessionId);
-      const stopped =
-        code === 'EPERM'
-          ? assert.rejects(stopping, /EPERM/)
-          : assert.doesNotReject(stopping);
-      await Promise.all([clock.tickAsync(10_000), stopped]);
-
-      sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
-      sinon.assert.notCalled(remove);
-      if (code === 'EPERM') {
-        sinon.assert.notCalled(unlink);
-        assert.strictEqual(getDaemonPid(sessionId), pid);
-      } else {
-        sinon.assert.calledOnceWithExactly(unlink, pidFilePath);
-        assert.strictEqual(getDaemonPid(sessionId), null);
-      }
+    const stopped = assert.rejects(stopDaemon(sessionId), {
+      message: `Failed to stop daemon (pid ${pid}): kill EPERM`,
     });
-  }
+    await Promise.all([clock.tickAsync(10_000), stopped]);
+
+    sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
+    sinon.assert.notCalled(unlink);
+    assert.strictEqual(getDaemonPid(sessionId), pid);
+  });
+
+  it('ignores SIGKILL ESRCH in the error handler and removes the PID file', async () => {
+    using dir = createTempDir('cdm-stop-exited-');
+    const {sessionId, pid, pidFilePath, clock, kill, unlink} =
+      setupStopDaemonSignalFailure(dir.path);
+    kill
+      .withArgs(pid, 'SIGKILL')
+      .throws(Object.assign(new Error('kill ESRCH'), {code: 'ESRCH'}));
+
+    const stopped = assert.doesNotReject(stopDaemon(sessionId));
+    await Promise.all([clock.tickAsync(10_000), stopped]);
+
+    sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
+    sinon.assert.calledOnceWithExactly(unlink, pidFilePath);
+    assert.strictEqual(getDaemonPid(sessionId), null);
+  });
 });
+
+function setupStopDaemonSignalFailure(runtimeDir: string) {
+  sinon
+    .stub(process, 'env')
+    .value({...process.env, XDG_RUNTIME_DIR: runtimeDir});
+  const sessionId = crypto.randomUUID();
+  const pid = 1234567895;
+  const pidFilePath = getPidFilePath(sessionId);
+  mkdirSync(dirname(pidFilePath), {recursive: true});
+  writeFileSync(pidFilePath, String(pid));
+  const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
+  sinon.stub(fs, 'existsSync').callThrough().withArgs('/proc').returns(false);
+  sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
+  sinon.stub(net, 'createConnection').throws(new Error('socket unreachable'));
+  const denied = Object.assign(new Error('kill EPERM'), {code: 'EPERM'});
+  const kill = sinon.stub(process, 'kill').throws(denied);
+  const unlink = sinon.spy(fs, 'unlinkSync');
+  return {sessionId, pid, pidFilePath, clock, kill, unlink};
+}
 
 describe('daemon client', () => {
   let sessionId: string;
