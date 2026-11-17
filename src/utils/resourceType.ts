@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPRequest, ResourceType} from '../third_party/index.js';
+import type {HTTPRequest, ResourceType} from '../third_party/browser.js';
 
 /**
  * The resource type a request is filtered by. Chrome reports CORS preflights

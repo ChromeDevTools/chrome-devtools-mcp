@@ -17,7 +17,7 @@ import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/index.js';
+import {DevTools, type Extension} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {

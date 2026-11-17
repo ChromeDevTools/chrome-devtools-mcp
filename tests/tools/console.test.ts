@@ -14,7 +14,7 @@ import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {DevTools, type CdpWebWorker} from '../../src/third_party/index.js';
+import {DevTools, type CdpWebWorker} from '../../src/third_party/browser.js';
 import {
   getConsoleMessage,
   listConsoleMessages,

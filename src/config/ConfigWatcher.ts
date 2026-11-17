@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
 import {logger} from '../utils/logger.js';
 

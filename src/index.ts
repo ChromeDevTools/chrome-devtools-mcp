@@ -29,8 +29,8 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  puppeteer,
 } from './third_party/index.js';
+import {puppeteer} from './third_party/browser.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';

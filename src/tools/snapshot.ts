@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {TimeoutError, zod} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import {TimeoutError} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {

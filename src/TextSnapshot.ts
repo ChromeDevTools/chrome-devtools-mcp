@@ -9,7 +9,7 @@ import type {
   Protocol,
   SerializedAXNode,
   ElementHandle,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';

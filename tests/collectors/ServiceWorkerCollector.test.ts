@@ -12,7 +12,7 @@ import sinon from 'sinon';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from '../../src/collectors/ServiceWorkerCollector.js';
 import {McpWorker} from '../../src/McpWorker.js';
-import {TargetType, type Protocol} from '../../src/third_party/index.js';
+import {TargetType, type Protocol} from '../../src/third_party/browser.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {
   createMockPuppeteerBrowser,

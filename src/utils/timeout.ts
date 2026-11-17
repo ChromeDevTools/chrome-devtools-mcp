@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Deferred} from '../third_party/index.js';
+import {Deferred} from '../third_party/browser.js';
 
 /**
  * Rejects with a Puppeteer `TimeoutError` with `message` if `promise` does not

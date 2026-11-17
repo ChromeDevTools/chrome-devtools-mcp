@@ -14,13 +14,13 @@ import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {
   DevTools,
   Frame,
   Locator,
   ScreenRecorder,
-  type JSONSchema7Definition,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {

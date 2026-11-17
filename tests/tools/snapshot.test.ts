@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
-import {TimeoutError} from '../../src/third_party/index.js';
+import {TimeoutError} from '../../src/third_party/browser.js';
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
 import {createHandlerMocks, createMockServerConfig} from '../mocks.js';
 
