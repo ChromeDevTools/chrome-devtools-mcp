@@ -34,20 +34,92 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const SESSION_ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-interface BufferedEvent {
+export interface TimestampedEvent {
   event: ChromeDevToolsMcpExtension;
   timestamp: number;
+}
+
+export interface SendClearcutBatchOptions {
+  clearcutEndpoint?: string;
+  includePidHeader?: boolean;
+}
+
+export interface SendClearcutBatchResult {
+  success: boolean;
+  isPermanentError?: boolean;
+  nextRequestWaitMs?: number;
+}
+
+/**
+ * Sends events to Clearcut in one request and never rejects.
+ */
+export async function sendClearcutBatch(
+  events: TimestampedEvent[],
+  options: SendClearcutBatchOptions = {},
+): Promise<SendClearcutBatchResult> {
+  logger?.(`Sending batch of ${events.length}`);
+  const requestBody: LogRequest = {
+    log_source: LOG_SOURCE,
+    request_time_ms: Date.now().toString(),
+    client_info: {
+      client_type: CLIENT_TYPE,
+    },
+    log_event: events.map(({event, timestamp}) => ({
+      event_time_ms: timestamp.toString(),
+      source_extension_json: JSON.stringify(event),
+    })),
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      options.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Used in E2E tests to confirm that the watchdog process is killed
+          ...(options.includePidHeader
+            ? {'X-Watchdog-Pid': process.pid.toString()}
+            : {}),
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      },
+    );
+
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const data: LogResponse = await response.json();
+      return {
+        success: true,
+        nextRequestWaitMs: data.next_request_wait_millis,
+      };
+    }
+
+    const status = response.status;
+    if (status >= 500 || status === 429) {
+      return {success: false};
+    }
+
+    logger?.('Telemetry permanent error:', status);
+    return {success: false, isPermanentError: true};
+  } catch {
+    clearTimeout(timeoutId);
+    return {success: false};
+  }
 }
 
 export class ClearcutSender {
   #appVersion: string;
   #osType: OsType;
-  #clearcutEndpoint: string;
+  #clearcutEndpoint?: string;
   #flushIntervalMs: number;
   #includePidHeader: boolean;
   #sessionId: string;
   #sessionCreated: number;
-  #buffer: BufferedEvent[] = [];
+  #buffer: TimestampedEvent[] = [];
   #flushTimer: ReturnType<typeof setTimeout> | null = null;
   #isFlushing = false;
   #timerStarted = false;
@@ -55,8 +127,7 @@ export class ClearcutSender {
   constructor(config: ClearcutSenderConfig) {
     this.#appVersion = config.appVersion;
     this.#osType = config.osType;
-    this.#clearcutEndpoint =
-      config.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT;
+    this.#clearcutEndpoint = config.clearcutEndpoint;
     this.#flushIntervalMs =
       config.forceFlushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
     this.#includePidHeader = config.includePidHeader ?? false;
@@ -179,60 +250,11 @@ export class ClearcutSender {
     }, delayMs);
   }
 
-  async #sendBatch(events: BufferedEvent[]): Promise<{
-    success: boolean;
-    isPermanentError?: boolean;
-    nextRequestWaitMs?: number;
-  }> {
-    logger?.(`Sending batch of ${events.length}`);
-    const requestBody: LogRequest = {
-      log_source: LOG_SOURCE,
-      request_time_ms: Date.now().toString(),
-      client_info: {
-        client_type: CLIENT_TYPE,
-      },
-      log_event: events.map(({event, timestamp}) => ({
-        event_time_ms: timestamp.toString(),
-        source_extension_json: JSON.stringify(event),
-      })),
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetch(this.#clearcutEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Used in E2E tests to confirm that the watchdog process is killed
-          ...(this.#includePidHeader
-            ? {'X-Watchdog-Pid': process.pid.toString()}
-            : {}),
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      if (response.ok) {
-        const data = (await response.json()) as LogResponse;
-        return {
-          success: true,
-          nextRequestWaitMs: data.next_request_wait_millis,
-        };
-      }
-
-      const status = response.status;
-      if (status >= 500 || status === 429) {
-        return {success: false};
-      }
-
-      logger?.('Telemetry permanent error:', status);
-      return {success: false, isPermanentError: true};
-    } catch {
-      clearTimeout(timeoutId);
-      return {success: false};
-    }
+  #sendBatch(events: TimestampedEvent[]): Promise<SendClearcutBatchResult> {
+    return sendClearcutBatch(events, {
+      clearcutEndpoint: this.#clearcutEndpoint,
+      includePidHeader: this.#includePidHeader,
+    });
   }
 
   async #finalFlush(): Promise<void> {
