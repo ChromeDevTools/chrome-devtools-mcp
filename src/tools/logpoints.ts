@@ -5,12 +5,12 @@
  */
 
 import {LogpointFormatter} from '../formatters/LogpointFormatter.js';
+import {zod} from '../third_party/index.js';
 import {
   LOGPOINT_FORMAT,
   LogpointError,
   parseLogpoint,
-} from '../LogpointManager.js';
-import {zod} from '../third_party/index.js';
+} from '../utils/logpoint.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';

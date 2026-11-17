@@ -20,6 +20,7 @@ const LIGHT_ENTRIES = [
   'tools/emulation.js',
   'tools/input.js',
   'tools/lighthouse.js',
+  'tools/logpoints.js',
   'tools/performance.js',
   'tools/snapshot.js',
   'utils/text.js',
