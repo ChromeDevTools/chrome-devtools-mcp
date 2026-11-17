@@ -1046,6 +1046,11 @@ describe('cli args parsing', () => {
     );
   });
 
+  it('shows idleTimeout only in the CLI start options', () => {
+    assert.strictEqual(getCliOptions().idleTimeout?.hidden, false);
+    assert.strictEqual(mcpOptions.idleTimeout.hidden, true);
+  });
+
   describe('mutual exclusivity', () => {
     it('rejects isolated with userDataDir', async () => {
       assert.throws(

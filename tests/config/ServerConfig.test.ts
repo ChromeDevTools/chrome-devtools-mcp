@@ -88,6 +88,61 @@ describe('ServerConfig', () => {
     });
   });
 
+  describe('idleTimeout', () => {
+    it('accepts idleTimeout via the CLI', () => {
+      const config = parseConfig(['--viaCli', '--idleTimeout=30m']);
+      assert.strictEqual(config.resolved.idleTimeout, '30m');
+    });
+
+    it('leaves idleTimeout unset by default', () => {
+      assert.strictEqual(
+        parseConfig(['--viaCli']).resolved.idleTimeout,
+        undefined,
+      );
+    });
+
+    it('accepts idleTimeout for the MCP server', () => {
+      assert.strictEqual(
+        parseConfig(['--idleTimeout=30m']).resolved.idleTimeout,
+        '30m',
+      );
+    });
+
+    it('accepts idleTimeout in a config file', () => {
+      assert.strictEqual(
+        ConfigParser.parseConfigFile(
+          'config.json',
+          JSON.stringify({idleTimeout: '2h'}),
+        ).idleTimeout,
+        '2h',
+      );
+    });
+
+    it('rejects a bare number in a config file', () => {
+      assert.throws(
+        () =>
+          ConfigParser.parseConfigFile(
+            'config.json',
+            JSON.stringify({idleTimeout: 30}),
+          ),
+        /Invalid idleTimeout 30\. Expected a positive integer followed by s, m or h/,
+      );
+    });
+
+    for (const [value, message] of [
+      ['30', 'Expected a positive integer followed by s, m or h'],
+      ['0s', 'Expected a positive integer followed by s, m or h'],
+      ['597h', 'Expected at most 2147483647 ms'],
+    ]) {
+      it(`rejects idleTimeout ${value}`, () => {
+        assert.throws(
+          () => parseConfig(['--viaCli', `--idleTimeout=${value}`]),
+          new RegExp(`Invalid idleTimeout "${value}"\\. ${message}`),
+        );
+      });
+    }
+  });
+
   describe('applyDefaults', () => {
     it('keeps explicit values and fills in defaults', () => {
       const args = ServerConfig.applyDefaults({headless: true}, {env: {}});
