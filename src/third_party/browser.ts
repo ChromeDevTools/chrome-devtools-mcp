@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// The heavy bundle with Puppeteer, @puppeteer/browsers and the DevTools
+// frontend. Only code that runs once a tool call needs a browser or DevTools
+// should import values from it.
+
 // Runs the polyfills in index.js before Puppeteer and DevTools code.
 import './index.js';
 
