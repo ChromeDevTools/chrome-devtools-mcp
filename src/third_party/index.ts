@@ -54,6 +54,8 @@ export {
   AsyncDisposableStack,
   SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
+// eslint-disable-next-line no-restricted-imports
+export * as StringUtilities from '../../third_party/devtools-frontend/front_end/core/platform/StringUtilities.js';
 export async function getToonEncode(): Promise<(val: unknown) => string> {
   const {encode} = await import('@toon-format/toon');
   return encode;
