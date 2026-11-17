@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.js';
+import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt:
