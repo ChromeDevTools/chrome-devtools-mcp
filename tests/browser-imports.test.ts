@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {loadBrowser} from '../src/third_party/index.js';
+
 import {BUILD_SRC, findImportPath} from './importGraph.js';
 
 const BROWSER_BUNDLE = path.join(BUILD_SRC, 'third_party', 'browser.js');
@@ -16,6 +18,7 @@ const LIGHT_ENTRIES = [
   'config/ConfigWatcher.js',
   'telemetry/flagUtils.js',
   'tools/emulation.js',
+  'tools/input.js',
   'utils/text.js',
 ];
 
@@ -34,4 +37,11 @@ describe('browser bundle imports', () => {
       );
     });
   }
+
+  it('loadBrowser returns the third_party/browser.js module', async () => {
+    assert.strictEqual(
+      await loadBrowser(),
+      await import('../src/third_party/browser.js'),
+    );
+  });
 });
