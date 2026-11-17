@@ -2432,7 +2432,6 @@ describe('ToolHandler', () => {
     sinon.stub(mockPage, 'geolocation').get(() => undefined);
     sinon.stub(mockPage, 'viewport').get(() => undefined);
     sinon.stub(mockPage, 'userAgent').get(() => undefined);
-    sinon.stub(mockPage, 'backgroundColor').get(() => undefined);
     sinon.stub(mockPage, 'colorScheme').get(() => undefined);
     sinon.stub(mockPage, 'forcedColors').get(() => undefined);
     sinon.stub(mockPage, 'prefersContrast').get(() => undefined);

@@ -117,10 +117,6 @@
       {
         "name": "prefers_reduced_motion",
         "argType": "string"
-      },
-      {
-        "name": "background_color_length",
-        "argType": "number"
       }
     ]
   },
@@ -626,6 +622,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "omit_background",
+        "argType": "boolean"
       }
     ]
   },

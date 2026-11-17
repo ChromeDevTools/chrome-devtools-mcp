@@ -45,7 +45,6 @@ export interface EmulationSettings {
   cpuThrottlingRate?: number;
   geolocation?: GeolocationOptions;
   userAgent?: string;
-  backgroundColor?: string;
   colorScheme?: 'dark' | 'light';
   forcedColors?: ForcedColors;
   prefersContrast?: PrefersContrast;

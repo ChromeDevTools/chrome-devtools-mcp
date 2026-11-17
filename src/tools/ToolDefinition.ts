@@ -567,7 +567,6 @@ export type ContextPage = Readonly<{
     cpuThrottlingRate?: number;
     geolocation?: GeolocationOptions;
     userAgent?: string;
-    backgroundColor?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
     forcedColors?: ForcedColors | 'auto';
     prefersContrast?: PrefersContrast | 'auto';
