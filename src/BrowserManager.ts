@@ -196,11 +196,19 @@ export class BrowserManager {
       throw new Error('Connection attempt was abandoned before it completed.');
     }
     if (!this.#browser?.connected) {
-      const browser = await this.#initBrowser();
       const {cookiesFile} = this.#config.resolved;
+      const cookies =
+        cookiesFile === undefined ? [] : await readCookiesFile(cookiesFile);
+      if (this.#closingCount > 0 || this.#browserAttempt !== attempt) {
+        throw new Error(
+          this.#closingCount > 0
+            ? 'Browser was closed while initializing.'
+            : 'Connection attempt was abandoned before it completed.',
+        );
+      }
+      const browser = await this.#initBrowser();
       if (cookiesFile !== undefined) {
         try {
-          const cookies = await readCookiesFile(cookiesFile);
           if (
             this.#closingCount === 0 &&
             this.#browserAttempt === attempt &&
