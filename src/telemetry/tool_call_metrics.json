@@ -643,6 +643,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "selector_length",
+        "argType": "number"
       }
     ]
   },

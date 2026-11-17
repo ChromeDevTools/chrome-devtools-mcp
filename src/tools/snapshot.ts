@@ -24,6 +24,17 @@ in the DevTools Elements panel (if any).`,
     readOnlyHint: false,
   },
   schema: {
+    selector: zod
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'Limit this snapshot to the subtree of the first element matching ' +
+          'this selector in the main frame. Omit to snapshot the whole page. ' +
+          'Includes all accessibility nodes within that subtree, but not ' +
+          'nested iframe documents. Returns an error if no element matches ' +
+          'or it has no accessibility node.',
+      ),
     verbose: zod
       .boolean()
       .optional()
@@ -44,6 +55,7 @@ in the DevTools Elements panel (if any).`,
   },
   handler: async (request, response) => {
     response.includeSnapshot({
+      selector: request.params.selector,
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
     });

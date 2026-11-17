@@ -519,6 +519,7 @@ in the DevTools Elements panel (if any).
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **selector** (string) _(optional)_: Limit this snapshot to the subtree of the first element matching this selector in the main frame. Omit to snapshot the whole page. Includes all accessibility nodes within that subtree, but not nested iframe documents. Returns an error if no element matches or it has no accessibility node.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---
