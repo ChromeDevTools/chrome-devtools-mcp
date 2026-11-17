@@ -1263,7 +1263,7 @@ describe('ToolHandler', () => {
     ClearcutLogger.initialize({
       persistence: mockPersistence,
       appVersion: '1.0.0',
-      watchdogClient: mockWatchdogClient,
+      createWatchdogClient: () => mockWatchdogClient,
     });
     await Promise.resolve();
 

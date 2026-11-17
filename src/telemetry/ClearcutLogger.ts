@@ -83,7 +83,7 @@ export interface ClearcutLoggerOptions {
   appVersion: string;
   persistence: Persistence;
   logFile?: string;
-  watchdogClient?: WatchdogClient;
+  createWatchdogClient?: () => WatchdogClient;
   sendToClearcut?: typeof sendToClearcut;
   clearcutEndpoint?: string;
   clearcutForceFlushIntervalMs?: number;
@@ -96,7 +96,8 @@ let _clearcut_logger_instance: ClearcutLogger | undefined;
 export class ClearcutLogger {
   #persistence: Persistence;
   #loggingAttrs: LoggingAttrs;
-  #watchdog: WatchdogClient;
+  #createWatchdogClient: () => WatchdogClient;
+  #watchdog?: WatchdogClient;
   #sendToClearcut: typeof sendToClearcut;
   #mcpClient: McpClient;
   #rawClientName?: string;
@@ -127,15 +128,16 @@ export class ClearcutLogger {
       sessionId: crypto.randomUUID(),
       clearcutEndpoint: options.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT,
     };
-    this.#watchdog =
-      options.watchdogClient ??
-      new WatchdogClient({
-        ...this.#loggingAttrs,
-        parentPid: process.pid,
-        logFile: options.logFile,
-        clearcutForceFlushIntervalMs: options.clearcutForceFlushIntervalMs,
-        clearcutIncludePidHeader: options.clearcutIncludePidHeader,
-      });
+    this.#createWatchdogClient =
+      options.createWatchdogClient ??
+      (() =>
+        new WatchdogClient({
+          ...this.#loggingAttrs,
+          parentPid: process.pid,
+          logFile: options.logFile,
+          clearcutForceFlushIntervalMs: options.clearcutForceFlushIntervalMs,
+          clearcutIncludePidHeader: options.clearcutIncludePidHeader,
+        }));
     this.#mcpClient = McpClient.MCP_CLIENT_UNSPECIFIED;
     void this.#persistence
       .loadState()
@@ -196,6 +198,12 @@ export class ClearcutLogger {
     return ext;
   }
 
+  // Spawns the watchdog process on the first event that needs it.
+  #getWatchdog(): WatchdogClient {
+    this.#watchdog ??= this.#createWatchdogClient();
+    return this.#watchdog;
+  }
+
   // Sends one event from this process without going through the watchdog.
   async #sendDirectly(payload: ChromeDevToolsMcpExtension): Promise<void> {
     const {appVersion, osType, sessionId, clearcutEndpoint} =
@@ -251,7 +259,7 @@ export class ClearcutLogger {
       };
     }
 
-    this.#watchdog.send({
+    this.#getWatchdog().send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         tool_invocation,
@@ -293,7 +301,7 @@ export class ClearcutLogger {
     errorCode: ErrorCode;
     toolName?: string;
   }): Promise<void> {
-    this.#watchdog.send({
+    this.#getWatchdog().send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         server_error: {
@@ -330,7 +338,7 @@ export class ClearcutLogger {
 
     const daysSinceToolCall = calculateDaysSince(state.lastToolCall, now);
 
-    this.#watchdog.send({
+    this.#getWatchdog().send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         tool_active: {
