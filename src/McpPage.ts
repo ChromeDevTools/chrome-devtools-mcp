@@ -16,8 +16,8 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
-import type {Logpoint, LogpointOptions} from './LogpointManager.js';
 import {LogpointManager} from './LogpointManager.js';
+import type {Logpoint, LogpointOptions} from './utils/logpoint.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   NetworkOverrideManager,
@@ -30,11 +30,11 @@ import {
   type JSONSchema7Definition,
   lighthouseNavigation,
   lighthouseSnapshot,
+  PredefinedNetworkConditions,
   type RunnerResult,
 } from './third_party/index.js';
 import {
   type Locator,
-  PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
   type Frame,

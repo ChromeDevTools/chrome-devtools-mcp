@@ -84,6 +84,7 @@ third_party_bundle("third_party_index_bundle") {
   node_require_shim = true
   external = [
     # Separate files in the same directory.
+    "./browser.js",
     "./cli.js",
     "./lighthouse-devtools-mcp-bundle.js",
 
@@ -217,6 +218,7 @@ ts_library("mcp_lib") {
     "formatters/RemoteObjectFormatter.ts",
     "formatters/SnapshotFormatter.ts",
     "formatters/WebAuthnFormatter.ts",
+    "formatters/constants.ts",
     "index.ts",
     "processors/ChunkedTraceParser.ts",
     "processors/HeapSnapshotManager.ts",
@@ -267,6 +269,7 @@ ts_library("mcp_lib") {
     "utils/id.ts",
     "utils/keyboard.ts",
     "utils/logger.ts",
+    "utils/logpoint.ts",
     "utils/network.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",

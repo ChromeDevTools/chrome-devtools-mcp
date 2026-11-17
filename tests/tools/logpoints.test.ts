@@ -9,8 +9,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {Logpoint} from '../../src/LogpointManager.js';
-import {LogpointError} from '../../src/LogpointManager.js';
+import {type Logpoint, LogpointError} from '../../src/utils/logpoint.js';
 import {setLogpoints} from '../../src/tools/logpoints.js';
 import {createHandlerMocks} from '../mocks.js';
 

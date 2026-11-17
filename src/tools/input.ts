@@ -4,12 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
-import {
-  TimeoutError,
-  type ElementHandle,
-  type KeyInput,
-} from '../third_party/browser.js';
+import {loadBrowser, zod} from '../third_party/index.js';
+import type {ElementHandle, KeyInput} from '../third_party/browser.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
@@ -53,17 +49,18 @@ const submitKeySchema = zod
  * The open dialog is already reported in the response, so treat this as an
  * interruption instead of a failure.
  */
-function handleActionError(
+async function handleActionError(
   error: unknown,
   uid: string,
   page: ContextPage,
-): void {
+): Promise<void> {
   if (page.getDialog()) {
     logger?.('action interrupted by a dialog', error);
     return;
   }
 
   logger?.('failed to act using a locator', error);
+  const {TimeoutError} = await loadBrowser();
   const reason =
     error instanceof TimeoutError
       ? 'The element did not become interactive within the configured timeout.'
@@ -170,7 +167,7 @@ export const click: PageToolFactory = definePageTool(() => ({
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid, request.page);
+      await handleActionError(error, uid, request.page);
       response.appendResponseLine(
         request.params.dblClick
           ? `The element was double clicked and it opened a dialog.`
@@ -249,7 +246,7 @@ export const hover: PageToolFactory = definePageTool(() => ({
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid, request.page);
+      await handleActionError(error, uid, request.page);
       response.appendResponseLine(
         `The element was hovered and it opened a dialog.`,
       );
@@ -374,7 +371,7 @@ async function fillFormElements(
     if (!currentUid) {
       throw error;
     }
-    handleActionError(error, currentUid, page);
+    await handleActionError(error, currentUid, page);
     return {interruptedUid: currentUid};
   }
 }
