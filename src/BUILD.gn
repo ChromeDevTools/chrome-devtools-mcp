@@ -218,6 +218,7 @@ ts_library("mcp_lib") {
     "formatters/RemoteObjectFormatter.ts",
     "formatters/SnapshotFormatter.ts",
     "formatters/WebAuthnFormatter.ts",
+    "formatters/constants.ts",
     "index.ts",
     "processors/ChunkedTraceParser.ts",
     "processors/HeapSnapshotManager.ts",
