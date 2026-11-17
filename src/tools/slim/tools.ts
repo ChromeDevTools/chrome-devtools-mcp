@@ -5,7 +5,8 @@
  */
 
 import type {ParsedArguments} from '../../config/mcp-options.js';
-import {zod, type Dialog} from '../../third_party/index.js';
+import {zod} from '../../third_party/index.js';
+import type {Dialog} from '../../third_party/browser.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool, type PageToolFactory} from '../ToolDefinition.js';
 import {validateUrl} from '../../utils/url.js';

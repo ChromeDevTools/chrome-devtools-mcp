@@ -50,6 +50,7 @@ import type {
   HeapSnapshotDiff,
   HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
+import type {Result, RunnerResult} from '../src/third_party/index.js';
 import {
   Accessibility,
   CdpBrowser,
@@ -82,9 +83,7 @@ import {
   type Page,
   type Protocol,
   type Realm,
-  type Result,
-  type RunnerResult,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;

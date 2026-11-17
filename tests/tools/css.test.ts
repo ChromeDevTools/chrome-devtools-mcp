@@ -9,7 +9,8 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {DevTools, zod} from '../../src/third_party/index.js';
+import {zod} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {getCssStyles} from '../../src/tools/css.js';
 import {createHandlerMocks} from '../mocks.js';
 

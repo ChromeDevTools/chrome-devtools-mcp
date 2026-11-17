@@ -16,7 +16,7 @@ import type {
   ConsoleMessage,
   Protocol,
   DevTools,
-} from '../../src/third_party/index.js';
+} from '../../src/third_party/browser.js';
 import {createMockCDPSession, createMockCdpJSHandle} from '../mocks.js';
 
 interface MockConsoleMessage {

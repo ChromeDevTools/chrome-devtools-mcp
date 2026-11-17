@@ -12,7 +12,7 @@
  * them get it automatically.
  *
  * This module is not part of tests/setup.ts because it loads
- * src/third_party/index.js, which takes about 0.5 s. Many test files do not
+ * src/third_party/browser.js, which takes about 0.5 s. Many test files do not
  * need it.
  */
 

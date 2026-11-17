@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from '../third_party/index.js';
+import type {Page} from '../third_party/browser.js';
 import type {CD4ACommentThread} from '../types.js';
 import {logger} from '../utils/logger.js';
 

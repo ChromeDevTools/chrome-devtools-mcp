@@ -16,9 +16,9 @@ import {
   ProtocolError,
   ProtocolErrorCode,
   zod,
-  type Browser,
   type CallToolResult,
 } from './third_party/index.js';
+import type {Browser} from './third_party/browser.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
 import {

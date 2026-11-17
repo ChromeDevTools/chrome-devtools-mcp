@@ -7,7 +7,8 @@
 import zlib from 'node:zlib';
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod, DevTools} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,

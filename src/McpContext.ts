@@ -23,6 +23,7 @@ import type {
 import {McpPage} from './McpPage.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
+import type {Root} from './third_party/index.js';
 import {
   Locator,
   Mutex,
@@ -39,9 +40,8 @@ import {
   type Target,
   type UninstallPWAOptions,
   type Extension,
-  type Root,
   type DevTools,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';

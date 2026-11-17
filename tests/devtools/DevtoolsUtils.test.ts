@@ -13,7 +13,7 @@ import {
   createTargetUniverse,
   SymbolizedError,
 } from '../../src/devtools/DevtoolsUtils.js';
-import {DevTools, type Protocol} from '../../src/third_party/index.js';
+import {DevTools, type Protocol} from '../../src/third_party/browser.js';
 import {createMockCDPSession} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';

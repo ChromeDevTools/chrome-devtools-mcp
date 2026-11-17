@@ -19,7 +19,7 @@ import {
   Mutex,
   type Page,
   type ResourceType,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import {logger, redactUrlForLogging} from './utils/logger.js';
 
 interface BaseNetworkOverride {

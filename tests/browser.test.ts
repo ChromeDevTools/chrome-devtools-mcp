@@ -12,7 +12,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
-import {puppeteer, type Browser} from '../src/third_party/index.js';
+import {puppeteer, type Browser} from '../src/third_party/browser.js';
 
 import {
   createMockPuppeteerBrowser,

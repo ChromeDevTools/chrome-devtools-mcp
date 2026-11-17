@@ -11,7 +11,7 @@ import {
   type ResolvedContainerDetails,
   type UidResolver,
 } from '../../src/formatters/CssFormatter.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {
   createMockCSSAtRule,
   createMockCSSInlineStyle,

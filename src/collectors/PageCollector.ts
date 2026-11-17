@@ -17,7 +17,7 @@ import {
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 import {
   createIdGenerator,
   stableIdSymbol,

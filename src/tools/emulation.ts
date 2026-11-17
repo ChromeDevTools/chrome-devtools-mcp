@@ -5,7 +5,8 @@
  *
  */
 
-import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import {PredefinedNetworkConditions} from '../third_party/browser.js';
 import {
   FORCED_COLORS_VALUES,
   PREFERS_CONTRAST_VALUES,
