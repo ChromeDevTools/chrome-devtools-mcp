@@ -622,6 +622,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "omit_background",
+        "argType": "boolean"
       }
     ]
   },
