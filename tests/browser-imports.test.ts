@@ -19,6 +19,8 @@ const LIGHT_ENTRIES = [
   'telemetry/flagUtils.js',
   'tools/emulation.js',
   'tools/input.js',
+  'tools/lighthouse.js',
+  'tools/performance.js',
   'tools/snapshot.js',
   'utils/text.js',
 ];
