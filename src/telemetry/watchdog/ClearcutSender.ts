@@ -43,6 +43,7 @@ export interface TimestampedEvent {
 export interface SendClearcutBatchOptions {
   clearcutEndpoint?: string;
   includePidHeader?: boolean;
+  requestTimeoutMs?: number;
 }
 
 export interface SendClearcutBatchResult {
@@ -72,7 +73,10 @@ export async function sendClearcutBatch(
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
+  );
   try {
     const response = await fetch(
       options.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT,

@@ -279,11 +279,14 @@ async function cleanup(exitCode = 0): Promise<void> {
   isCleaningUp = true;
   console.log('Cleaning up daemon...');
 
+  // Runs concurrently with mcpServer.close() and never rejects.
+  const shutdownLogged = ClearcutLogger.get()?.logServerShutdownIfNoWatchdog();
   try {
     await mcpServer?.close();
   } catch (error) {
     logger?.('Error closing MCP server:', error);
   }
+  await shutdownLogged;
   const activeServer = server;
   if (activeServer) {
     await new Promise<void>(resolve => {

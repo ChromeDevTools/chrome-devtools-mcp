@@ -64,7 +64,10 @@ async function shutdown(reason: string): Promise<void> {
     process.exit(0);
   }, 5000).unref();
   const server = await serverPromise;
+  // Runs concurrently with server.close() and never rejects.
+  const shutdownLogged = ClearcutLogger.get()?.logServerShutdownIfNoWatchdog();
   await server.close();
+  await shutdownLogged;
   process.exit(0);
 }
 process.stdin.on('end', () => {

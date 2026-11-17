@@ -638,6 +638,82 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('logServerShutdownIfNoWatchdog', () => {
+    const invocation = {
+      toolName: 'test_tool',
+      params: {},
+      schema: {},
+      success: true,
+      latencyMs: 123,
+    };
+
+    it('sends server_shutdown directly when no watchdog was started', async () => {
+      const createWatchdogClient = sinon
+        .stub<[], WatchdogClient>()
+        .returns(mockWatchdogClient);
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient,
+        sendClearcutBatch: mockSendClearcutBatch,
+        clearcutEndpoint: ENDPOINT,
+      });
+
+      await logger.logServerShutdownIfNoWatchdog();
+
+      sinon.assert.calledOnceWithExactly(
+        mockSendClearcutBatch,
+        [
+          {
+            event: {
+              server_shutdown: {},
+              session_id: SESSION_ID,
+              app_version: '1.0.0',
+              os_type: OsType.OS_TYPE_LINUX,
+            },
+            timestamp: NOW_MS,
+          },
+        ],
+        {clearcutEndpoint: ENDPOINT, requestTimeoutMs: 2500},
+      );
+      sinon.assert.notCalled(createWatchdogClient);
+    });
+
+    it('does not send server_shutdown when the watchdog was started', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient: () => mockWatchdogClient,
+        sendClearcutBatch: mockSendClearcutBatch,
+      });
+      await logger.logToolInvocation(invocation);
+      mockWatchdogClient.send.resetHistory();
+
+      await logger.logServerShutdownIfNoWatchdog();
+
+      sinon.assert.notCalled(mockSendClearcutBatch);
+      sinon.assert.notCalled(mockWatchdogClient.send);
+    });
+
+    it('does not start the watchdog for tool invocations after shutdown', async () => {
+      const createWatchdogClient = sinon
+        .stub<[], WatchdogClient>()
+        .returns(mockWatchdogClient);
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient,
+        sendClearcutBatch: mockSendClearcutBatch,
+      });
+
+      await logger.logServerShutdownIfNoWatchdog();
+      await logger.logToolInvocation(invocation);
+
+      sinon.assert.notCalled(createWatchdogClient);
+      sinon.assert.calledOnce(mockSendClearcutBatch);
+    });
+  });
+
   describe('Singleton', () => {
     it('returns undefined if not initialized', () => {
       assert.strictEqual(ClearcutLogger.get(), undefined);

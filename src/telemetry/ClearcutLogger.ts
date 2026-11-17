@@ -34,6 +34,8 @@ import {WatchdogClient} from './WatchdogClient.js';
 import type {DevToolsData} from '../tools/ToolDefinition.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Keeps the shutdown event within the server's 5 s shutdown backstop.
+const SHUTDOWN_REQUEST_TIMEOUT_MS = 2_500;
 
 function detectOsType(): OsType {
   switch (process.platform) {
@@ -101,6 +103,7 @@ export class ClearcutLogger {
   #mcpClient: McpClient;
   #rawClientName?: string;
   #state?: LocalState;
+  #shutDown = false;
 
   static initialize(options: ClearcutLoggerOptions): ClearcutLogger {
     if (_clearcut_logger_instance) {
@@ -199,15 +202,22 @@ export class ClearcutLogger {
   }
 
   // Spawns the watchdog process on the first event that needs it.
-  #getWatchdog(): WatchdogClient {
+  #getWatchdog(): WatchdogClient | undefined {
+    if (!this.#watchdog && this.#shutDown) {
+      logger?.('Server is shutting down, dropping telemetry event');
+      return undefined;
+    }
     this.#watchdog ??= this.#createWatchdogClient();
     return this.#watchdog;
   }
 
   // Sends one event from this process without going through the watchdog.
-  async #sendDirectly(payload: ChromeDevToolsMcpExtension): Promise<void> {
+  async #sendDirectly(
+    payload: ChromeDevToolsMcpExtension,
+    options: {requestTimeoutMs?: number} = {},
+  ): Promise<void> {
     const event: ChromeDevToolsMcpExtension = {
-      ...this.#addMcpClient(payload),
+      ...payload,
       session_id: this.#sessionId,
       app_version: this.#appVersion,
       os_type: this.#osType,
@@ -215,7 +225,7 @@ export class ClearcutLogger {
     try {
       const result = await this.#sendClearcutBatch(
         [{event, timestamp: Date.now()}],
-        {clearcutEndpoint: this.#clearcutEndpoint},
+        {clearcutEndpoint: this.#clearcutEndpoint, ...options},
       );
       if (!result.success) {
         logger?.('Failed to send telemetry event:', JSON.stringify(result));
@@ -223,6 +233,24 @@ export class ClearcutLogger {
     } catch (error) {
       logger?.('Error sending telemetry event:', error);
     }
+  }
+
+  /**
+   * Sends `server_shutdown` when the server exits without a watchdog.
+   *
+   * The watchdog sends `server_shutdown` when the server exits. If no
+   * watchdog was started, the logger sends it. After this call, no watchdog
+   * is started, so later events that need one are dropped.
+   */
+  async logServerShutdownIfNoWatchdog(): Promise<void> {
+    this.#shutDown = true;
+    if (this.#watchdog) {
+      return;
+    }
+    await this.#sendDirectly(
+      {server_shutdown: {}},
+      {requestTimeoutMs: SHUTDOWN_REQUEST_TIMEOUT_MS},
+    );
   }
 
   async logToolInvocation(args: {
@@ -257,7 +285,7 @@ export class ClearcutLogger {
       };
     }
 
-    this.#getWatchdog().send({
+    this.#getWatchdog()?.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         tool_invocation,
@@ -266,11 +294,13 @@ export class ClearcutLogger {
   }
 
   async logServerStart(flagUsage: FlagUsage): Promise<void> {
-    await this.#sendDirectly({
-      server_start: {
-        flag_usage: flagUsage,
-      },
-    });
+    await this.#sendDirectly(
+      this.#addMcpClient({
+        server_start: {
+          flag_usage: flagUsage,
+        },
+      }),
+    );
   }
 
   async logDailyActiveIfNeeded(): Promise<void> {
@@ -280,11 +310,13 @@ export class ClearcutLogger {
       if (shouldLogDailyActive(this.#state)) {
         const daysSince = calculateDaysSince(this.#state.lastActive);
 
-        const sent = this.#sendDirectly({
-          daily_active: {
-            days_since_last_active: bucketizeDaysSince(daysSince),
-          },
-        });
+        const sent = this.#sendDirectly(
+          this.#addMcpClient({
+            daily_active: {
+              days_since_last_active: bucketizeDaysSince(daysSince),
+            },
+          }),
+        );
 
         this.#state.lastActive = new Date().toISOString();
         await this.#persistence.saveState(this.#state);
@@ -299,7 +331,7 @@ export class ClearcutLogger {
     errorCode: ErrorCode;
     toolName?: string;
   }): Promise<void> {
-    this.#getWatchdog().send({
+    this.#getWatchdog()?.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         server_error: {
@@ -336,7 +368,11 @@ export class ClearcutLogger {
 
     const daysSinceToolCall = calculateDaysSince(state.lastToolCall, now);
 
-    this.#getWatchdog().send({
+    const watchdog = this.#getWatchdog();
+    if (!watchdog) {
+      return;
+    }
+    watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
         tool_active: {

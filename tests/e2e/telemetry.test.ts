@@ -376,6 +376,45 @@ describe('Telemetry E2E', () => {
   );
 
   it(
+    'sends server_shutdown from the server on SIGTERM when idle',
+    {skip: process.platform === 'win32'},
+    async () => {
+      const mockContext = await startMockServer();
+      const ctx: TestContext = {
+        mockServer: mockContext,
+      };
+
+      try {
+        const serverProcess = spawnServer(mockContext);
+        ctx.process = serverProcess;
+        const startEvent = await withTimeout(
+          mockContext.waitForEvent(e => e.server_start !== undefined),
+          'Timeout waiting for server_start',
+        );
+
+        serverProcess.kill('SIGTERM');
+
+        const shutdownEvent = await withTimeout(
+          mockContext.waitForEvent(e => e.server_shutdown !== undefined),
+          'Timeout waiting for server_shutdown',
+        );
+        assert.strictEqual(
+          shutdownEvent.session_id,
+          startEvent.session_id,
+          'server_shutdown should share the session_id of server_start',
+        );
+        assert.strictEqual(
+          mockContext.watchdogPid,
+          undefined,
+          'server_shutdown should not be sent by a watchdog',
+        );
+      } finally {
+        cleanupTest(ctx);
+      }
+    },
+  );
+
+  it(
     'starts the watchdog on the first tool call, not when idle',
     {skip: process.platform === 'win32'},
     async () => {

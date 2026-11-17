@@ -145,6 +145,25 @@ describe('sendClearcutBatch', () => {
 
     assert.deepStrictEqual(await resultPromise, {success: false});
   });
+
+  it('returns transient failure after the given request timeout', async () => {
+    let signal: AbortSignal | null | undefined;
+    fetchStub.callsFake((_url: string, init: RequestInit) => {
+      signal = init.signal;
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
+        });
+      });
+    });
+
+    const resultPromise = sendClearcutBatch(events, {requestTimeoutMs: 2000});
+    await clock.tickAsync(1999);
+    assert.strictEqual(signal?.aborted, false);
+    await clock.tickAsync(1);
+
+    assert.deepStrictEqual(await resultPromise, {success: false});
+  });
 });
 
 describe('ClearcutSender', () => {
