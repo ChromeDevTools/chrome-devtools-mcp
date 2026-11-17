@@ -138,7 +138,10 @@ describe('chrome-devtools values starting with a hyphen', () => {
       0,
       `emulate command failed: ${result.stderr}`,
     );
-    assert.match(result.stdout, /Emulation configured successfully/);
+    assert.match(
+      result.stdout,
+      /Emulating geolocation: latitude=-33\.86, longitude=151\.2/,
+    );
   });
 
   it('rejects unknown flags that are not preceded by --', async () => {
