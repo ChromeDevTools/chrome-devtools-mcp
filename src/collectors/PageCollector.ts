@@ -368,7 +368,7 @@ class PageEventSubscriber {
 
   #onIssueAdded = (inspectorIssue: Issue): void => {
     try {
-      // @ts-expect-error The types are missmatched but they
+      // @ts-expect-error The types are mismatched but they
       // are coming from CDP
       if (!DevTools.isIssueCodeSupported(inspectorIssue.code)) {
         return;
@@ -379,7 +379,7 @@ class PageEventSubscriber {
         inspectorIssue,
       )[0];
       if (!issue) {
-        logger?.('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger?.('No issue mapping for the issue: ', inspectorIssue.code);
         return;
       }
 

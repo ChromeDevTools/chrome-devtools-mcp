@@ -1276,7 +1276,7 @@ describe('extensions', () => {
       const emptyText = getTextContent(emptyResult.content[0]);
       assert.ok(
         emptyText.includes('No unpacked extensions found.'),
-        'Should show message for ampty extensions',
+        'Should show message for empty extensions',
       );
 
       response.resetResponseLineForTesting();
