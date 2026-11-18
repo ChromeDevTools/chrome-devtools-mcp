@@ -67,7 +67,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
       await logger.logToolInvocation({
@@ -90,7 +90,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
       await logger.logToolInvocation({
@@ -120,7 +120,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -178,7 +178,7 @@ describe('ClearcutLogger', () => {
         const logger = ClearcutLogger.initialize({
           persistence: mockPersistence,
           appVersion: '1.0.0',
-          watchdogClient: mockWatchdogClient,
+          createWatchdogClient: () => mockWatchdogClient,
           sendToClearcut: mockSendToClearcut,
           clearcutEndpoint: ENDPOINT,
         });
@@ -216,7 +216,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -241,7 +241,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -267,7 +267,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
         clearcutEndpoint: ENDPOINT,
       });
@@ -299,7 +299,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -317,7 +317,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -340,7 +340,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -366,7 +366,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -389,7 +389,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -406,7 +406,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
         clearcutEndpoint: ENDPOINT,
       });
@@ -442,7 +442,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -462,7 +462,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -511,7 +511,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -547,7 +547,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -588,7 +588,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -614,6 +614,51 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('lazy watchdog', () => {
+    it('does not create the watchdog for startup events', async () => {
+      const createWatchdogClient = sinon
+        .stub<[], WatchdogClient>()
+        .returns(mockWatchdogClient);
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+      });
+
+      await logger.logServerStart({headless: true});
+      await logger.logDailyActiveIfNeeded();
+
+      sinon.assert.calledTwice(mockSendToClearcut);
+      sinon.assert.notCalled(createWatchdogClient);
+    });
+
+    it('creates the watchdog once on the first tool invocation', async () => {
+      const createWatchdogClient = sinon
+        .stub<[], WatchdogClient>()
+        .returns(mockWatchdogClient);
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+      });
+      const invocation = {
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 123,
+      };
+
+      await logger.logToolInvocation(invocation);
+      sinon.assert.calledOnceWithExactly(createWatchdogClient);
+
+      await logger.logToolInvocation(invocation);
+      sinon.assert.calledOnce(createWatchdogClient);
+    });
+  });
+
   describe('Singleton', () => {
     it('returns undefined if not initialized', () => {
       assert.strictEqual(ClearcutLogger.get(), undefined);
@@ -623,7 +668,7 @@ describe('ClearcutLogger', () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
       assert.strictEqual(ClearcutLogger.get(), logger);
@@ -633,7 +678,7 @@ describe('ClearcutLogger', () => {
       ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
@@ -641,7 +686,7 @@ describe('ClearcutLogger', () => {
         ClearcutLogger.initialize({
           persistence: mockPersistence,
           appVersion: '1.0.0',
-          watchdogClient: mockWatchdogClient,
+          createWatchdogClient: () => mockWatchdogClient,
           sendToClearcut: mockSendToClearcut,
         });
       }, /ClearcutLogger is already initialized/);
@@ -651,7 +696,7 @@ describe('ClearcutLogger', () => {
       ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+        createWatchdogClient: () => mockWatchdogClient,
         sendToClearcut: mockSendToClearcut,
       });
 
