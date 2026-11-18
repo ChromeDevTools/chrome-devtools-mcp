@@ -418,15 +418,17 @@
 
 ### `get_css_styles`
 
-**Description:** Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
-Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved values as inline comments (e.g. color: var(--brand); /* #ff0000 */).
-Treat the output as authoritative and complete.
-Results are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from [`take_snapshot`](#take_snapshot).
+**Description:** Retrieve computed styles, matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
+Computed styles for the target element itself (not its pseudo-elements) appears as the first entry, showing display, width, height, and properties from matched or inherited rules; pass computedProperties to include additional CSS properties in Computed styles.
+Matched CSS rules follow from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved token values as inline comments (e.g. color: var(--brand); /* #ff0000 */). Computed styles shows final browser-computed longhand values.
+Treat the matched cascade and computed values as authoritative.
+Results are paginated (10 entries per page by default); use pageIdx to page through the remaining rules. Requires a UID from [`take_snapshot`](#take_snapshot).
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **uid** (string) **(required)**: The uid of the element on the page from the page content snapshot to inspect CSS styles for
+- **computedProperties** (array) _(optional)_: Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). Defaults to 0 (the first page).
 - **pageSize** (integer) _(optional)_: Maximum number of CSS rules to return per page. Defaults to 10.
 

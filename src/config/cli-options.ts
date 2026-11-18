@@ -645,7 +645,7 @@ export const commands: Commands = {
   },
   get_css_styles: {
     description:
-      'Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.\nRules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved values as inline comments (e.g. color: var(--brand); /* #ff0000 */).\nTreat the output as authoritative and complete.\nResults are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.',
+      'Retrieve computed styles, matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.\nComputed styles for the target element itself (not its pseudo-elements) appears as the first entry, showing display, width, height, and properties from matched or inherited rules; pass computedProperties to include additional CSS properties in Computed styles.\nMatched CSS rules follow from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved token values as inline comments (e.g. color: var(--brand); /* #ff0000 */). Computed styles shows final browser-computed longhand values.\nTreat the matched cascade and computed values as authoritative.\nResults are paginated (10 entries per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -680,6 +680,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
         default: 0,
+      },
+      computedProperties: {
+        name: 'computedProperties',
+        type: 'array',
+        description:
+          'Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.',
+        required: false,
+        positional: false,
       },
     },
   },

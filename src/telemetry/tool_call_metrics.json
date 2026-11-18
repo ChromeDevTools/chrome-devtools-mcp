@@ -1284,6 +1284,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "computed_properties_count",
+        "argType": "number"
       }
     ]
   },

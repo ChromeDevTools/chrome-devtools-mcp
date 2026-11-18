@@ -51,7 +51,7 @@ import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
-  MatchedStyles,
+  ElementCssStyles,
   Response,
   ScreenRecorderData,
   WebAuthnAuthenticatorConfig,
@@ -1308,7 +1308,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
     if (!this.textSnapshot) {
       throw new Error(
         `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
@@ -1363,14 +1363,22 @@ export class McpPage implements ContextPage {
       );
     }
 
-    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    const [matchedStyles, computedStyles] = await Promise.all([
+      cssModel.getMatchedStyles(targetElement.id),
+      cssModel.getComputedStyle(targetElement.id),
+    ]);
     if (!matchedStyles) {
       throw new Error(
         `Could not retrieve matched styles for element with uid "${uid}".`,
       );
     }
+    if (!computedStyles) {
+      logger?.(
+        `Could not retrieve computed styles for element with uid ${uid}.`,
+      );
+    }
 
-    return matchedStyles;
+    return {matchedStyles, computedStyles};
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

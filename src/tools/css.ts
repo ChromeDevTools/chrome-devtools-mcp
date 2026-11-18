@@ -11,10 +11,11 @@ import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export const getCssStyles: PageToolFactory = definePageTool(() => ({
   name: 'get_css_styles',
-  description: `Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
-Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved values as inline comments (e.g. color: var(--brand); /* #ff0000 */).
-Treat the output as authoritative and complete.
-Results are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
+  description: `Retrieve computed styles, matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
+Computed styles for the target element itself (not its pseudo-elements) appears as the first entry, showing display, width, height, and properties from matched or inherited rules; pass computedProperties to include additional CSS properties in Computed styles.
+Matched CSS rules follow from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved token values as inline comments (e.g. color: var(--brand); /* #ff0000 */). Computed styles shows final browser-computed longhand values.
+Treat the matched cascade and computed values as authoritative.
+Results are paginated (10 entries per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -41,18 +42,23 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
       .describe(
         'Page number to return (0-based). Defaults to 0 (the first page).',
       ),
+    computedProperties: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.',
+      ),
   },
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const matchedStyles = await request.page.getMatchedStylesForUid(
-      request.params.uid,
-    );
-    response.setIncludeCssStyles(matchedStyles, {
+    const styles = await request.page.getCssStylesForUid(request.params.uid);
+    response.setIncludeCssStyles(styles, {
       uid: request.params.uid,
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
+      computedProperties: request.params.computedProperties,
     });
   },
 }));
