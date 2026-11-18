@@ -126,7 +126,7 @@ describe('comments tools', () => {
     });
 
     it('keeps waiting when an event yields no new threads', async () => {
-      const clock = sinon.useFakeTimers();
+      const clock = sinon.useFakeTimers({toFake: ['Date']});
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       const bridge = sinon.createStubInstance(DevToolsCommentBridge);
@@ -162,7 +162,7 @@ describe('comments tools', () => {
     });
 
     it('does not set comments after the wait times out', async () => {
-      const clock = sinon.useFakeTimers();
+      const clock = sinon.useFakeTimers({toFake: ['Date']});
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       const bridge = sinon.createStubInstance(DevToolsCommentBridge);
@@ -190,7 +190,7 @@ describe('comments tools', () => {
     });
 
     it('reports the elapsed time when the wait ends early', async () => {
-      const clock = sinon.useFakeTimers();
+      const clock = sinon.useFakeTimers({toFake: ['Date']});
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       const bridge = sinon.createStubInstance(DevToolsCommentBridge);

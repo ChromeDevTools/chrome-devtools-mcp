@@ -578,6 +578,7 @@ export default defineConfig([
       'mocha/no-async-suite': 'error',
       'mocha/no-top-level-tests': 'error',
       'mocha/no-nested-tests': 'error',
+      '@local/require-explicit-fake-timers': 'error',
 
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
