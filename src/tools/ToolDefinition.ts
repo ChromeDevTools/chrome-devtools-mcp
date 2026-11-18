@@ -309,7 +309,7 @@ export interface Response {
    */
   includeConsoleErrorsFrom(page: ContextPage): void;
   setIncludeCssStyles(
-    matchedStyles: MatchedStyles,
+    styles: ElementCssStyles,
     options: CssFormatterOptions & PaginationOptions,
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
@@ -478,6 +478,12 @@ export type BrowserlessContext = Readonly<{
 }>;
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+export type ComputedStyles = ReadonlyMap<string, string>;
+
+export interface ElementCssStyles {
+  matchedStyles: MatchedStyles;
+  computedStyles?: ComputedStyles | null;
+}
 
 export type WebAuthnProtocol = 'ctap2' | 'u2f';
 export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
@@ -517,7 +523,7 @@ export type ContextPage = Readonly<{
   init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
-  getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  getCssStylesForUid(uid: string): Promise<ElementCssStyles>;
   configureWebAuthn(
     config: WebAuthnAuthenticatorConfig,
   ): Promise<WebAuthnAuthenticatorState | undefined>;
