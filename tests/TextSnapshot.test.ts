@@ -138,6 +138,46 @@ describe('TextSnapshot', () => {
     });
   });
 
+  it('keeps extra node UIDs usable after disposing action handles', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <div
+          id="target"
+          role="none"
+          style="width: 100px; height: 100px"
+          data-clicks="0"
+          onclick="this.dataset.clicks++"
+        ></div>
+      `);
+      using retainedHandle = await page.pptrPage.$('#target');
+      assert.ok(retainedHandle);
+      const backendNodeId = await retainedHandle.backendNodeId();
+      page.textSnapshot = await TextSnapshot.create(page, {
+        extraHandles: [retainedHandle],
+      });
+      const uid = page.textSnapshot.resolveCdpElementId(backendNodeId);
+      assert.ok(uid);
+
+      for (let i = 0; i < 2; i++) {
+        using actionHandle = await page.getElementByUid(uid);
+        await actionHandle.click();
+      }
+
+      page.textSnapshot = await TextSnapshot.create(page);
+      assert.strictEqual(
+        page.textSnapshot.resolveCdpElementId(backendNodeId),
+        uid,
+      );
+      assert.strictEqual(
+        await retainedHandle.evaluate(element =>
+          element.getAttribute('data-clicks'),
+        ),
+        '2',
+      );
+    });
+  });
+
   it('inserts extraHandles into the snapshot correctly', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
