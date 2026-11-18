@@ -10,18 +10,15 @@ import readline from 'node:readline';
 import {parseArgs} from 'node:util';
 
 import {logger, flushLogs, saveLogsToFile} from '../../utils/logger.js';
-import {WatchdogMessageType, type OsType} from '../types.js';
+import {WatchdogMessageType, type LoggingAttrs} from '../types.js';
 
 import {ClearcutSender} from './ClearcutSender.js';
 
-interface WatchdogArgs {
+interface WatchdogArgs extends LoggingAttrs {
   // Required arguments
   parentPid: number;
-  appVersion: string;
-  osType: OsType;
   // Optional arguments
   logFile?: string;
-  clearcutEndpoint?: string;
   clearcutForceFlushIntervalMs?: number;
   clearcutIncludePidHeader?: boolean;
 }
@@ -32,6 +29,7 @@ function parseWatchdogArgs(): WatchdogArgs {
       'parent-pid': {type: 'string'},
       'app-version': {type: 'string'},
       'os-type': {type: 'string'},
+      'session-id': {type: 'string'},
       'log-file': {type: 'string'},
       'clearcut-endpoint': {type: 'string'},
       'clearcut-force-flush-interval-ms': {type: 'string'},
@@ -43,17 +41,30 @@ function parseWatchdogArgs(): WatchdogArgs {
   const parentPid = parseInt(values['parent-pid'] ?? '', 10);
   const appVersion = values['app-version'];
   const osType = parseInt(values['os-type'] ?? '', 10);
-  if (isNaN(parentPid) || !appVersion || isNaN(osType)) {
+  const sessionId = values['session-id'];
+  const clearcutEndpoint = values['clearcut-endpoint'];
+  if (
+    isNaN(parentPid) ||
+    !appVersion ||
+    isNaN(osType) ||
+    !sessionId ||
+    !clearcutEndpoint
+  ) {
     console.error(
       'Invalid arguments provided for watchdog process: ',
-      JSON.stringify({parentPid, appVersion, osType}),
+      JSON.stringify({
+        parentPid,
+        appVersion,
+        osType,
+        sessionId,
+        hasClearcutEndpoint: Boolean(clearcutEndpoint),
+      }),
     );
     process.exit(1);
   }
 
   // Parse Optional Arguments
   const logFile = values['log-file'];
-  const clearcutEndpoint = values['clearcut-endpoint'];
   const clearcutIncludePidHeader = values['clearcut-include-pid-header'];
   let clearcutForceFlushIntervalMs: number | undefined;
   if (values['clearcut-force-flush-interval-ms']) {
@@ -67,8 +78,9 @@ function parseWatchdogArgs(): WatchdogArgs {
     parentPid,
     appVersion,
     osType,
-    logFile,
+    sessionId,
     clearcutEndpoint,
+    logFile,
     clearcutForceFlushIntervalMs,
     clearcutIncludePidHeader,
   };
@@ -79,8 +91,9 @@ function main(): void {
     parentPid,
     appVersion,
     osType,
-    logFile,
+    sessionId,
     clearcutEndpoint,
+    logFile,
     clearcutForceFlushIntervalMs,
     clearcutIncludePidHeader,
   } = parseWatchdogArgs();
@@ -116,6 +129,7 @@ function main(): void {
   const sender = new ClearcutSender({
     appVersion,
     osType,
+    sessionId,
     clearcutEndpoint,
     forceFlushIntervalMs: clearcutForceFlushIntervalMs,
     includePidHeader: clearcutIncludePidHeader,

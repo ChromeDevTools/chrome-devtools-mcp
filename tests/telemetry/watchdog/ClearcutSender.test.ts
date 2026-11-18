@@ -18,6 +18,13 @@ import {
 } from '../../../src/telemetry/watchdog/ClearcutSender.js';
 
 const FLUSH_INTERVAL_MS = 15 * 1000;
+const SENDER_CONFIG = {
+  appVersion: '1.0.0',
+  osType: OsType.OS_TYPE_MACOS,
+  sessionId: 'session-1',
+  clearcutEndpoint: 'http://127.0.0.1:1234',
+  forceFlushIntervalMs: FLUSH_INTERVAL_MS,
+};
 
 describe('sendToClearcut', () => {
   const NOW_MS = 5000;
@@ -167,11 +174,7 @@ describe('ClearcutSender', () => {
   });
 
   it('enriches events with app version, os type, and session id', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({mcp_client: undefined});
     assert.strictEqual(sender.bufferSizeForTesting, 1);
@@ -185,32 +188,13 @@ describe('ClearcutSender', () => {
     ) as LogRequest;
     const event = JSON.parse(requestBody.log_event[0].source_extension_json);
 
-    assert.strictEqual(event.session_id, 'uuid-1');
+    assert.strictEqual(event.session_id, 'session-1');
     assert.strictEqual(event.app_version, '1.0.0');
     assert.strictEqual(event.os_type, OsType.OS_TYPE_MACOS);
   });
 
-  it('posts to the configured clearcutEndpoint', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      clearcutEndpoint: 'http://127.0.0.1:1234',
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
-
-    sender.enqueueEvent({});
-    await clock.tickAsync(FLUSH_INTERVAL_MS);
-    sender.stopForTesting();
-
-    sinon.assert.calledOnceWithMatch(fetchStub, 'http://127.0.0.1:1234');
-  });
-
   it('accumulates events in buffer without immediate send', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'test1', success: true, latency_ms: 100},
@@ -226,11 +210,7 @@ describe('ClearcutSender', () => {
   });
 
   it('sends correct LogRequest format', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'test', success: true, latency_ms: 100},
@@ -240,10 +220,7 @@ describe('ClearcutSender', () => {
     sender.stopForTesting();
 
     const [url, options] = fetchStub.firstCall.args;
-    assert.strictEqual(
-      url,
-      'https://play.googleapis.com/log?format=json_proto',
-    );
+    assert.strictEqual(url, 'http://127.0.0.1:1234');
     assert.strictEqual(options.method, 'POST');
     assert.strictEqual(options.headers['Content-Type'], 'application/json');
 
@@ -254,11 +231,7 @@ describe('ClearcutSender', () => {
   });
 
   it('clears buffer on successful send', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({});
     sender.enqueueEvent({});
@@ -270,11 +243,7 @@ describe('ClearcutSender', () => {
   });
 
   it('keeps events in buffer on transient 5xx error', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     fetchStub.resolves(new Response('Server Error', {status: 500}));
 
     sender.enqueueEvent({});
@@ -285,11 +254,7 @@ describe('ClearcutSender', () => {
   });
 
   it('keeps events in buffer on transient 429 error', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     fetchStub.resolves(new Response('Too Many Requests', {status: 429}));
 
     sender.enqueueEvent({});
@@ -300,11 +265,7 @@ describe('ClearcutSender', () => {
   });
 
   it('drops batch on permanent 4xx error', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     fetchStub.resolves(new Response('Bad Request', {status: 400}));
 
     sender.enqueueEvent({});
@@ -315,11 +276,7 @@ describe('ClearcutSender', () => {
   });
 
   it('keeps events in buffer on network error', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     fetchStub.rejects(new Error('Network error'));
 
     sender.enqueueEvent({});
@@ -330,11 +287,7 @@ describe('ClearcutSender', () => {
   });
 
   it('sendShutdownEvent sends an immediate server_shutdown event', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     await sender.sendShutdownEvent();
 
@@ -348,11 +301,7 @@ describe('ClearcutSender', () => {
   });
 
   it('shutdown includes buffered events', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'test', success: true, latency_ms: 100},
@@ -366,11 +315,7 @@ describe('ClearcutSender', () => {
   });
 
   it('correctly handles buffer overflow during queued flush', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'initial', success: true, latency_ms: 100},
@@ -405,11 +350,7 @@ describe('ClearcutSender', () => {
   });
 
   it('does not duplicate events when shutdown occurs during an active flush', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     sender.enqueueEvent({
       tool_invocation: {
         tool_name: 'test-event',
@@ -460,11 +401,7 @@ describe('ClearcutSender', () => {
   });
 
   it('rotates session id after 24 hours', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'test1', success: true, latency_ms: 10},
@@ -497,17 +434,14 @@ describe('ClearcutSender', () => {
     );
     const secondSessionId = secondEvent.session_id;
 
-    assert.notStrictEqual(firstSessionId, secondSessionId);
+    assert.strictEqual(firstSessionId, 'session-1');
+    assert.strictEqual(secondSessionId, 'uuid-1');
 
     sender.stopForTesting();
   });
 
   it('respects next_request_wait_millis from server', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
 
     fetchStub.resolves(
       new Response(
@@ -539,11 +473,7 @@ describe('ClearcutSender', () => {
   });
 
   it('aborts request after timeout', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     const REQUEST_TIMEOUT_MS = 30000;
 
     let fetchSignal: AbortSignal | undefined;
@@ -570,11 +500,7 @@ describe('ClearcutSender', () => {
   });
 
   it('resolves sendShutdownEvent after timeout if flush hangs', async () => {
-    const sender = new ClearcutSender({
-      appVersion: '1.0.0',
-      osType: OsType.OS_TYPE_MACOS,
-      forceFlushIntervalMs: FLUSH_INTERVAL_MS,
-    });
+    const sender = new ClearcutSender(SENDER_CONFIG);
     fetchStub.returns(
       new Promise(() => {
         // Hangs forever
