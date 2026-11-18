@@ -918,14 +918,43 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls setUserAgent with undefined to clear the user agent', async () => {
+    it('calls setUserAgent with an empty string to clear the override', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       await mcpPage.emulate({userAgent: ''});
       assert.strictEqual(mcpPage.userAgent, null);
       sinon.assert.calledTwice(pptrPage.setUserAgent);
       sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {
-        userAgent: undefined,
+        userAgent: '',
+      });
+    });
+
+    describe('User-Agent Client Hints', () => {
+      const server = serverHooks();
+
+      it('keeps default Client Hints when emulating dark mode', async () => {
+        server.addRoute('/client-hints', (request, response) => {
+          response.writeHead(200, {
+            'Content-Type': 'text/plain',
+            'Cache-Control': 'no-store',
+          });
+          response.end(request.headers['sec-ch-ua'] ?? '');
+        });
+
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const page = mcpPage.pptrPage;
+          const before = await page.goto(server.getRoute('/client-hints'));
+          assert.ok(before);
+          const clientHints = await before.text();
+          assert.ok(clientHints);
+
+          await mcpPage.emulate({colorScheme: 'dark'});
+
+          const after = await page.reload();
+          assert.ok(after);
+          assert.strictEqual(await after.text(), clientHints);
+        });
       });
     });
 

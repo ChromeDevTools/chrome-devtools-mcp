@@ -1510,7 +1510,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.userAgent) {
-      await page.setUserAgent({userAgent: undefined});
+      await page.setUserAgent({userAgent: ''});
       delete newSettings.userAgent;
     } else {
       await page.setUserAgent({userAgent: options.userAgent});
