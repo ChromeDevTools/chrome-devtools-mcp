@@ -8,7 +8,6 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -21,6 +20,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
+import type {Dialog} from '../../src/third_party/browser.js';
 import {zod} from '../../src/third_party/index.js';
 import {
   createHandlerMocks,

@@ -14,18 +14,6 @@ import os from 'node:os';
 import path from 'node:path';
 import type {TestContext} from 'node:test';
 
-import type {Browser} from 'puppeteer';
-import puppeteer, {executablePath, Locator} from 'puppeteer';
-
-import type {
-  Frame,
-  HTTPRequest,
-  HTTPResponse,
-  LaunchOptions,
-  Page,
-  Protocol,
-  Target,
-} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
@@ -37,7 +25,22 @@ import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {CallToolResult} from '../src/third_party/index.js';
-import {DevTools} from '../src/third_party/browser.js';
+import {
+  BrowserEnum,
+  computeExecutablePath,
+  DevTools,
+  Locator,
+  puppeteer,
+  PUPPETEER_REVISIONS,
+  type Browser,
+  type Frame,
+  type HTTPRequest,
+  type HTTPResponse,
+  type LaunchOptions,
+  type Page,
+  type Protocol,
+  type Target,
+} from '../src/third_party/browser.js';
 import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
@@ -108,8 +111,7 @@ export async function withBrowser(
   let attempt = 1;
   while (attempt <= 3) {
     const launchOptions: LaunchOptions = {
-      executablePath:
-        options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+      executablePath: options.executablePath ?? (await getExecutablePath()),
       headless: !options.debug,
       defaultViewport: null,
       devtools: options.autoOpenDevTools ?? false,
@@ -461,7 +463,16 @@ export function getMockBrowser(options?: {
 }
 
 export async function getExecutablePath(): Promise<string> {
-  return process.env['PUPPETEER_EXECUTABLE_PATH'] ?? (await executablePath());
+  return (
+    process.env['PUPPETEER_EXECUTABLE_PATH'] ||
+    computeExecutablePath({
+      cacheDir:
+        process.env['PUPPETEER_CACHE_DIR'] ||
+        path.join(os.homedir(), '.cache', 'puppeteer'),
+      browser: BrowserEnum.CHROME,
+      buildId: PUPPETEER_REVISIONS.chrome,
+    })
+  );
 }
 
 export const CLI_PATH: string = path.resolve(

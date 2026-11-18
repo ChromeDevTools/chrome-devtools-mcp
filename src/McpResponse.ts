@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {WebMCPTool} from 'puppeteer-core';
-
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
   CommentFormatter,
@@ -57,6 +55,7 @@ import {
   type Extension,
   type HTTPRequest,
   type Protocol,
+  type WebMCPTool,
 } from './third_party/browser.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';

@@ -15,6 +15,7 @@ export {
   ConsoleMessage,
   Dialog,
   ElementHandle,
+  EventEmitter,
   Frame,
   Locator,
   PredefinedNetworkConditions,
@@ -46,7 +47,9 @@ export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
+export {PUPPETEER_REVISIONS} from 'puppeteer-core/internal/revisions.js';
 export {
+  computeExecutablePath,
   resolveDefaultUserDataDir,
   detectBrowserPlatform,
   Browser as BrowserEnum,
