@@ -896,6 +896,31 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reads an attached message from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const message = createMockConsoleMessage({
+      type: 'log',
+      text: 'logged by the service worker',
+    });
+    context.getServiceWorkerConsoleMessageById.returns(message);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachConsoleMessage(2, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleMessageById,
+      'sw-1',
+      2,
+    );
+    sinon.assert.notCalled(page.getConsoleMessageById);
+    assert.ok(
+      getTextContent(content[0]).includes('logged by the service worker'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();

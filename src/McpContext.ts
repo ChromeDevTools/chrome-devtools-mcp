@@ -844,7 +844,9 @@ export class McpContext implements Context, BrowserlessContext {
   #getServiceWorkerExtensionId(serviceWorkerId: string): string {
     const worker = this.getWorkerById(serviceWorkerId);
     if (worker?.type !== 'service_worker') {
-      throw new Error('Service worker not found.');
+      throw new Error(
+        `Service worker ${serviceWorkerId} not found. Call list_pages to get the current sw-N IDs.`,
+      );
     }
     return new URL(worker.url).hostname;
   }

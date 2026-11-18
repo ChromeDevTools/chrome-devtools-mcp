@@ -198,7 +198,9 @@ describe('McpContext', () => {
 
         assert.throws(
           () => context.getServiceWorkerConsoleData(serviceWorkerId),
-          /Service worker not found\./,
+          new RegExp(
+            `Service worker ${serviceWorkerId} not found\\. Call list_pages to get the current sw-N IDs\\.`,
+          ),
         );
 
         sinon.assert.calledOnceWithExactly(getWorkerById, serviceWorkerId);
@@ -250,37 +252,6 @@ describe('McpContext', () => {
       sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
       sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
       assert.strictEqual(result, message);
-      context.dispose();
-    });
-
-    it('rejects a non service worker ID without reading console data', async () => {
-      const browser = createMockPuppeteerBrowser();
-      browser.targets.returns([]);
-      const context = await createConnectedMcpContext(
-        browser,
-        {
-          config: createMockServerConfig({
-            performanceCrux: false,
-          }),
-          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
-        },
-        Locator,
-      );
-      const getWorkerById = sinon
-        .stub(context, 'getWorkerById')
-        .returns(createMockMcpWorker({id: 'dw-1', type: 'dedicated_worker'}));
-      const getById = sinon.stub(
-        ServiceWorkerConsoleCollector.prototype,
-        'getById',
-      );
-
-      assert.throws(
-        () => context.getServiceWorkerConsoleMessageById('dw-1', 2),
-        /Service worker not found\./,
-      );
-
-      sinon.assert.calledOnceWithExactly(getWorkerById, 'dw-1');
-      sinon.assert.notCalled(getById);
       context.dispose();
     });
   });

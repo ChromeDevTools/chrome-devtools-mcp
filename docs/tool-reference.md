@@ -411,9 +411,9 @@
 
 **Parameters:**
 
-- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+- **msgid** (number) **(required)**: The msgid of a console message from [`list_console_messages`](#list_console_messages): for the page, or for the service worker when serviceWorkerId is set.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **serviceWorkerId** (string) _(optional)_: Get the message from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. Use the msgid listed for that service worker.
+- **serviceWorkerId** (string) _(optional)_: Get the message from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.
 
 ---
 

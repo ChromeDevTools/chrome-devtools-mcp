@@ -611,7 +611,7 @@ export class McpResponse implements Response {
     }
     const consoleMessageStableId = this.#attachedConsoleMessageId;
     if (this.#attachedConsoleMessageServiceWorkerId) {
-      // Service workers have no DevTools universe, like in the list tool.
+      // Service workers have no DevTools universe, so no stack trace is resolved.
       return await ConsoleFormatter.from(
         context.getServiceWorkerConsoleMessageById(
           this.#attachedConsoleMessageServiceWorkerId,
@@ -623,9 +623,7 @@ export class McpResponse implements Response {
     if (!this.#page) {
       throw new Error(`Response must have an McpPage`);
     }
-    const message = this.#page.getConsoleMessageById(
-      this.#attachedConsoleMessageId,
-    );
+    const message = this.#page.getConsoleMessageById(consoleMessageStableId);
     if ('args' in message || message instanceof UncaughtError) {
       const consoleMessage = message as ConsoleMessage | UncaughtError;
       return await ConsoleFormatter.from(consoleMessage, {

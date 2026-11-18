@@ -122,13 +122,13 @@ export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
     msgid: zod
       .number()
       .describe(
-        'The msgid of a console message on the page from the listed console messages',
+        'The msgid of a console message from list_console_messages: for the page, or for the service worker when serviceWorkerId is set.',
       ),
     serviceWorkerId: zod
       .string()
       .optional()
       .describe(
-        'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. Use the msgid listed for that service worker.',
+        'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.',
       ),
   },
   blockedByDialog: false,
