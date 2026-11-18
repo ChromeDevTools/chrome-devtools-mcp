@@ -266,6 +266,7 @@ ts_library("mcp_lib") {
     "utils/errorHandling.ts",
     "utils/files.ts",
     "utils/id.ts",
+    "utils/json.ts",
     "utils/keyboard.ts",
     "utils/logger.ts",
     "utils/network.ts",

@@ -9,6 +9,8 @@ import fs from 'node:fs/promises';
 import type {CookieData} from '../third_party/browser.js';
 import {zod} from '../third_party/index.js';
 
+import {parseJsonFile} from './json.js';
+
 const cookiesSchema = zod.array(
   zod.object({
     name: zod.string(),
@@ -43,12 +45,11 @@ export async function readCookiesFile(filePath: string): Promise<CookieData[]> {
     throw new Error(`Unable to read cookies file "${filePath}"${code}.`);
   }
 
-  let data: unknown;
-  try {
-    data = JSON.parse(contents.replace(/^\uFEFF/, ''));
-  } catch {
-    throw new Error(`Cookies file "${filePath}" must contain valid JSON.`);
-  }
+  // A JSON parse error can quote part of the input, so it is not passed on.
+  const data = parseJsonFile(
+    contents,
+    `Cookies file "${filePath}" must contain valid JSON.`,
+  );
   const result = cookiesSchema.safeParse(data);
   if (!result.success) {
     throw new Error(

@@ -114,6 +114,7 @@ ts_library("tests") {
     "utils/errorHandling.test.ts",
     "utils/files.test.ts",
     "utils/id.test.ts",
+    "utils/json.test.ts",
     "utils/keyboard.test.ts",
     "utils/logger.test.ts",
     "utils/network.test.ts",
