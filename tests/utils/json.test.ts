@@ -15,7 +15,7 @@ describe('parseJsonFile', () => {
   });
 
   it('ignores a leading UTF-8 byte order mark', () => {
-    assert.deepStrictEqual(parseJsonFile('﻿{"a":1}'), {a: 1});
+    assert.deepStrictEqual(parseJsonFile('\uFEFF{"a":1}'), {a: 1});
   });
 
   it('keeps the parser error when no message is given', () => {

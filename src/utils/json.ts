@@ -16,11 +16,14 @@
  */
 export function parseJsonFile(content: string, errorMessage?: string): unknown {
   try {
-    return JSON.parse(content.replace(/^﻿/, ''));
+    return JSON.parse(content.replace(/^\uFEFF/, ''));
   } catch (error) {
     if (errorMessage === undefined) {
       throw error;
     }
+    // Deliberately no `{cause: error}`. A JSON.parse SyntaxError quotes part of
+    // the input, and Node prints `[cause]` whenever the error is logged or
+    // inspected, so keeping it would leak the file contents we are hiding.
     throw new Error(errorMessage);
   }
 }
