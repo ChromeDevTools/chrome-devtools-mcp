@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type {TestContext} from 'node:test';
+import {after, type TestContext} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -97,6 +97,38 @@ export async function settle(): Promise<void> {
 const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
+async function closeBrowserSafely(browser: Browser): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      browser.close(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('browser.close timeout')),
+          2000,
+        );
+      }),
+    ]);
+  } catch {
+    browser.process()?.kill('SIGKILL');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function closeAllBrowsers(): Promise<void> {
+  if (browsers.size === 0) {
+    return;
+  }
+  const openBrowsers = Array.from(browsers.values());
+  browsers.clear();
+  await Promise.all(openBrowsers.map(browser => closeBrowserSafely(browser)));
+}
+
+after(async () => {
+  await closeAllBrowsers();
+});
+
 export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
   options: {
@@ -130,6 +162,7 @@ export async function withBrowser(
       browsers.set(key, browser);
     }
 
+    let runTimeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         (async () => {
@@ -145,26 +178,17 @@ export async function withBrowser(
 
           await cb(browser, newPage);
         })(),
-        new Promise((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          runTimeoutId = setTimeout(
             () => reject(new Error('withBrowser timeout exceeded')),
             60000,
-          ),
-        ),
+          );
+        }),
       ]);
       return;
     } catch (error) {
       browsers.delete(key);
-      try {
-        await Promise.race([
-          browser.close(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('browser.close timeout')), 2000),
-          ),
-        ]);
-      } catch {
-        browser.process()?.kill('SIGKILL');
-      }
+      await closeBrowserSafely(browser);
 
       const isRetryable =
         error instanceof Error &&
@@ -180,6 +204,8 @@ export async function withBrowser(
       }
       attempt++;
       await new Promise(r => setTimeout(r, 1000));
+    } finally {
+      clearTimeout(runTimeoutId);
     }
   }
 }
