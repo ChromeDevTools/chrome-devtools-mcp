@@ -14,9 +14,6 @@ import os from 'node:os';
 import path from 'node:path';
 import type {TestContext} from 'node:test';
 
-import type {Browser} from 'puppeteer';
-import puppeteer, {executablePath, Locator} from 'puppeteer';
-
 import type {
   Frame,
   HTTPRequest,
@@ -36,7 +33,16 @@ import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type CallToolResult} from '../src/third_party/index.js';
+import {
+  BrowserEnum,
+  computeExecutablePath,
+  DevTools,
+  Locator,
+  puppeteer,
+  PUPPETEER_REVISIONS,
+  type Browser,
+  type CallToolResult,
+} from '../src/third_party/index.js';
 import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
@@ -107,8 +113,7 @@ export async function withBrowser(
   let attempt = 1;
   while (attempt <= 3) {
     const launchOptions: LaunchOptions = {
-      executablePath:
-        options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+      executablePath: options.executablePath ?? (await getExecutablePath()),
       headless: !options.debug,
       defaultViewport: null,
       devtools: options.autoOpenDevTools ?? false,
@@ -460,7 +465,16 @@ export function getMockBrowser(options?: {
 }
 
 export async function getExecutablePath(): Promise<string> {
-  return process.env['PUPPETEER_EXECUTABLE_PATH'] ?? (await executablePath());
+  return (
+    process.env['PUPPETEER_EXECUTABLE_PATH'] ||
+    computeExecutablePath({
+      cacheDir:
+        process.env['PUPPETEER_CACHE_DIR'] ||
+        path.join(os.homedir(), '.cache', 'puppeteer'),
+      browser: BrowserEnum.CHROME,
+      buildId: PUPPETEER_REVISIONS.chrome,
+    })
+  );
 }
 
 export const CLI_PATH: string = path.resolve(
@@ -471,7 +485,7 @@ export const CLI_PATH: string = path.resolve(
 export async function runCli(
   args: string[],
   sessionId?: string,
-  options?: {cwd?: string},
+  options?: {cwd?: string; env?: NodeJS.ProcessEnv},
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return await new Promise((resolve, reject) => {
     const finalArgs = [...args];
@@ -480,7 +494,7 @@ export async function runCli(
       finalArgs.unshift('--sessionId', sessionId);
     }
     const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
-      env: process.env,
+      env: options?.env ? {...process.env, ...options.env} : process.env,
       cwd: options?.cwd,
     });
     let stdout = '';

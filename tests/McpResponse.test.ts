@@ -2183,6 +2183,15 @@ describe('McpResponse heap snapshot formatting', () => {
     const toonText = getTextContent(toonResult.content[0]);
     assert.ok(toonText.includes('### Object Details'));
     assert.ok(toonText.includes('Object_xxx...'));
+
+    const gcfResponse = new McpResponse(createMockServerConfig());
+    gcfResponse.setHeapSnapshotObjectDetails(longNameObjectInfo, {
+      maxNameLength: 10,
+    });
+    const gcfResult = await gcfResponse.handle(context, 'gcf');
+    const gcfText = getTextContent(gcfResult.content[0]);
+    assert.ok(gcfText.includes('### Object Details'));
+    assert.ok(gcfText.includes('Object_xxx...'));
   });
 
   it('renders the context field usage section for the filtered contexts', async () => {
