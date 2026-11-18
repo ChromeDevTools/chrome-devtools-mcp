@@ -9,7 +9,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
-import util from 'node:util';
 
 import sinon from 'sinon';
 
@@ -299,41 +298,6 @@ describe('browser', () => {
         sinon.assert.notCalled(browser.close);
       });
     }
-
-    it('suppresses protocol logging during cookie import and restores it after a failure', async () => {
-      using file = createTempFile(
-        JSON.stringify([
-          {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
-        ]),
-        'cookies.json',
-      );
-      const debugLog = Object.assign(sinon.stub(), {enabled: true});
-      sinon.stub(util, 'debuglog').returns(debugLog);
-      const browser = createMockPuppeteerBrowser();
-      const launch = sinon.stub(puppeteer, 'launch').resolves(browser);
-      browser.setCookie.callsFake(async () => {
-        const log = launch.firstCall.args[0]?.logger?.('puppeteer:protocol');
-        assert.ok(log);
-        log('Storage.setCookies COOKIE_VALUE');
-        log('Protocol error COOKIE_VALUE');
-        throw new Error('COOKIE_VALUE');
-      });
-      const manager = new BrowserManager(
-        createMockServerConfig({isolated: true, cookiesFile: file.path}),
-      );
-
-      await assert.rejects(manager.ensureBrowser(), /Unable to import cookies/);
-      sinon.assert.notCalled(debugLog);
-      const log = launch.firstCall.args[0]?.logger?.('puppeteer:protocol');
-      assert.ok(log);
-      log('visible');
-      sinon.assert.calledOnceWithExactly(
-        debugLog,
-        '%s %s',
-        sinon.match.string,
-        'visible',
-      );
-    });
 
     it('imports HttpOnly cookies into the default context and leaves new isolated contexts empty', async () => {
       using file = createTempFile(

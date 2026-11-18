@@ -44,19 +44,6 @@ export class BrowserManager {
   #closingCount = 0;
   #config: ReadonlyServerConfig;
   #options: BrowserManagerOptions;
-  #importingCookies = false;
-
-  #puppeteerLogger = (prefix: string): ReturnType<typeof puppeteerLogger> => {
-    const log = puppeteerLogger(prefix);
-    if (!log) {
-      return;
-    }
-    return (...args: unknown[]): void => {
-      if (!this.#importingCookies) {
-        log(...args);
-      }
-    };
-  };
 
   #browserAttempt: BrowserAttempt = new BrowserAttempt();
 
@@ -215,7 +202,6 @@ export class BrowserManager {
             this.#browser === browser &&
             cookies.length > 0
           ) {
-            this.#importingCookies = true;
             try {
               await browser.setCookie(...cookies);
             } catch {
@@ -223,8 +209,6 @@ export class BrowserManager {
               throw new Error(
                 `Unable to import cookies from "${cookiesFile}".`,
               );
-            } finally {
-              this.#importingCookies = false;
             }
           }
         } catch (error) {
@@ -361,7 +345,7 @@ export class BrowserManager {
         enableExtensions,
         blocklist,
         allowlist,
-        logger: this.#puppeteerLogger,
+        logger: puppeteerLogger,
         // The entry points own signal handling and call close(), which
         // closes the browser gracefully. Puppeteer's handlers would SIGKILL
         // Chrome synchronously on the same signal and win the race.
@@ -440,7 +424,7 @@ export class BrowserManager {
       handleDevToolsAsPage: true,
       blocklist,
       allowlist,
-      logger: this.#puppeteerLogger,
+      logger: puppeteerLogger,
       // Detects a transport that died without a close frame (e.g. an adb
       // port-forward torn down mid-call). Puppeteer pings the socket
       // periodically and terminates it on a missed pong, which rejects the
