@@ -503,6 +503,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **omitBackground** (boolean) _(optional)_: Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.
 

@@ -60,7 +60,7 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
-    "@google/genai": "^2.0.1",
+    "@google/genai": "^3.0.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",

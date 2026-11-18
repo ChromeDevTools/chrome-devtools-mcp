@@ -1178,7 +1178,7 @@ describe('pages', () => {
       });
     });
 
-    it('reload with accpeting the beforeunload dialog', async () => {
+    it('reload with accepting the beforeunload dialog', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
