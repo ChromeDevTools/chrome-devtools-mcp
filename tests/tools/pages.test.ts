@@ -275,25 +275,27 @@ describe('pages', () => {
 
       sinon.assert.calledOnceWithExactly(context.newPage, true, undefined);
     });
-    it('ignores background false when backgroundNewPages is set', async () => {
+    it('keeps the isolated context when backgroundNewPages is set', async () => {
       const {page, context, response, args} = createHandlerMocks({
         backgroundNewPages: true,
       });
       context.newPage.resolves(page);
 
       await newPage(args).handler(
-        {
-          params: {
-            url: 'https://example.com',
-            background: false,
-            isolatedContext: 'ctx',
-          },
-        },
+        {params: {url: 'https://example.com', isolatedContext: 'ctx'}},
         response,
         context,
       );
 
       sinon.assert.calledOnceWithExactly(context.newPage, true, 'ctx');
+    });
+    it('drops the background param from the schema when backgroundNewPages is set', () => {
+      const {args} = createHandlerMocks({backgroundNewPages: true});
+      const tool = newPage(args);
+      assert.ok(!('background' in tool.schema));
+      assert.match(tool.description, /background/);
+      const {args: defaultArgs} = createHandlerMocks();
+      assert.ok('background' in newPage(defaultArgs).schema);
     });
     it('passes background false through when backgroundNewPages is off', async () => {
       const {page, context, response, args} = createHandlerMocks();
