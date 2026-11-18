@@ -183,13 +183,17 @@ export class ServiceWorkerConsoleCollector {
   ): WithSymbolId<ConsoleMessage | UncaughtError> {
     const logs = this.#storage.get(extensionId);
     if (!logs) {
-      throw new Error('No logs found for selected extension');
+      throw new Error(
+        `No console messages found for extension ${extensionId}.`,
+      );
     }
     const item = logs.find(item => item[stableIdSymbol] === stableId);
     if (item) {
       return item;
     }
-    throw new Error('Log not found for selected extension');
+    throw new Error(
+      `Console message ${stableId} not found for extension ${extensionId}.`,
+    );
   }
 
   find(

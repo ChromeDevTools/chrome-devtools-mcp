@@ -841,15 +841,30 @@ export class McpContext implements Context, BrowserlessContext {
     return Array.from(this.#workers.values());
   }
 
-  getServiceWorkerConsoleData(
-    serviceWorkerId: string,
-  ): Array<ConsoleMessage | UncaughtError> {
+  #getServiceWorkerExtensionId(serviceWorkerId: string): string {
     const worker = this.getWorkerById(serviceWorkerId);
     if (worker?.type !== 'service_worker') {
       throw new Error('Service worker not found.');
     }
-    const extensionId = new URL(worker.url).hostname;
+    return new URL(worker.url).hostname;
+  }
+
+  getServiceWorkerConsoleData(
+    serviceWorkerId: string,
+  ): Array<ConsoleMessage | UncaughtError> {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
     return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
+  }
+
+  getServiceWorkerConsoleMessageById(
+    serviceWorkerId: string,
+    msgid: number,
+  ): ConsoleMessage | UncaughtError {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    if (!this.#serviceWorkerConsoleCollector) {
+      throw new Error('Service worker console data is not available.');
+    }
+    return this.#serviceWorkerConsoleCollector.getById(extensionId, msgid);
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {

@@ -641,6 +641,14 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. Use the msgid listed for that service worker.',
+        required: false,
+        positional: false,
+      },
     },
   },
   get_css_styles: {

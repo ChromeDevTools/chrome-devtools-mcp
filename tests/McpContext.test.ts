@@ -207,6 +207,83 @@ describe('McpContext', () => {
       });
     }
   });
+
+  describe('getServiceWorkerConsoleMessageById', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const worker = createMockMcpWorker({
+        id: 'sw-3',
+        url: 'chrome-extension://extension-id/background.js',
+      });
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(worker);
+      const message = Object.assign(
+        new UncaughtError(
+          {
+            exceptionId: 1,
+            text: 'Service worker error',
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          'extension-id',
+        ),
+        {[stableIdSymbol]: 2},
+      );
+      const getById = sinon
+        .stub(ServiceWorkerConsoleCollector.prototype, 'getById')
+        .returns(message);
+
+      const result = context.getServiceWorkerConsoleMessageById('sw-3', 2);
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
+      assert.strictEqual(result, message);
+      context.dispose();
+    });
+
+    it('rejects a non service worker ID without reading console data', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(createMockMcpWorker({id: 'dw-1', type: 'dedicated_worker'}));
+      const getById = sinon.stub(
+        ServiceWorkerConsoleCollector.prototype,
+        'getById',
+      );
+
+      assert.throws(
+        () => context.getServiceWorkerConsoleMessageById('dw-1', 2),
+        /Service worker not found\./,
+      );
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'dw-1');
+      sinon.assert.notCalled(getById);
+      context.dispose();
+    });
+  });
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();

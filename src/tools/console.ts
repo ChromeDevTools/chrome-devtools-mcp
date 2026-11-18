@@ -124,11 +124,19 @@ export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
       .describe(
         'The msgid of a console message on the page from the listed console messages',
       ),
+    serviceWorkerId: zod
+      .string()
+      .optional()
+      .describe(
+        'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. Use the msgid listed for that service worker.',
+      ),
   },
   blockedByDialog: false,
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    response.attachConsoleMessage(request.params.msgid);
+    response.attachConsoleMessage(request.params.msgid, {
+      serviceWorkerId: request.params.serviceWorkerId,
+    });
   },
 }));
