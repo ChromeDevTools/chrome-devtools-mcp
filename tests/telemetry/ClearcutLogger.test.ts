@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
@@ -16,20 +17,45 @@ import {
   FilePersistence,
   type Persistence,
 } from '../../src/telemetry/persistence.js';
-import {McpClient, WatchdogMessageType} from '../../src/telemetry/types.js';
+import {
+  McpClient,
+  OsType,
+  WatchdogMessageType,
+} from '../../src/telemetry/types.js';
+import {
+  DEFAULT_CLEARCUT_ENDPOINT,
+  type sendToClearcut,
+} from '../../src/telemetry/watchdog/ClearcutSender.js';
 import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
 import {zod} from '../../src/third_party/index.js';
+
+const NOW_MS = Date.UTC(2026, 0, 15, 12);
+const SESSION_ID = '00000000-0000-4000-8000-000000000001';
+const ENDPOINT = 'http://127.0.0.1:1234';
 
 describe('ClearcutLogger', () => {
   let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
   let mockWatchdogClient: sinon.SinonStubbedInstance<WatchdogClient>;
+  let mockSendToClearcut: sinon.SinonStub<
+    Parameters<typeof sendToClearcut>,
+    ReturnType<typeof sendToClearcut>
+  >;
 
   beforeEach(() => {
     ClearcutLogger.resetForTesting();
+    sinon.useFakeTimers({now: NOW_MS, toFake: ['Date']});
+    sinon.stub(crypto, 'randomUUID').returns(SESSION_ID);
+    sinon.stub(process, 'platform').value('linux');
     mockPersistence = sinon.createStubInstance(FilePersistence, {
       loadState: Promise.resolve({}),
     });
     mockWatchdogClient = sinon.createStubInstance(WatchdogClient);
+    mockSendToClearcut = sinon
+      .stub<
+        Parameters<typeof sendToClearcut>,
+        ReturnType<typeof sendToClearcut>
+      >()
+      .resolves({success: true});
   });
 
   afterEach(() => {
@@ -42,6 +68,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
       await logger.logToolInvocation({
         toolName: 'test_tool',
@@ -57,12 +84,14 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.tool_name, 'test_tool');
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 250);
+      sinon.assert.notCalled(mockSendToClearcut);
     });
     it('sends context when provided', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
       await logger.logToolInvocation({
         toolName: 'test_tool',
@@ -92,6 +121,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       const schema = {
@@ -149,23 +179,34 @@ describe('ClearcutLogger', () => {
           persistence: mockPersistence,
           appVersion: '1.0.0',
           watchdogClient: mockWatchdogClient,
+          sendToClearcut: mockSendToClearcut,
+          clearcutEndpoint: ENDPOINT,
         });
 
         logger.setClientName(name);
         await logger.logServerStart({headless: true});
 
-        sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
-          type: WatchdogMessageType.LOG_EVENT,
-          payload: {
-            mcp_client: expected,
-            ...(rawName
-              ? {raw_mcp_client_info: {raw_client_name: rawName}}
-              : {}),
-            server_start: {
-              flag_usage: {headless: true},
+        sinon.assert.calledOnceWithExactly(
+          mockSendToClearcut,
+          [
+            {
+              event: {
+                mcp_client: expected,
+                ...(rawName
+                  ? {raw_mcp_client_info: {raw_client_name: rawName}}
+                  : {}),
+                server_start: {
+                  flag_usage: {headless: true},
+                },
+                session_id: SESSION_ID,
+                app_version: '1.0.0',
+                os_type: OsType.OS_TYPE_LINUX,
+              },
+              timestamp: NOW_MS,
             },
-          },
-        });
+          ],
+          {clearcutEndpoint: ENDPOINT, includePidHeader: false},
+        );
       });
     }
   });
@@ -176,6 +217,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await logger.logServerError({
@@ -200,6 +242,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await logger.logServerError({
@@ -220,24 +263,68 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logServerStart', () => {
-    it('logs flag usage', async () => {
+    it('sends server_start directly instead of via the watchdog', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+        clearcutEndpoint: ENDPOINT,
       });
 
       await logger.logServerStart({headless: true});
 
-      sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
-        type: WatchdogMessageType.LOG_EVENT,
-        payload: {
-          mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
-          server_start: {
-            flag_usage: {headless: true},
+      sinon.assert.calledOnceWithExactly(
+        mockSendToClearcut,
+        [
+          {
+            event: {
+              mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+              server_start: {
+                flag_usage: {headless: true},
+              },
+              session_id: SESSION_ID,
+              app_version: '1.0.0',
+              os_type: OsType.OS_TYPE_LINUX,
+            },
+            timestamp: NOW_MS,
           },
-        },
+        ],
+        {clearcutEndpoint: ENDPOINT, includePidHeader: false},
+      );
+      sinon.assert.notCalled(mockWatchdogClient.send);
+    });
+
+    it('sends to the default endpoint when clearcutEndpoint is not set', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
+
+      await logger.logServerStart({headless: true});
+
+      sinon.assert.calledOnceWithExactly(
+        mockSendToClearcut,
+        sinon.match.array,
+        {clearcutEndpoint: DEFAULT_CLEARCUT_ENDPOINT, includePidHeader: false},
+      );
+    });
+
+    it('does not throw when the direct send rejects', async () => {
+      mockSendToClearcut.rejects(new Error('Network error'));
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+      });
+
+      await logger.logServerStart({headless: true});
+
+      sinon.assert.calledOnce(mockSendToClearcut);
+      sinon.assert.notCalled(mockWatchdogClient.send);
     });
   });
 
@@ -254,19 +341,18 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await logger.logDailyActiveIfNeeded();
 
-      sinon.assert.calledOnce(mockWatchdogClient.send);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-      assert.ok(msg.payload.daily_active);
-      assert.notStrictEqual(
-        msg.payload.daily_active.days_since_last_active,
-        undefined,
+      sinon.assert.calledOnce(mockSendToClearcut);
+      const [[sentEvent]] = mockSendToClearcut.firstCall.args;
+      assert.strictEqual(
+        sentEvent.event.daily_active?.days_since_last_active,
+        1,
       );
-
+      sinon.assert.notCalled(mockWatchdogClient.send);
       sinon.assert.called(mockPersistence.saveState);
     });
 
@@ -281,14 +367,17 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await logger.logDailyActiveIfNeeded();
 
-      sinon.assert.calledOnce(mockWatchdogClient.send);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-      assert.strictEqual(msg.payload.daily_active?.days_since_last_active, 31);
+      sinon.assert.calledOnce(mockSendToClearcut);
+      const [[sentEvent]] = mockSendToClearcut.firstCall.args;
+      assert.strictEqual(
+        sentEvent.event.daily_active?.days_since_last_active,
+        31,
+      );
       sinon.assert.called(mockPersistence.saveState);
     });
 
@@ -301,30 +390,68 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await logger.logDailyActiveIfNeeded();
 
+      sinon.assert.notCalled(mockSendToClearcut);
       sinon.assert.notCalled(mockWatchdogClient.send);
       sinon.assert.notCalled(mockPersistence.saveState);
     });
 
-    it('logs daily active with -1 if lastActive is missing', async () => {
+    it('sends daily_active directly with -1 if lastActive is missing', async () => {
       mockPersistence.loadState.resolves({});
 
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+        clearcutEndpoint: ENDPOINT,
       });
 
       await logger.logDailyActiveIfNeeded();
 
-      sinon.assert.calledOnce(mockWatchdogClient.send);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-      assert.strictEqual(msg.payload.daily_active?.days_since_last_active, -1);
-      sinon.assert.called(mockPersistence.saveState);
+      sinon.assert.calledOnceWithExactly(
+        mockSendToClearcut,
+        [
+          {
+            event: {
+              mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+              daily_active: {days_since_last_active: -1},
+              session_id: SESSION_ID,
+              app_version: '1.0.0',
+              os_type: OsType.OS_TYPE_LINUX,
+            },
+            timestamp: NOW_MS,
+          },
+        ],
+        {clearcutEndpoint: ENDPOINT, includePidHeader: false},
+      );
+      sinon.assert.notCalled(mockWatchdogClient.send);
+      sinon.assert.calledOnceWithExactly(mockPersistence.saveState, {
+        lastActive: new Date(NOW_MS).toISOString(),
+      });
+    });
+
+    it('saves state when the direct send fails', async () => {
+      mockPersistence.loadState.resolves({});
+      mockSendToClearcut.resolves({success: false});
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+      });
+
+      await logger.logDailyActiveIfNeeded();
+
+      sinon.assert.calledOnce(mockSendToClearcut);
+      sinon.assert.calledOnceWithExactly(mockPersistence.saveState, {
+        lastActive: new Date(NOW_MS).toISOString(),
+      });
     });
   });
 
@@ -336,6 +463,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       // Wait for initial loadState to populate #state
@@ -384,6 +512,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await Promise.resolve();
@@ -419,6 +548,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await Promise.resolve();
@@ -459,6 +589,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       await Promise.resolve();
@@ -493,6 +624,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
       assert.strictEqual(ClearcutLogger.get(), logger);
     });
@@ -502,6 +634,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       assert.throws(() => {
@@ -509,6 +642,7 @@ describe('ClearcutLogger', () => {
           persistence: mockPersistence,
           appVersion: '1.0.0',
           watchdogClient: mockWatchdogClient,
+          sendToClearcut: mockSendToClearcut,
         });
       }, /ClearcutLogger is already initialized/);
     });
@@ -518,6 +652,7 @@ describe('ClearcutLogger', () => {
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
       });
 
       ClearcutLogger.resetForTesting();

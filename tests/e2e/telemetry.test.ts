@@ -194,24 +194,20 @@ describe('Telemetry E2E', () => {
 
       const startEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_start !== undefined),
-        new Promise((_, reject) =>
+        new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error('Timeout waiting for server_start')),
             10000,
           ),
         ),
       ]);
-      assert.ok(startEvent, 'server_start event not received');
+      assert.ok(startEvent.session_id, 'server_start has no session_id');
 
-      // Now that we received an event, we should have the Watchdog PID
-      const watchdogPid = mockContext.watchdogPid;
-      assert.ok(watchdogPid, 'Watchdog PID not captured from headers');
-
-      // Assert Watchdog is actually running
+      // The server sends server_start itself, so no watchdog request yet.
       assert.strictEqual(
-        isProcessAlive(watchdogPid),
-        true,
-        'Watchdog process should be running',
+        mockContext.watchdogPid,
+        undefined,
+        'server_start should not be sent by the watchdog',
       );
 
       // Trigger shutdown
@@ -220,14 +216,22 @@ describe('Telemetry E2E', () => {
       // Verify shutdown event
       const shutdownEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_shutdown !== undefined),
-        new Promise((_, reject) =>
+        new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error('Timeout waiting for server_shutdown')),
             10000,
           ),
         ),
       ]);
-      assert.ok(shutdownEvent, 'server_shutdown event not received');
+      assert.strictEqual(
+        shutdownEvent.session_id,
+        startEvent.session_id,
+        'server_shutdown should share the session_id of server_start',
+      );
+
+      // The watchdog sends server_shutdown with its PID in the headers.
+      const watchdogPid = mockContext.watchdogPid;
+      assert.ok(watchdogPid, 'Watchdog PID not captured from headers');
 
       // Wait for Watchdog to exit naturally
       await waitForProcessExit(watchdogPid);
