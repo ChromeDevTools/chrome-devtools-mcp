@@ -274,7 +274,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('should should detect open DevTools pages', async () => {
+  it('should detect open DevTools pages', async () => {
     await withMcpContext(
       async (_response, context) => {
         const page = await context.newPage();

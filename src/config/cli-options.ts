@@ -2119,6 +2119,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      omitBackground: {
+        name: 'omitBackground',
+        type: 'boolean',
+        description:
+          'Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.',
+        required: false,
+        positional: false,
+      },
       filePath: {
         name: 'filePath',
         type: 'string',
