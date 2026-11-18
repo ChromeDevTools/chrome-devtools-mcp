@@ -509,7 +509,7 @@ export const CLI_PATH: string = path.resolve(
 export async function runCli(
   args: string[],
   sessionId?: string,
-  options?: {cwd?: string},
+  options?: {cwd?: string; env?: NodeJS.ProcessEnv},
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return await new Promise((resolve, reject) => {
     const finalArgs = [...args];
@@ -517,8 +517,19 @@ export async function runCli(
       // Prepend so that the flag is not swallowed by a trailing `--`.
       finalArgs.unshift('--sessionId', sessionId);
     }
+    let env: NodeJS.ProcessEnv = process.env;
+    if (options?.env) {
+      env = {...process.env};
+      for (const [key, value] of Object.entries(options.env)) {
+        if (value === undefined) {
+          delete env[key];
+        } else {
+          env[key] = value;
+        }
+      }
+    }
     const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
-      env: process.env,
+      env,
       cwd: options?.cwd,
     });
     let stdout = '';
