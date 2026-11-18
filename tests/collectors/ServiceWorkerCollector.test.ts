@@ -15,6 +15,7 @@ import {McpWorker} from '../../src/McpWorker.js';
 import {TargetType, type Protocol} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {
+  createMockCDPSession,
   createMockPuppeteerBrowser,
   createMockPuppeteerTarget,
 } from '../mocks.js';
@@ -96,6 +97,30 @@ describe('ServiceWorkerConsoleCollector', () => {
     await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
     await new Promise(resolve => setTimeout(resolve, 0));
     sinon.assert.calledOnce(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('bounds a failed Runtime.enable and detaches the worker session', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    const session = createMockCDPSession();
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.createCDPSession.resolves(session);
+    session.send.rejects(new Error('Runtime.enable timed out'));
+
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    sinon.assert.calledOnceWithExactly(
+      session.send,
+      'Runtime.enable',
+      undefined,
+      {timeout: 5_000},
+    );
+    sinon.assert.calledOnce(session.detach);
     collector.dispose();
   });
 });

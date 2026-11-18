@@ -21,6 +21,7 @@ import {
 } from '../utils/id.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
+const SERVICE_WORKER_SUBSCRIBE_TIMEOUT = 5_000;
 
 export class ServiceWorkerSubscriber {
   #target: Target;
@@ -38,7 +39,9 @@ export class ServiceWorkerSubscriber {
 
   async subscribe(): Promise<void> {
     this.#session = await this.#target.createCDPSession();
-    await this.#session.send('Runtime.enable');
+    await this.#session.send('Runtime.enable', undefined, {
+      timeout: SERVICE_WORKER_SUBSCRIBE_TIMEOUT,
+    });
     this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
 
     this.#worker = (await this.#target.worker()) ?? undefined;
@@ -135,13 +138,12 @@ export class ServiceWorkerConsoleCollector {
         if (this.#serviceWorkerSubscribers.get(target) !== subscriber) {
           await subscriber.unsubscribe();
         }
-      } catch (err) {
+      } catch {
         if (this.#serviceWorkerSubscribers.get(target) === subscriber) {
           this.#serviceWorkerSubscribers.delete(target);
         }
-        if (!isIgnoredTargetError(err)) {
-          throw err;
-        }
+        // Extension console collection is optional; release a failed session.
+        await subscriber.unsubscribe().catch(() => {});
       }
     }
   };
@@ -152,10 +154,8 @@ export class ServiceWorkerConsoleCollector {
       this.#serviceWorkerSubscribers.delete(target);
       try {
         await subscriber.unsubscribe();
-      } catch (err) {
-        if (!isIgnoredTargetError(err)) {
-          throw err;
-        }
+      } catch {
+        // Target shutdown can race with detaching the session.
       }
     }
   };
