@@ -7,7 +7,7 @@
 import fsSync from 'node:fs';
 import path from 'node:path';
 
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import {createIdGenerator} from '../utils/id.js';
 import type {TaskQueue, TaskRunner} from '../utils/TaskRunner.js';
 

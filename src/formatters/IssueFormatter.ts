@@ -5,7 +5,7 @@
  */
 
 import {ISSUE_UTILS} from '../devtools/issueDescriptions.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import {logger} from '../utils/logger.js';
 import {substitutePlaceholders} from '../utils/text.js';
 

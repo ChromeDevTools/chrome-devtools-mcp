@@ -36,7 +36,8 @@ import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type CallToolResult} from '../src/third_party/index.js';
+import type {CallToolResult} from '../src/third_party/index.js';
+import {DevTools} from '../src/third_party/browser.js';
 import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 

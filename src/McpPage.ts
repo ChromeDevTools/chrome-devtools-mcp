@@ -26,6 +26,13 @@ import {
   type NetworkMockInput,
 } from './NetworkOverrideManager.js';
 import {
+  type Flags,
+  type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
+} from './third_party/index.js';
+import {
   type Locator,
   PredefinedNetworkConditions,
   type Dialog,
@@ -39,12 +46,7 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
-  type Flags,
-  type JSONSchema7Definition,
-  lighthouseNavigation,
-  lighthouseSnapshot,
-  type RunnerResult,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,

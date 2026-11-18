@@ -10,7 +10,7 @@ import {
   DevTools,
   type HTTPRequest,
   type HTTPResponse,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 import {truncateText, truncateUrl} from '../utils/text.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;

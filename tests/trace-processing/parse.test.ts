@@ -15,7 +15,7 @@ import {
   getTraceSummary,
   parseRawTraceBuffer,
 } from '../../src/processors/PerformanceTrace.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 
 import {loadTraceAsBuffer} from './fixtures/load.js';
 

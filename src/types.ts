@@ -8,7 +8,7 @@ import type {
   SerializedAXNode,
   Viewport,
   DevTools,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;

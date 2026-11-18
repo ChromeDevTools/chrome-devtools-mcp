@@ -45,17 +45,19 @@ import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
-  DevTools,
   getToonEncode,
   getGcfEncode,
-  type ConsoleMessage,
   type ImageContent,
-  type ResourceType,
   type TextContent,
+} from './third_party/index.js';
+import {
+  DevTools,
+  type ConsoleMessage,
+  type ResourceType,
   type Extension,
   type HTTPRequest,
   type Protocol,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {

@@ -14,7 +14,7 @@ import {
   HeapSnapshotManager,
 } from '../../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../../src/utils/TaskRunner.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 
 describe('HeapSnapshotManager', () => {
   it('rejects when a file without .heapsnapshot or .heaptimeline extension is passed', async () => {

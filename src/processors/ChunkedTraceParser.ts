@@ -10,7 +10,7 @@
  * This parser scans raw byte buffers, finds event boundaries, and parses events in batches.
  */
 
-import type {DevTools} from '../third_party/index.js';
+import type {DevTools} from '../third_party/browser.js';
 
 /**
  * Represents the output of a parsed trace buffer.
