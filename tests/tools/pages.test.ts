@@ -261,6 +261,52 @@ describe('pages', () => {
         page.pptrPage.goto,
       );
     });
+    it('opens pages in the background when backgroundNewPages is set', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        backgroundNewPages: true,
+      });
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com'}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, true, undefined);
+    });
+    it('ignores background false when backgroundNewPages is set', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        backgroundNewPages: true,
+      });
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {
+          params: {
+            url: 'https://example.com',
+            background: false,
+            isolatedContext: 'ctx',
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, true, 'ctx');
+    });
+    it('passes background false through when backgroundNewPages is off', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com', background: false}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, false, undefined);
+    });
     it('closes the new tab and restores the selection when navigation fails', async () => {
       const {
         page: previousPage,

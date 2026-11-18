@@ -147,7 +147,7 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
         // Nothing is selected, so there is no selection to restore on failure.
       }
       const page = await context.newPage(
-        request.params.background,
+        args?.backgroundNewPages ? true : request.params.background,
         request.params.isolatedContext,
       );
       response.includeConsoleErrorsFrom(page);
