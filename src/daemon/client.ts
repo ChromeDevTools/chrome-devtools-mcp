@@ -29,6 +29,7 @@ import {
   getSocketPath,
   getPidFilePath,
   isDaemonRunning,
+  assertSafeRuntimeDir,
 } from './utils.js';
 
 const FILE_TIMEOUT = 10_000;
@@ -185,6 +186,11 @@ export async function sendCommand(
   }
 
   const socketPath = getSocketPath(sessionId);
+
+  // Mirror the daemon's runtime-directory validation before connecting, so a
+  // socket planted in a tampered (non-owned or group/world-writable) directory
+  // is rejected by the client too, not only when the daemon created it.
+  assertSafeRuntimeDir(path.dirname(socketPath));
 
   const socket = net.createConnection({
     path: socketPath,

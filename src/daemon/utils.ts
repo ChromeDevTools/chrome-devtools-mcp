@@ -77,6 +77,51 @@ export function getPidFilePath(sessionId: string): string {
   return path.join(runtimeDir, 'daemon.pid');
 }
 
+/**
+ * Validates that a runtime directory is safe to trust on POSIX systems before a
+ * socket or PID file inside it is created or connected to.
+ *
+ * Both the daemon (which creates the directory) and the client (which connects
+ * to the socket inside it) must call this, so the ownership/permission
+ * guarantee is enforced symmetrically on every use — not only when the daemon
+ * first creates the directory. On Windows this is a no-op, since named pipes
+ * embed the username to prevent cross-user squatting.
+ *
+ * Throws if the directory is a symbolic link, is not owned by the current user,
+ * or is writable by group or others.
+ */
+export function assertSafeRuntimeDir(dir: string): void {
+  if (IS_WINDOWS) {
+    return;
+  }
+
+  const stats = fs.lstatSync(dir);
+
+  // 1. Reject symlinked runtime directories before checking ownership.
+  if (stats.isSymbolicLink()) {
+    throw new Error(
+      `Refusing to use runtime directory ${dir}: it must not be a symbolic link. Possible tampering.`,
+    );
+  }
+
+  // 2. Ensure the directory is owned by the current user.
+  const currentUserUid = os.userInfo().uid;
+  if (stats.uid !== currentUserUid) {
+    throw new Error(
+      `Refusing to use runtime directory ${dir}: not owned by the current user ` +
+        `(expected uid ${currentUserUid}, found ${stats.uid}). Possible tampering.`,
+    );
+  }
+
+  // 3. Ensure the directory is not group- or world-writable.
+  if (stats.mode & fs.constants.S_IWGRP || stats.mode & fs.constants.S_IWOTH) {
+    throw new Error(
+      `Refusing to use runtime directory ${dir}: insecure permissions ` +
+        `(mode ${stats.mode.toString(8)}). It must not be writable by group or others.`,
+    );
+  }
+}
+
 export function getDaemonPid(sessionId: string): number | null {
   assertValidSessionId(sessionId);
   try {
