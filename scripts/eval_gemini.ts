@@ -19,7 +19,7 @@ import {
   Result,
   type CapturedFunctionCall,
   type TestScenario,
-} from './eval_result.js';
+} from './eval_result.ts';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
@@ -152,7 +152,8 @@ async function runSingleScenario(
       return response;
     };
 
-    const ai = new GoogleGenAI({apiKey});
+    // Preview models require v1beta; @google/genai v3 defaults to v1.
+    const ai = new GoogleGenAI({apiKey, apiVersion: 'v1beta'});
 
     debugLog(`\n--- Prompt ---\n${scenario.prompt}`);
 
