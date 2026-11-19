@@ -205,4 +205,5 @@ chrome-devtools start   # Start or restart chrome-devtools-mcp
 chrome-devtools start --headless=false # Start with visible browser window
 chrome-devtools status  # Checks if chrome-devtools-mcp is running
 chrome-devtools stop    # Stop chrome-devtools-mcp if any
+chrome-devtools start --sessionId=<uuid> # Separate daemon and browser; pass the same --sessionId to every command
 ```

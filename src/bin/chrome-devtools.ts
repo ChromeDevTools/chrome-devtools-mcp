@@ -22,6 +22,8 @@ import {
   isDaemonRunning,
   serializeArgs,
   assertValidSessionId,
+  getDefaultSessionId,
+  SESSION_ID_ENV_VAR,
 } from '../daemon/utils.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
 import {stripTerminalEscapes} from '../utils/logger.js';
@@ -85,9 +87,10 @@ const y = yargs(cliArgs)
   )
   .option('sessionId', {
     type: 'string',
-    description: 'Session ID for daemon scoping',
-    default: process.env.CD4A_INTERNAL_DAEMON_SESSION_ID || '',
-    hidden: true,
+    description:
+      'Use a separate daemon, browser and tabs for this ID. Use hex digits and dashes, for example a UUID. Commands without an ID share one default daemon. Pass the same ID to start, status, stop and every tool command.',
+    default: getDefaultSessionId(process.env),
+    defaultDescription: `$${SESSION_ID_ENV_VAR}`,
     coerce: (sessionId: string) => {
       assertValidSessionId(sessionId);
       return sessionId;
