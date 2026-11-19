@@ -418,6 +418,45 @@ describe('network', () => {
   });
 
   describe('list_network_requests', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          listNetworkRequests(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          listNetworkRequests(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
+    it('forwards serviceWorkerId without reading DevTools data', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await listNetworkRequests(args).handler(
+        {params: {serviceWorkerId: 'sw-1', pageSize: 5}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.setIncludeNetworkRequests,
+        true,
+        {
+          pageSize: 5,
+          pageIdx: undefined,
+          resourceTypes: undefined,
+          serviceWorkerId: 'sw-1',
+        },
+      );
+      sinon.assert.notCalled(page.getDevToolsData);
+    });
+
     it('describes the default preserved navigation history', () => {
       const tool = listNetworkRequests(createMockParsedArguments());
       assert.strictEqual(

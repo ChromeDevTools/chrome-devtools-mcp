@@ -1466,10 +1466,18 @@ export const commands: Commands = {
         name: 'includePreservedRequests',
         type: 'boolean',
         description:
-          'Set to true to return the preserved requests over the last 3 navigations.',
+          'Set to true to return the preserved requests over the last 3 navigations. Ignored when serviceWorkerId is set.',
         required: false,
         positional: false,
         default: false,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'List requests made by the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set.',
+        required: false,
+        positional: false,
       },
     },
   },

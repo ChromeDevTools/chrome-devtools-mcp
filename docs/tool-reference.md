@@ -375,10 +375,11 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
+- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations. Ignored when serviceWorkerId is set.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+- **serviceWorkerId** (string) _(optional)_: List requests made by the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. pageId is ignored when set.
 
 ---
 

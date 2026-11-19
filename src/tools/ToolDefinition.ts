@@ -292,6 +292,7 @@ export interface Response {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      serviceWorkerId?: string;
     },
   ): void;
   setIncludeConsoleData(

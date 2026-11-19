@@ -78,13 +78,33 @@ export const listNetworkRequests: PageToolFactory = definePageTool(
         .default(false)
         .optional()
         .describe(
-          `Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.`,
+          `Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.${args.categoryExtensions ? ' Ignored when serviceWorkerId is set.' : ''}`,
         ),
+      ...(args.categoryExtensions
+        ? {
+            serviceWorkerId: zod
+              .string()
+              .optional()
+              .describe(
+                'List requests made by the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set.',
+              ),
+          }
+        : {}),
     },
     blockedByDialog: false,
     concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
+      const {serviceWorkerId} = request.params;
+      if (serviceWorkerId) {
+        response.setIncludeNetworkRequests(true, {
+          pageSize: request.params.pageSize,
+          pageIdx: request.params.pageIdx,
+          resourceTypes: request.params.resourceTypes,
+          serviceWorkerId,
+        });
+        return;
+      }
       const data = await request.page.getDevToolsData();
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId

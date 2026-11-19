@@ -14,7 +14,7 @@ import {pathToFileURL} from 'node:url';
 import sinon from 'sinon';
 
 import {UncaughtError} from '../src/collectors/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from '../src/collectors/ServiceWorkerCollector.js';
+import {ExtensionItemStore} from '../src/collectors/ServiceWorkerCollector.js';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
@@ -39,6 +39,7 @@ import {stableIdSymbol} from '../src/utils/id.js';
 
 import type {ServerConfig} from '../src/config/ServerConfig.js';
 import {
+  createMockHTTPRequest,
   createMockMcpWorker,
   createMockPuppeteerBrowser,
   createMockPuppeteerPage,
@@ -159,7 +160,7 @@ describe('McpContext', () => {
         ),
       ];
       const getData = sinon
-        .stub(ServiceWorkerConsoleCollector.prototype, 'getData')
+        .stub(ExtensionItemStore.prototype, 'getData')
         .returns(messages);
 
       const result = context.getServiceWorkerConsoleData('sw-3');
@@ -191,10 +192,7 @@ describe('McpContext', () => {
         getWorkerById
           .withArgs('shw-2')
           .returns(createMockMcpWorker({id: 'shw-2', type: 'shared_worker'}));
-        const getData = sinon.stub(
-          ServiceWorkerConsoleCollector.prototype,
-          'getData',
-        );
+        const getData = sinon.stub(ExtensionItemStore.prototype, 'getData');
 
         assert.throws(
           () => context.getServiceWorkerConsoleData(serviceWorkerId),
@@ -244,7 +242,7 @@ describe('McpContext', () => {
         {[stableIdSymbol]: 2},
       );
       const getById = sinon
-        .stub(ServiceWorkerConsoleCollector.prototype, 'getById')
+        .stub(ExtensionItemStore.prototype, 'getById')
         .returns(message);
 
       const result = context.getServiceWorkerConsoleMessageById('sw-3', 2);
@@ -252,6 +250,40 @@ describe('McpContext', () => {
       sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
       sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
       assert.strictEqual(result, message);
+      context.dispose();
+    });
+  });
+
+  describe('getServiceWorkerNetworkData', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const getWorkerById = sinon.stub(context, 'getWorkerById').returns(
+        createMockMcpWorker({
+          id: 'sw-3',
+          url: 'chrome-extension://extension-id/background.js',
+        }),
+      );
+      const requests = [createMockHTTPRequest()];
+      const getData = sinon
+        .stub(ExtensionItemStore.prototype, 'getData')
+        .returns(requests);
+
+      const result = context.getServiceWorkerNetworkData('sw-3');
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getData, 'extension-id');
+      assert.strictEqual(result, requests);
       context.dispose();
     });
   });
