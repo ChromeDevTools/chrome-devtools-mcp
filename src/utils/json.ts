@@ -21,9 +21,7 @@ export function parseJsonFile(content: string, errorMessage?: string): unknown {
     if (errorMessage === undefined) {
       throw error;
     }
-    // Deliberately no `{cause: error}`. A JSON.parse SyntaxError quotes part of
-    // the input, and Node prints `[cause]` whenever the error is logged or
-    // inspected, so keeping it would leak the file contents we are hiding.
+    // No `cause`: the SyntaxError quotes part of the input and Node logs it.
     throw new Error(errorMessage);
   }
 }

@@ -35,6 +35,20 @@ const cookiesSchema = zod.array(
   }),
 );
 
+function formatIssuePath(
+  path: ReadonlyArray<string | number | symbol>,
+): string {
+  return path
+    .map((key, index) =>
+      typeof key === 'number'
+        ? `[${key}]`
+        : index === 0
+          ? String(key)
+          : `.${String(key)}`,
+    )
+    .join('');
+}
+
 export async function readCookiesFile(filePath: string): Promise<CookieData[]> {
   let contents: string;
   try {
@@ -45,15 +59,19 @@ export async function readCookiesFile(filePath: string): Promise<CookieData[]> {
     throw new Error(`Unable to read cookies file "${filePath}"${code}.`);
   }
 
-  // A JSON parse error can quote part of the input, so it is not passed on.
   const data = parseJsonFile(
     contents,
     `Cookies file "${filePath}" must contain valid JSON.`,
   );
   const result = cookiesSchema.safeParse(data);
   if (!result.success) {
+    // The path names the invalid entry and field, never a cookie value.
+    const [issue] = result.error.issues;
+    const location = issue?.path.length
+      ? ` Invalid value at ${formatIssuePath(issue.path)}.`
+      : '';
     throw new Error(
-      `Cookies file "${filePath}" must contain a Puppeteer CookieData array.`,
+      `Cookies file "${filePath}" must contain a Puppeteer CookieData array.${location}`,
     );
   }
   return result.data;

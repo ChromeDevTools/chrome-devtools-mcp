@@ -79,15 +79,19 @@ The file must contain a JSON array of
 ]
 ```
 
-Cookies are loaded before the first tool uses the browser and again if the
-server reconnects or relaunches it. The file is not watched; restart the
-server after replacing it to reload a session. Relative paths resolve from
-the server's working directory. Invalid files fail browser initialization.
+The file is read and imported each time the server launches Chrome or
+connects to a browser. That includes the first tool call and any later
+reconnect or relaunch. It is not watched, so a replaced file takes effect at
+the next launch or connection. Relative paths resolve from the server's
+working directory. A missing or invalid file fails browser initialization,
+including on a reconnect, so keep the file in place while the server runs.
 
 The import sets cookies in the default context without clearing other
-cookies. New isolated browser contexts start empty. With a persistent Chrome
-profile, imported cookies can remain after the server stops. Only select a
-file you trust, keep it private, and keep it out of version control.
+cookies. Each import writes the file's values again, so after a reconnect or
+relaunch it can replace newer values that a site set during the session. New
+isolated browser contexts start empty. With a persistent Chrome profile,
+imported cookies can remain after the server stops. Only select a file you
+trust, keep it private, and keep it out of version control.
 
 ## Custom browser executable
 

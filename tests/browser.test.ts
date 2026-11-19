@@ -123,7 +123,7 @@ describe('browser', () => {
       sinon.assert.calledOnceWithExactly(browser.setCookie, ...cookies);
     });
 
-    it('cleans up a launched browser without exposing a cookie import error', async () => {
+    it('cleans up a launched browser and reports why the cookie import failed', async () => {
       using file = createTempFile(
         JSON.stringify([
           {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
@@ -131,7 +131,10 @@ describe('browser', () => {
         'cookies.json',
       );
       const browser = createMockPuppeteerBrowser();
-      browser.setCookie.rejects(new Error('invalid COOKIE_VALUE'));
+      const importError = new Error(
+        'Protocol error (Storage.setCookies): Invalid cookie fields',
+      );
+      browser.setCookie.rejects(importError);
       sinon.stub(puppeteer, 'launch').resolves(browser);
       const manager = new BrowserManager(
         createMockServerConfig({
@@ -143,9 +146,11 @@ describe('browser', () => {
 
       await assert.rejects(manager.ensureBrowser(), error => {
         assert.ok(error instanceof Error);
-        assert.match(error.message, /Unable to import cookies/);
-        assert.doesNotMatch(error.stack ?? error.message, /COOKIE_VALUE/);
-        assert.strictEqual(error.cause, undefined);
+        assert.strictEqual(
+          error.message,
+          `Unable to import cookies from "${file.path}": ${importError.message}`,
+        );
+        assert.strictEqual(error.cause, importError);
         return true;
       });
       sinon.assert.calledOnceWithExactly(browser.close);
@@ -265,8 +270,15 @@ describe('browser', () => {
       sinon.assert.notCalled(browser.setCookie);
     });
 
-    for (const action of ['abandon', 'close']) {
-      it(`does not import cookies when ${action} happens while reading the file`, async () => {
+    const interruptionErrors = {
+      abandon: 'Connection attempt was abandoned before it completed.',
+      close: 'Browser was closed while initializing.',
+    };
+
+    for (const [action, interruptionError] of Object.entries(
+      interruptionErrors,
+    )) {
+      it(`does not launch when ${action} happens while reading the cookies file`, async () => {
         const readStarted = Promise.withResolvers<void>();
         const contents = Promise.withResolvers<string>();
         sinon.stub(fs.promises, 'readFile').callsFake(async () => {
@@ -291,11 +303,40 @@ describe('browser', () => {
           ]),
         );
 
-        await assert.rejects(pending, /was closed|was abandoned/);
+        await assert.rejects(pending, new Error(interruptionError));
+        await closed;
+        sinon.assert.notCalled(launch);
+      });
+
+      it(`does not import cookies when ${action} happens during launch`, async () => {
+        using file = createTempFile(
+          JSON.stringify([
+            {name: 'session', value: 'COOKIE_VALUE', domain: 'example.test'},
+          ]),
+          'cookies.json',
+        );
+        const launchStarted = Promise.withResolvers<void>();
+        const launched = Promise.withResolvers<Browser>();
+        const browser = createMockPuppeteerBrowser();
+        sinon.stub(puppeteer, 'launch').callsFake(async () => {
+          launchStarted.resolve();
+          return await launched.promise;
+        });
+        const manager = new BrowserManager(
+          createMockServerConfig({isolated: true, cookiesFile: file.path}),
+        );
+
+        const pending = manager.ensureBrowser();
+        await launchStarted.promise;
+        const closed = action === 'close' ? manager.close() : undefined;
+        if (action === 'abandon') {
+          manager.abandonPendingAttempt();
+        }
+        launched.resolve(browser);
+
+        await assert.rejects(pending, new Error(interruptionError));
         await closed;
         sinon.assert.notCalled(browser.setCookie);
-        sinon.assert.notCalled(launch);
-        sinon.assert.notCalled(browser.close);
       });
     }
 

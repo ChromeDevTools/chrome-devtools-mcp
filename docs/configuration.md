@@ -105,7 +105,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--cookiesFile`/ `--cookies-file`**
-  Load a Puppeteer CookieData JSON array from a local file into the default browser context when initializing the browser. Relative paths use the server working directory. Newly created isolated contexts remain empty. Restart the server to reload the file.
+  Load a Puppeteer CookieData JSON array from a local file into the default browser context each time the server launches or connects to a browser, including after a reconnect or relaunch. The file is read again each time and is not watched. Relative paths use the server working directory. Newly created isolated contexts remain empty.
   - **Type:** string
 
 - **`--channel`**

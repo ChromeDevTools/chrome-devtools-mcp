@@ -99,4 +99,28 @@ describe('readCookiesFile', () => {
       });
     });
   }
+
+  it('names the entry and field of an invalid cookie without its value', async () => {
+    using file = createTempFile(
+      JSON.stringify([
+        {name: 'first', value: 'COOKIE_VALUE', domain: 'example.test'},
+        {
+          name: 'second',
+          value: 'COOKIE_VALUE',
+          domain: 'example.test',
+          partitionKey: {sourceOrigin: 123},
+        },
+      ]),
+      'cookies.json',
+    );
+
+    await assert.rejects(readCookiesFile(file.path), error => {
+      assert.ok(error instanceof Error);
+      assert.strictEqual(
+        error.message,
+        `Cookies file "${file.path}" must contain a Puppeteer CookieData array. Invalid value at [1].partitionKey.`,
+      );
+      return true;
+    });
+  });
 });
