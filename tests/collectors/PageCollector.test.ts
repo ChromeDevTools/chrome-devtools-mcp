@@ -21,6 +21,7 @@ import {
   type ConsoleMessage,
   type Frame,
   type HTTPRequest,
+  createRemoteException,
   type Protocol,
 } from '../../src/third_party/browser.js';
 
@@ -681,11 +682,9 @@ describe('ConsoleCollector', () => {
     assert.strictEqual(collectedIssue.getAggregatedIssuesCount(), 1);
   });
 
-  it('emits UncaughtErrors for Runtime.exceptionThrown CDP events', async () => {
+  it('emits UncaughtErrors for page exception events', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    // @ts-expect-error internal API.
-    const cdpSession = page._client();
     const onUncaughtErrorListener = sinon.spy();
     new ConsoleCollector(page, () => {
       return {
@@ -693,13 +692,18 @@ describe('ConsoleCollector', () => {
       } as ListenerMap;
     });
 
-    cdpSession.emit('Runtime.exceptionThrown', {
-      exceptionDetails: {
-        exception: {description: 'SyntaxError: Expected {'},
+    page.emit(
+      'exception',
+      // @ts-expect-error the internal RemoteException type differs from the public one.
+      createRemoteException({
+        exceptionId: 1,
+        exception: {type: 'object', description: 'SyntaxError: Expected {'},
         text: 'Uncaught',
+        lineNumber: 0,
+        columnNumber: 0,
         stackTrace: {callFrames: []},
-      },
-    });
+      }),
+    );
 
     sinon.assert.calledOnceWithMatch(
       onUncaughtErrorListener,
