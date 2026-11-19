@@ -56,7 +56,7 @@ export const uninstallExtension: ToolFactory = defineTool(() => ({
 export const listExtensions: ToolFactory = defineTool(() => ({
   name: 'list_extensions',
   description:
-    'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.',
+    'Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,

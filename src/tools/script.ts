@@ -7,13 +7,8 @@
 import {pathToFileURL} from 'node:url';
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {
-  zod,
-  type Frame,
-  type JSHandle,
-  type Page,
-  type WebWorker,
-} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {Frame, JSHandle, Page, WebWorker} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -197,6 +192,8 @@ Example with arguments: \`(el) => el.innerText\`
 
         const evaluatable = await getPageOrFrame(page, frames);
 
+        // ToolHandler hands over the page of page-scoped tools only.
+        response.includeConsoleErrorsFrom(mcpPage);
         const result = await mcpPage.waitForEventsAfterAction(
           async () => {
             await performEvaluation(

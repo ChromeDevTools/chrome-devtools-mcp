@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {KeyInput} from '../third_party/index.js';
+import type {KeyInput} from '../third_party/browser.js';
 
 // See the KeyInput type for the list of supported keys.
 const validKeys = new Set([

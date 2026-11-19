@@ -20,6 +20,19 @@ import type {Logpoint, LogpointOptions} from './LogpointManager.js';
 import {LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
+  NetworkOverrideManager,
+  type NetworkOverride,
+  type NetworkMockFilter,
+  type NetworkMockInput,
+} from './NetworkOverrideManager.js';
+import {
+  type Flags,
+  type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
+} from './third_party/index.js';
+import {
   type Locator,
   PredefinedNetworkConditions,
   type Dialog,
@@ -33,17 +46,12 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
-  type Flags,
-  type JSONSchema7Definition,
-  lighthouseNavigation,
-  lighthouseSnapshot,
-  type RunnerResult,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
-  MatchedStyles,
+  ElementCssStyles,
   Response,
   ScreenRecorderData,
   WebAuthnAuthenticatorConfig,
@@ -154,6 +162,7 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+const DEVTOOLS_UNIVERSE_TIMEOUT_MS = 5_000;
 
 /**
  * Chrome reports a URL-derived placeholder as the target title until the
@@ -226,6 +235,7 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
+  #networkOverrideManager?: NetworkOverrideManager;
 
   constructor(
     target: Target,
@@ -367,6 +377,10 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
+      this.#networkOverrideManager = new NetworkOverrideManager(
+        page,
+        this.#config,
+      );
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
@@ -812,10 +826,21 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async openDevTools(): Promise<Page | undefined> {
+  /**
+   * Opens the DevTools window and waits until the DevTools frontend creates
+   * its universe, which also creates the CD4A bridge when it is enabled.
+   */
+  async openDevTools(): Promise<Page> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    if (this.#config.resolved.devtoolsComments) {
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    try {
+      await devtoolsPage.waitForFunction(() => Boolean(window.universe), {
+        timeout: DEVTOOLS_UNIVERSE_TIMEOUT_MS,
+      });
+    } catch (e) {
+      logger?.(
+        `DevTools might not have loaded completely within ${DEVTOOLS_UNIVERSE_TIMEOUT_MS / 1000} seconds`,
+        e,
+      );
     }
     return devtoolsPage;
   }
@@ -830,6 +855,19 @@ export class McpPage implements ContextPage {
     id: number,
   ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
     return this.consoleCollector.getById(id);
+  }
+
+  getLatestConsoleMessageId(): number {
+    const latest = this.consoleCollector.getData(true).at(-1);
+    return latest ? this.consoleCollector.getIdForResource(latest) : 0;
+  }
+
+  getConsoleDataAfter(
+    id: number,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector
+      .getData(true)
+      .filter(item => this.consoleCollector.getIdForResource(item) > id);
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {
@@ -909,6 +947,7 @@ export class McpPage implements ContextPage {
       });
     }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
+    void this.#networkOverrideManager?.dispose();
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
@@ -920,6 +959,33 @@ export class McpPage implements ContextPage {
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
     });
+  }
+
+  async mockNetwork(input: NetworkMockInput): Promise<NetworkOverride> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.mock(input);
+  }
+
+  async #getNetworkOverrideManagerForChanges(): Promise<NetworkOverrideManager> {
+    if (this.#isRunningPerformanceTrace) {
+      throw new Error(
+        'Cannot change network mocks while a performance trace is running.',
+      );
+    }
+    await this.init();
+    if (!this.#networkOverrideManager) {
+      throw new Error(`McpPage (id=${this.id}) is not initialized.`);
+    }
+    return this.#networkOverrideManager;
+  }
+
+  listNetworkMocks(filter?: NetworkMockFilter): NetworkOverride[] {
+    return this.#networkOverrideManager?.list(filter) ?? [];
+  }
+
+  async removeNetworkMocks(filter: NetworkMockFilter): Promise<number> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.remove(filter);
   }
 
   async executeThirdPartyDeveloperTool(
@@ -1242,7 +1308,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
     if (!this.textSnapshot) {
       throw new Error(
         `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
@@ -1297,14 +1363,22 @@ export class McpPage implements ContextPage {
       );
     }
 
-    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    const [matchedStyles, computedStyles] = await Promise.all([
+      cssModel.getMatchedStyles(targetElement.id),
+      cssModel.getComputedStyle(targetElement.id),
+    ]);
     if (!matchedStyles) {
       throw new Error(
         `Could not retrieve matched styles for element with uid "${uid}".`,
       );
     }
+    if (!computedStyles) {
+      logger?.(
+        `Could not retrieve computed styles for element with uid ${uid}.`,
+      );
+    }
 
-    return matchedStyles;
+    return {matchedStyles, computedStyles};
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

@@ -14,13 +14,13 @@ import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {
   DevTools,
   Frame,
   Locator,
   ScreenRecorder,
-  type JSONSchema7Definition,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
@@ -287,6 +287,109 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
+  describe('network overrides', () => {
+    it('rejects changing overrides during recording and allows clearing after stopping', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*://*:*/*.js',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      page.setIsRunningPerformanceTrace(true);
+      await assert.rejects(
+        page.mockNetwork({
+          urlPattern: '*://*:*/*.js',
+          kind: 'file',
+          responseFilePath: '/tmp/app.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /trace is running/,
+      );
+      await assert.rejects(page.removeNetworkMocks({}), /trace is running/);
+      page.setIsRunningPerformanceTrace(false);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
+      page.dispose();
+    });
+    it('initializes interception and releases it when overrides are cleared', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const overrides = await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*://*:*/*.js',
+        responseFilePath: '/tmp/replacement.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(page.listNetworkMocks(), [overrides]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkMocks(), []);
+      sinon.assert.calledWithExactly(
+        pptrPage.setRequestInterception.secondCall,
+        false,
+      );
+      sinon.assert.calledWithExactly(pptrPage.setCacheEnabled.secondCall, true);
+      page.dispose();
+    });
+
+    it('rejects setting overrides after disposal', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      page.dispose();
+      await assert.rejects(
+        page.mockNetwork({
+          kind: 'file',
+          urlPattern: '*://*:*/*.js',
+          responseFilePath: '/tmp/replacement.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /already been disposed/,
+      );
+      sinon.assert.notCalled(pptrPage.setRequestInterception);
+    });
+
+    it('filters and removes network mocks without clearing unrelated routes', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const script = await page.mockNetwork({
+        urlPattern: '*://*:*/*app.js',
+        resourceType: 'script',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      await page.mockNetwork({
+        resourceType: 'image',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(page.listNetworkMocks({resourceType: 'script'}), [
+        script,
+      ]);
+      assert.equal(await page.removeNetworkMocks({resourceType: 'image'}), 1);
+      assert.deepStrictEqual(page.listNetworkMocks(), [script]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      page.dispose();
+    });
+  });
+
   async function createMcpPage(options: {config?: ReadonlyServerConfig} = {}) {
     const pptrPage = createMockPuppeteerPage();
     pptrPage.emulateFocusedPage.resolves();
@@ -572,6 +675,55 @@ describe('McpPage', () => {
 
       sinon.assert.calledTwice(target.page);
       sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+  });
+
+  describe('getLatestConsoleMessageId() and getConsoleDataAfter()', () => {
+    function createUncaughtError(exceptionId: number): UncaughtError {
+      return new UncaughtError(
+        {
+          exceptionId,
+          text: `error-${exceptionId}`,
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+        '<mock>',
+      );
+    }
+
+    it('getLatestConsoleMessageId() returns 0 and getConsoleDataAfter() nothing for an empty collector', async () => {
+      const {mcpPage} = await createMcpPage();
+
+      assert.strictEqual(mcpPage.getLatestConsoleMessageId(), 0);
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(0), []);
+    });
+
+    it('getLatestConsoleMessageId() includes messages from an earlier navigation', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const error = createUncaughtError(1);
+      pptrPage.emit('uncaughtError', error);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+
+      const id = mcpPage.getLatestConsoleMessageId();
+
+      assert.strictEqual(id, mcpPage.consoleCollector.getIdForResource(error));
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(id), []);
+    });
+
+    it('getConsoleDataAfter() returns the messages after the id, from an earlier navigation too', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.emit('uncaughtError', createUncaughtError(1));
+      const id = mcpPage.getLatestConsoleMessageId();
+      const beforeNavigation = createUncaughtError(2);
+      pptrPage.emit('uncaughtError', beforeNavigation);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      const afterNavigation = createUncaughtError(3);
+      pptrPage.emit('uncaughtError', afterNavigation);
+
+      assert.deepStrictEqual(mcpPage.getConsoleDataAfter(id), [
+        beforeNavigation,
+        afterNavigation,
+      ]);
     });
   });
 
@@ -1381,40 +1533,38 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.commentBridge, undefined);
     });
 
-    it('creates and attaches commentBridge when openDevTools is called', async () => {
+    it('waits for the DevTools universe when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage({
         config: createMockServerConfig({devtoolsComments: true}),
       });
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      assert.strictEqual(mcpPage.commentBridge, undefined);
-
       const result = await mcpPage.openDevTools();
+
       assert.strictEqual(result, devtoolsPage);
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-    });
-
-    it('does not attach commentBridge in openDevTools() when devtoolsComments is disabled', async () => {
-      const config = createMockServerConfig({devtoolsComments: true});
-      const {mcpPage, pptrPage} = await createMcpPage({config});
-      const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves(true);
-      pptrPage.openDevTools.resolves(devtoolsPage);
-
-      await mcpPage.openDevTools();
-      assert.notStrictEqual(mcpPage.commentBridge, undefined);
-
-      config.commit(createMockServerConfig());
-      mcpPage.disposeCommentBridge();
-      devtoolsPage.exposeFunction.resetHistory();
-
-      const result = await mcpPage.openDevTools();
-      assert.strictEqual(result, devtoolsPage);
+      sinon.assert.calledOnceWithMatch(
+        devtoolsPage.waitForFunction,
+        sinon.match.func,
+        {timeout: 5_000},
+      );
+      sinon.assert.callOrder(
+        pptrPage.openDevTools,
+        devtoolsPage.waitForFunction,
+      );
       assert.strictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.notCalled(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the DevTools page when the DevTools universe wait times out', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.waitForFunction.rejects(new Error('Timed out'));
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      const result = await mcpPage.openDevTools();
+
+      assert.strictEqual(result, devtoolsPage);
     });
 
     it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
@@ -1446,7 +1596,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1489,7 +1639,7 @@ describe('McpPage', () => {
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       const bridge = mcpPage.commentBridge;
       assert.ok(bridge);
 
@@ -1508,7 +1658,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
 
       config.commit(createMockServerConfig());
@@ -1540,7 +1690,7 @@ describe('McpPage', () => {
       devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
-      await mcpPage.openDevTools();
+      await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
       mcpPage.disposeCommentBridge();
       assert.strictEqual(mcpPage.commentBridge, undefined);
 
@@ -1733,7 +1883,7 @@ describe('McpPage', () => {
     });
   });
 
-  describe('getMatchedStylesForUid()', () => {
+  describe('getCssStylesForUid()', () => {
     const server = serverHooks();
 
     function getSelectors(
@@ -1750,19 +1900,24 @@ describe('McpPage', () => {
       return selectors;
     }
 
-    async function getSelectorsForUid(
+    async function getStylesAndSelectorsForUid(
       uid: string,
       mcpPage: McpPage,
-    ): Promise<string[]> {
-      const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+    ): Promise<{
+      selectors: string[];
+      computedStyles: ReadonlyMap<string, string>;
+    }> {
+      const {matchedStyles, computedStyles} =
+        await mcpPage.getCssStylesForUid(uid);
       assert.ok(matchedStyles);
-      return getSelectors(matchedStyles);
+      assert.ok(computedStyles);
+      return {selectors: getSelectors(matchedStyles), computedStyles};
     }
 
     it('throws when snapshot has not been captured', async () => {
       const {mcpPage} = await createMcpPage();
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /No snapshot found for page/,
       );
     });
@@ -1783,7 +1938,7 @@ describe('McpPage', () => {
         verbose: false,
       });
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /Element uid "node_1" not found on page/,
       );
     });
@@ -1805,12 +1960,12 @@ describe('McpPage', () => {
         verbose: false,
       });
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /Failed to resolve backend node ID for element with uid "node_1"/,
       );
     });
 
-    it('retrieves matched styles across elements, shadow roots, and iframes', async () => {
+    it('retrieves matched and computed styles across elements, shadow roots, and iframes', async () => {
       server.addHtmlRoute(
         '/iframe_content.html',
         html`
@@ -1896,7 +2051,9 @@ describe('McpPage', () => {
         // 1. Regular element
         {
           const uid = getUidForNode(mcpPage, 'Click Me');
-          const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+          const {matchedStyles, computedStyles} =
+            await mcpPage.getCssStylesForUid(uid);
+          assert.ok(computedStyles);
           const inlineStyle = matchedStyles
             .nodeStyles()
             .find(s => s.type === DevTools.CSSStyleDeclaration.Type.Inline);
@@ -1904,27 +2061,53 @@ describe('McpPage', () => {
           const selectors = getSelectors(matchedStyles);
           assert.ok(selectors.includes('#my-button'));
           assert.ok(selectors.includes('.btn-primary'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(0, 128, 0)');
+          assert.strictEqual(computedStyles.get('font-size'), '16px');
+          assert.strictEqual(computedStyles.get('padding-top'), '8px');
         }
 
         // 2. Open shadow root
         {
           const uid = getUidForNode(mcpPage, 'Open Shadow Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.shadow-btn-open'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(100, 200, 50)');
         }
 
         // 3. Closed shadow root
         {
           const uid = getUidForNode(mcpPage, 'Closed Shadow Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.shadow-btn-closed'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(200, 50, 100)');
         }
 
         // 4. Iframe
         {
           const uid = getUidForNode(mcpPage, 'Iframe Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.frame-btn'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(255, 255, 255)');
+        }
+
+        // 5. Fallback when getComputedStyle returns null
+        {
+          sinon
+            .stub(DevTools.CSSModel.CSSModel.prototype, 'getComputedStyle')
+            .resolves(null);
+          const uid = getUidForNode(mcpPage, 'Click Me');
+          const result = await mcpPage.getCssStylesForUid(uid);
+          assert.ok(result.matchedStyles);
+          assert.strictEqual(result.computedStyles, null);
         }
       });
     });

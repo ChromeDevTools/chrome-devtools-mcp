@@ -42,7 +42,13 @@ export async function checkForUpdates(message: string): Promise<void> {
   try {
     stats = await fs.stat(cachePath);
     const data = await fs.readFile(cachePath, 'utf8');
-    cachedVersion = JSON.parse(data).version;
+    const version: unknown = JSON.parse(data).version;
+    // A cache entry that is not a valid version would make `semver.lt` throw
+    // before the refresh below runs, so every start would fail on the same
+    // file. Ignore such an entry and let the refresh replace it.
+    if (typeof version === 'string' && semver.valid(version)) {
+      cachedVersion = version;
+    }
   } catch {
     // Ignore errors reading cache.
   }

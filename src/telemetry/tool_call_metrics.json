@@ -330,7 +330,8 @@
       },
       {
         "name": "service_worker_id_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "include_stack_traces",
@@ -622,6 +623,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "omit_background",
+        "argType": "boolean"
       }
     ]
   },
@@ -1280,6 +1285,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "computed_properties_count",
+        "argType": "number"
       }
     ]
   },
@@ -1407,6 +1416,56 @@
       {
         "name": "logpoints_count",
         "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "mock_network",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      },
+      {
+        "name": "body_length",
+        "argType": "number"
+      },
+      {
+        "name": "upstream_length",
+        "argType": "number"
+      },
+      {
+        "name": "abort",
+        "argType": "boolean"
+      },
+      {
+        "name": "allow_origin_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "remove_network_mock",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "route_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
       }
     ]
   }

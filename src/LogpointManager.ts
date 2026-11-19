@@ -10,7 +10,7 @@ import {
   type TargetUniverse,
   waitForSourceMaps,
 } from './devtools/DevtoolsUtils.js';
-import {DevTools} from './third_party/index.js';
+import {DevTools} from './third_party/browser.js';
 
 export interface LogpointOptions {
   /**

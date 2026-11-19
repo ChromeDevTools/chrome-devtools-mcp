@@ -11,7 +11,6 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
 import {UncaughtError} from '../src/collectors/PageCollector.js';
@@ -25,10 +24,11 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {
   type Browser,
   type HTTPResponse,
+  Locator,
   ScreenRecorder,
   type Target,
   TargetType,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {
   parseRawTraceBuffer,
   type TraceResult,
@@ -60,13 +60,11 @@ import {
   stabilizeStructuredContent,
 } from './utils.js';
 
-const EXTENSION_WITH_SW_PATH = path.join(
-  import.meta.dirname,
-  '../../../../tests/tools/fixtures/extension-sw',
+const EXTENSION_WITH_SW_PATH = path.resolve(
+  'tests/tools/fixtures/extension-sw',
 );
-const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
-  import.meta.dirname,
-  '../../../../tests/tools/fixtures/extension-content-script',
+const EXTENSION_CONTENT_SCRIPT_PATH = path.resolve(
+  'tests/tools/fixtures/extension-content-script',
 );
 
 describe('McpContext', () => {
@@ -200,7 +198,9 @@ describe('McpContext', () => {
 
         assert.throws(
           () => context.getServiceWorkerConsoleData(serviceWorkerId),
-          /Service worker not found\./,
+          new RegExp(
+            `Service worker ${serviceWorkerId} not found\\. Call list_pages to get the current sw-N IDs\\.`,
+          ),
         );
 
         sinon.assert.calledOnceWithExactly(getWorkerById, serviceWorkerId);
@@ -208,6 +208,52 @@ describe('McpContext', () => {
         context.dispose();
       });
     }
+  });
+
+  describe('getServiceWorkerConsoleMessageById', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const worker = createMockMcpWorker({
+        id: 'sw-3',
+        url: 'chrome-extension://extension-id/background.js',
+      });
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(worker);
+      const message = Object.assign(
+        new UncaughtError(
+          {
+            exceptionId: 1,
+            text: 'Service worker error',
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          'extension-id',
+        ),
+        {[stableIdSymbol]: 2},
+      );
+      const getById = sinon
+        .stub(ServiceWorkerConsoleCollector.prototype, 'getById')
+        .returns(message);
+
+      const result = context.getServiceWorkerConsoleMessageById('sw-3', 2);
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
+      assert.strictEqual(result, message);
+      context.dispose();
+    });
   });
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
@@ -276,7 +322,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('should should detect open DevTools pages', async () => {
+  it('should detect open DevTools pages', async () => {
     await withMcpContext(
       async (_response, context) => {
         const page = await context.newPage();
@@ -1347,6 +1393,22 @@ describe('McpContext', () => {
 
   describe('loadResource', () => {
     describe('file protocol', () => {
+      it('rejects blocked file URLs before accessing the filesystem', async () => {
+        const context = await createMockContext({
+          config: createMockServerConfig({blockedUrlPattern: ['file:///*']}),
+        });
+        const validatePath = sinon.stub(context, 'validatePath');
+        try {
+          await assert.rejects(
+            context.loadResource('file:///tmp/blocked.map'),
+            /Blocked by blocklist/,
+          );
+          sinon.assert.notCalled(validatePath);
+        } finally {
+          context.dispose();
+        }
+      });
+
       it('calls validatePath', async () => {
         using testFile = createTempFile(
           'test content',
@@ -1380,6 +1442,27 @@ describe('McpContext', () => {
     });
 
     describe('https protocol', () => {
+      it('rejects non-success responses and redacts the resource URL', async () => {
+        const context = await createMockContext();
+        const response = new Response('not found', {status: 404});
+        const text = sinon.spy(response, 'text');
+        sinon.stub(globalThis, 'fetch').resolves(response);
+        try {
+          await assert.rejects(
+            context.loadResource(
+              'https://example.com/missing.map?token=secret',
+            ),
+            {
+              message:
+                'Failed to load resource: https://example.com/missing.map?REDACTED',
+            },
+          );
+          sinon.assert.notCalled(text);
+        } finally {
+          context.dispose();
+        }
+      });
+
       async function createNetworkPolicyContext(options: {
         allowlist?: string[];
         blocklist?: string[];

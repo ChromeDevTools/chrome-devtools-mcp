@@ -11,7 +11,7 @@ import {
   ConsoleFormatter,
   GroupedConsoleFormatter,
 } from '../../src/formatters/ConsoleFormatter.js';
-import type {ConsoleMessage} from '../../src/third_party/index.js';
+import type {ConsoleMessage} from '../../src/third_party/browser.js';
 
 const createMockMessage = (
   type: string,

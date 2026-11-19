@@ -7,6 +7,7 @@
 import path from 'node:path';
 
 import type {ParsedArguments} from '../config/mcp-options.js';
+import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
 
 import {
   generateReport,
@@ -266,6 +267,13 @@ export const lighthouseAudit: PageToolFactory = definePageTool(
       }
 
       const lhr = result.lhr;
+      const {warning} = new NetworkOverridesFormatter(
+        page.listNetworkMocks(),
+      ).toJSON();
+      if (warning) {
+        lhr.runWarnings.push(warning);
+        response.appendResponseLine(warning);
+      }
       const reportPaths: string[] = [];
 
       const encoder = new TextEncoder();

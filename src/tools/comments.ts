@@ -32,7 +32,10 @@ export const openDevtools: PageToolFactory = definePageTool(() => ({
   handler: async (request, response) => {
     const page = request.page;
     try {
-      await page.openDevTools();
+      const devtoolsPage = await page.openDevTools();
+      if (devtoolsPage) {
+        await page.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       response.appendResponseLine('DevTools window opened successfully.');
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

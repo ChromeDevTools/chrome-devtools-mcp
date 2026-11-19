@@ -29,8 +29,8 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  puppeteer,
 } from './third_party/index.js';
+import {puppeteer} from './third_party/browser.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -397,7 +397,7 @@ export class McpServer {
    * checks run inside `ToolHandler.handle()` inside the task runner.
    */
   #setToolCallRequestHandler(): void {
-    this.server.server.setRequestHandler('tools/call', async request => {
+    this.server.server.setRequestHandler('tools/call', async (request, ctx) => {
       const entry = this.#tools.get(request.params.name);
       if (!entry) {
         throw new ProtocolError(
@@ -407,6 +407,7 @@ export class McpServer {
       }
       const result = await entry.handler.handle(request.params.arguments, {
         viaMcp: true,
+        signal: ctx.mcpReq.signal,
       });
       return this.server.server.projectCallToolResult(result, undefined);
     });

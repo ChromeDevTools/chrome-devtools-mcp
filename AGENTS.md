@@ -89,7 +89,7 @@ Complete every item before you upload a PR or push a new revision.
       `src/formatters/*`. `McpResponse` does not resolve pages or workers.
 - [ ] If Puppeteer or devtools-frontend owns the bug, fix it there first. Do
       not copy or re-implement upstream code in this repository.
-- [ ] Puppeteer internals are imported only through `src/third_party/index.ts`.
+- [ ] Puppeteer internals are imported only through `src/third_party/`.
 - [ ] Repeated code is one helper. Extract a helper when the same block
       appears two or more times. Prefer an existing helper or a Puppeteer
       utility (for example `Deferred`) over a new one.

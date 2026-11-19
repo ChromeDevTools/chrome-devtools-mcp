@@ -7,7 +7,12 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
+import {
+  definePageTool,
+  jsonObjectTransform,
+  zodTransform,
+  type PageToolFactory,
+} from './ToolDefinition.js';
 
 export const listWebMcpTools: PageToolFactory = definePageTool(() => ({
   name: 'list_webmcp_tools',
@@ -36,6 +41,7 @@ export const executeWebMcpTool: PageToolFactory = definePageTool(() => ({
     toolName: zod.string().describe('The name of the WebMCP tool to execute'),
     input: zod
       .string()
+      .transform(zodTransform(jsonObjectTransform))
       .optional()
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
@@ -44,25 +50,7 @@ export const executeWebMcpTool: PageToolFactory = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;
-
-    let input: Record<string, unknown> = {};
-    if (request.params.input) {
-      try {
-        const parsed = JSON.parse(request.params.input);
-        if (
-          typeof parsed === 'object' &&
-          parsed !== null &&
-          !Array.isArray(parsed)
-        ) {
-          input = parsed;
-        } else {
-          throw new Error('Parsed input is not an object');
-        }
-      } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        throw new Error(`Failed to parse input as JSON: ${errorMessage}`);
-      }
-    }
+    const input = request.params.input ?? {};
 
     const tools = request.page.getWebMcpTools();
     const tool = tools.find(t => t.name === toolName);

@@ -18,6 +18,10 @@ export function linkDevToolsDeps(): void {
     ['third_party/node', 'devtools-frontend/third_party/node'],
     ['third_party/typescript', 'devtools-frontend/third_party/typescript'],
     ['third_party/cpython3', 'devtools-frontend/third_party/cpython3'],
+    [
+      'third_party/inspector_protocol',
+      'devtools-frontend/third_party/inspector_protocol',
+    ],
   ];
 
   for (const [linkRel, targetRel] of links) {

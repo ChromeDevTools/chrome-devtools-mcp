@@ -16,7 +16,7 @@ import {
   type Browser,
   type ChromeReleaseChannel,
   type LaunchOptions,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import {
   logger,
   puppeteerLogger,
@@ -115,6 +115,31 @@ export class BrowserManager {
         'container, create an unprivileged user in the image and switch to it with ' +
         "USER. For the setup that Chrome's sandbox needs, see " +
         'https://pptr.dev/troubleshooting#setting-up-chrome-linux-sandbox.',
+      {
+        cause: error,
+      },
+    );
+  }
+
+  /**
+   * Puppeteer reports a headed launch without a display as "Missing X server"
+   * and suggests its own `headless` option, which users of this server cannot
+   * set directly. Point them to the `--headless` flag instead.
+   *
+   * Returns `undefined` for headless launches and for unrelated failures.
+   */
+  static missingDisplayLaunchError(
+    error: Error,
+    headless: boolean,
+  ): Error | undefined {
+    if (headless || !error.message.includes('Missing X server')) {
+      return undefined;
+    }
+    return new Error(
+      `Chrome failed to start: ${error.message}\n\n` +
+        'No X server is available to show a headed Chrome window. Start ' +
+        'chrome-devtools-mcp with --headless, set DISPLAY to a running X ' +
+        'server, or run chrome-devtools-mcp under xvfb-run.',
       {
         cause: error,
       },
@@ -333,6 +358,13 @@ export class BrowserManager {
         const rootError = BrowserManager.rootSandboxLaunchError(error, args);
         if (rootError) {
           throw rootError;
+        }
+        const displayError = BrowserManager.missingDisplayLaunchError(
+          error,
+          headless,
+        );
+        if (displayError) {
+          throw displayError;
         }
       }
       throw error;

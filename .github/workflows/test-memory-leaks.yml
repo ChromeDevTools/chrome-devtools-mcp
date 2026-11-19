@@ -27,22 +27,18 @@ jobs:
           cache: npm
           node-version: 22
 
-      - name: Install dependencies
+      - name: Install and sync dependencies
         shell: bash
-        run: npm ci
+        run: npm run sync
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
-
-      - name: Sync DevTools dependencies
-        shell: bash
-        run: npm run gclient-sync
 
       - name: Install browser
         shell: bash
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run build
+        run: npm run build:release
 
       - name: Disable AppArmor
         shell: bash
@@ -51,3 +47,7 @@ jobs:
       - name: Run memory leak tests
         shell: bash
         run: npm run profile -- --threshold-percentage=1
+
+      - name: Check idle memory footprint
+        shell: bash
+        run: npm run profile:footprint

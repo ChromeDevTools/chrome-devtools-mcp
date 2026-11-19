@@ -40,6 +40,29 @@ runs with the same channel. Only one browser can use it at a time. Set the `isol
 option to `true` to use a temporary user data directory instead which will be cleared
 automatically after the browser is closed.
 
+## Custom browser executable
+
+By default, `chrome-devtools-mcp` launches Chrome installed in the standard
+location for the selected channel. To launch a Chrome-based browser installed
+in a custom or non-standard location, pass its executable path with
+`--executablePath` (or `-e`):
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest", "--executablePath=/path/to/chrome"]
+    }
+  }
+}
+```
+
+`--executablePath` only applies when the MCP server launches the browser. It
+cannot be combined with `--channel`, `--autoConnect`, `--browserUrl` or
+`--wsEndpoint`. To use a browser that is already running, see
+[Connecting to a running Chrome instance](#connecting-to-a-running-chrome-instance).
+
 ## Connecting to a running Chrome instance
 
 By default, the Chrome DevTools MCP server will start a new Chrome instance with a dedicated profile. This might not be ideal in all situations:

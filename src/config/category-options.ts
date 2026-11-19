@@ -98,6 +98,13 @@ const categoryOverrides: Record<
   [ToolCategory.EMULATION]: {},
   [ToolCategory.PERFORMANCE]: {},
   [ToolCategory.NETWORK]: {},
+  [ToolCategory.NETWORK_MOCKS]: {
+    describe:
+      'Set to true to include network mocking tools. ' +
+      'Changing this option requires restarting the server.',
+    offByDefault: true,
+    reloadable: false,
+  },
   [ToolCategory.DEBUGGING]: {},
   [ToolCategory.MEMORY]: {},
   [ToolCategory.WEBMCP]: {

@@ -510,14 +510,25 @@ describe('comments tools', () => {
   });
 
   describe('open_devtools', () => {
-    it('opens DevTools window successfully', async () => {
+    it('opens DevTools window and attaches the comment bridge', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       page.openDevTools.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
 
       await openDevtools(args).handler({params: {}, page}, response, context);
 
       sinon.assert.calledOnce(page.openDevTools);
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.callOrder(
+        page.openDevTools,
+        page.ensureDevToolsCommentBridge,
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'DevTools window opened successfully.',
@@ -532,6 +543,7 @@ describe('comments tools', () => {
       await openDevtools(args).handler({params: {}, page}, response, context);
 
       sinon.assert.calledOnce(page.openDevTools);
+      sinon.assert.notCalled(page.ensureDevToolsCommentBridge);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Failed to open DevTools: Connection closed',

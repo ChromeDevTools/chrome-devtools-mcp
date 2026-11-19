@@ -5,7 +5,8 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod, type CdpPage} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {CdpPage} from '../third_party/browser.js';
 import {logger} from '../utils/logger.js';
 import {validateUrl} from '../utils/url.js';
 
@@ -150,6 +151,7 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
         request.params.background,
         request.params.isolatedContext,
       );
+      response.includeConsoleErrorsFrom(page);
 
       try {
         await page.waitForEventsAfterAction(

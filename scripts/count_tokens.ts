@@ -9,7 +9,11 @@ import {parseArgs} from 'node:util';
 
 import {GoogleGenAI} from '@google/genai';
 
-const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
+// Keep v1beta so preview and -latest models passed via --model work on v3.
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  apiVersion: 'v1beta',
+});
 
 const {values, positionals} = parseArgs({
   options: {

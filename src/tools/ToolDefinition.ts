@@ -19,29 +19,32 @@ import type {Logpoint, LogpointOptions} from '../LogpointManager.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import type {
+  NetworkOverride,
+  NetworkMockFilter,
+  NetworkMockInput,
+} from '../NetworkOverrideManager.js';
+import type {
   ContextFilterOptions,
   HeapSnapshotFormatOptions,
 } from '../formatters/HeapSnapshotFormatter.js';
-import {
-  zod,
-  type Dialog,
-  type ElementHandle,
-  type Extension,
-  type GetPWAStateOptions,
-  type InstallPWAOptions,
-  type LaunchPWAOptions,
-  type PWAState,
-  type ScreenRecorder,
-  type ScreenRecording,
-  type UninstallPWAOptions,
-  type Viewport,
-  type DevTools,
-  type Flags,
-  type Protocol,
-  type Page,
-  type RunnerResult,
-  type WebMCPTool,
-} from '../third_party/index.js';
+import {zod, type Flags, type RunnerResult} from '../third_party/index.js';
+import type {
+  Dialog,
+  ElementHandle,
+  Extension,
+  GetPWAStateOptions,
+  InstallPWAOptions,
+  LaunchPWAOptions,
+  PWAState,
+  ScreenRecorder,
+  ScreenRecording,
+  UninstallPWAOptions,
+  Viewport,
+  DevTools,
+  Protocol,
+  Page,
+  WebMCPTool,
+} from '../third_party/browser.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
@@ -300,8 +303,13 @@ export interface Response {
       serviceWorkerId?: string;
     },
   ): void;
+  /**
+   * Lists the console errors and uncaught exceptions that the page raises from
+   * now until the response is handled.
+   */
+  includeConsoleErrorsFrom(page: ContextPage): void;
   setIncludeCssStyles(
-    matchedStyles: MatchedStyles,
+    styles: ElementCssStyles,
     options: CssFormatterOptions & PaginationOptions,
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
@@ -310,7 +318,10 @@ export interface Response {
     reqId: number,
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
-  attachConsoleMessage(msgid: number): void;
+  attachConsoleMessage(
+    msgid: number,
+    options?: {serviceWorkerId?: string},
+  ): void;
   attachWebAuthnAuthenticator(
     authenticator: WebAuthnAuthenticatorState | undefined,
   ): void;
@@ -356,6 +367,7 @@ export type Context = Readonly<{
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;
   getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
+  validatePath(filePath: string): Promise<string>;
   ensureExtension<Extension extends `.${string}`>(
     filePath: string,
     extension: Extension,
@@ -469,6 +481,12 @@ export type BrowserlessContext = Readonly<{
 }>;
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+export type ComputedStyles = ReadonlyMap<string, string>;
+
+export interface ElementCssStyles {
+  matchedStyles: MatchedStyles;
+  computedStyles?: ComputedStyles | null;
+}
 
 export type WebAuthnProtocol = 'ctap2' | 'u2f';
 export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
@@ -508,7 +526,7 @@ export type ContextPage = Readonly<{
   init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
-  getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  getCssStylesForUid(uid: string): Promise<ElementCssStyles>;
   configureWebAuthn(
     config: WebAuthnAuthenticatorConfig,
   ): Promise<WebAuthnAuthenticatorState | undefined>;
@@ -573,6 +591,9 @@ export type ContextPage = Readonly<{
   ): Promise<DevToolsCommentBridge | undefined>;
   lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
   lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
+  mockNetwork(input: NetworkMockInput): Promise<NetworkOverride>;
+  listNetworkMocks(filter?: NetworkMockFilter): NetworkOverride[];
+  removeNetworkMocks(filter: NetworkMockFilter): Promise<number>;
 }>;
 
 export type ToolFactory<Schema extends ToolSchema = ToolSchema> = (
@@ -822,6 +843,17 @@ export function geolocationTransform(
     latitude: parts[0],
     longitude: parts[1],
   });
+}
+
+const jsonObjectSchema = zod.record(zod.string(), zod.unknown());
+
+export function jsonObjectTransform(
+  arg: string | undefined,
+): Record<string, unknown> | undefined {
+  if (!arg) {
+    return undefined;
+  }
+  return jsonObjectSchema.parse(JSON.parse(arg));
 }
 
 export function isSlimTool(

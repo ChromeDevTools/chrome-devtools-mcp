@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Target, WebWorker} from './third_party/index.js';
+import type {Target, WebWorker} from './third_party/browser.js';
 
 /**
  * The kinds of worker target the browser exposes. Only `service_worker` is
