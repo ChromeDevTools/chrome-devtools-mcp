@@ -30,11 +30,11 @@ import {
   type JSONSchema7Definition,
   lighthouseNavigation,
   lighthouseSnapshot,
+  PredefinedNetworkConditions,
   type RunnerResult,
 } from './third_party/index.js';
 import {
   type Locator,
-  PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
   type Frame,

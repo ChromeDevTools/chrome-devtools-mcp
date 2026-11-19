@@ -18,7 +18,6 @@ export {
   EventEmitter,
   Frame,
   Locator,
-  PredefinedNetworkConditions,
   KnownDevices,
   CDPSession,
   CDPSessionEvent,
