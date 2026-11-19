@@ -140,6 +140,7 @@ export class McpResponse implements Response {
     resourceTypes?: ResourceType[];
     includePreservedRequests?: boolean;
     networkRequestIdInDevToolsUI?: number;
+    serviceWorkerId?: string;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -232,6 +233,7 @@ export class McpResponse implements Response {
       resourceTypes?: ResourceType[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      serviceWorkerId?: string;
     },
   ): void {
     if (!value) {
@@ -251,6 +253,7 @@ export class McpResponse implements Response {
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
       networkRequestIdInDevToolsUI: options?.networkRequestIdInDevToolsUI,
+      serviceWorkerId: options?.serviceWorkerId,
     };
   }
 
@@ -780,12 +783,19 @@ export class McpResponse implements Response {
     if (!this.#networkRequestsOptions?.include) {
       return undefined;
     }
-    if (!this.#page) {
-      throw new Error(`Response must have an McpPage`);
+    let requests: HTTPRequest[];
+    if (this.#networkRequestsOptions.serviceWorkerId) {
+      requests = context.getServiceWorkerNetworkData(
+        this.#networkRequestsOptions.serviceWorkerId,
+      );
+    } else {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      requests = this.#page.getNetworkRequests(
+        this.#networkRequestsOptions.includePreservedRequests,
+      );
     }
-    let requests = this.#page.getNetworkRequests(
-      this.#networkRequestsOptions?.includePreservedRequests,
-    );
 
     // Apply resource type filtering if specified
     if (this.#networkRequestsOptions.resourceTypes?.length) {

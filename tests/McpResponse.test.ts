@@ -921,6 +921,28 @@ describe('McpResponse', () => {
     );
   });
 
+  it('lists network requests from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    context.getServiceWorkerNetworkData.returns([
+      getMockRequest({url: 'https://sw.example/data.json', stableId: 1}),
+    ]);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.setIncludeNetworkRequests(true, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerNetworkData,
+      'sw-1',
+    );
+    sinon.assert.notCalled(page.getNetworkRequests);
+    assert.ok(
+      getTextContent(content[0]).includes('https://sw.example/data.json'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();

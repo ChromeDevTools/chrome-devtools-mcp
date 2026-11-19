@@ -22,7 +22,7 @@ import type {
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
+import {ServiceWorkerCollector} from './collectors/ServiceWorkerCollector.js';
 import type {Root} from './third_party/index.js';
 import {
   Locator,
@@ -31,6 +31,7 @@ import {
   type BrowserContext,
   type Connection,
   type ConsoleMessage,
+  type HTTPRequest,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
@@ -182,7 +183,7 @@ export class McpContext implements Context, BrowserlessContext {
   #selectedPageFallback?: {wasClosed: boolean};
   #selectedPageFallbackRead = false;
 
-  #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
+  #serviceWorkerCollector?: ServiceWorkerCollector;
 
   #reconnectNotice = false;
 
@@ -381,8 +382,8 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async #initBrowserState(browser: Browser): Promise<void> {
-    const collector = new ServiceWorkerConsoleCollector(browser);
-    this.#serviceWorkerConsoleCollector = collector;
+    const collector = new ServiceWorkerCollector(browser);
+    this.#serviceWorkerCollector = collector;
     // All listeners are registered synchronously, before the first await. If
     // this call hangs and is abandoned by the tool-call timeout, a later call
     // that installs a different browser removes them in #resetBrowserState().
@@ -407,7 +408,7 @@ export class McpContext implements Context, BrowserlessContext {
     this.#browser?.off('targetcreated', this.#onTargetCreated);
     this.#browser?.off('targetdestroyed', this.#onTargetDestroyed);
 
-    this.#serviceWorkerConsoleCollector?.dispose();
+    this.#serviceWorkerCollector?.dispose();
     for (const mcpPage of this.#allMcpPages()) {
       this.#disposeMcpPage(mcpPage);
     }
@@ -422,7 +423,7 @@ export class McpContext implements Context, BrowserlessContext {
     this.#selectedPageFallback = undefined;
     this.#selectedPageFallbackRead = false;
     this.#traceResults = [];
-    this.#serviceWorkerConsoleCollector = undefined;
+    this.#serviceWorkerCollector = undefined;
     this.#browser = undefined;
     this.#browserReady = undefined;
   }
@@ -861,7 +862,7 @@ export class McpContext implements Context, BrowserlessContext {
     serviceWorkerId: string,
   ): Array<ConsoleMessage | UncaughtError> {
     const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
-    return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
+    return this.#serviceWorkerCollector?.console.getData(extensionId) ?? [];
   }
 
   getServiceWorkerConsoleMessageById(
@@ -869,10 +870,15 @@ export class McpContext implements Context, BrowserlessContext {
     msgid: number,
   ): ConsoleMessage | UncaughtError {
     const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
-    if (!this.#serviceWorkerConsoleCollector) {
+    if (!this.#serviceWorkerCollector) {
       throw new Error('Service worker console data is not available.');
     }
-    return this.#serviceWorkerConsoleCollector.getById(extensionId, msgid);
+    return this.#serviceWorkerCollector.console.getById(extensionId, msgid);
+  }
+
+  getServiceWorkerNetworkData(serviceWorkerId: string): HTTPRequest[] {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    return this.#serviceWorkerCollector?.network.getData(extensionId) ?? [];
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {
