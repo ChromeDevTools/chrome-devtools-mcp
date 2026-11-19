@@ -538,7 +538,12 @@ export default defineConfig([
   },
   {
     name: 'Modules that must not load the browser bundle',
-    files: ['src/tools/**/*.ts', 'src/config/**/*.ts', 'src/telemetry/**/*.ts'],
+    files: [
+      'src/tools/**/*.ts',
+      'src/config/**/*.ts',
+      'src/telemetry/**/*.ts',
+      'src/BrowserManager.ts',
+    ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

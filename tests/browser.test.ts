@@ -188,6 +188,36 @@ describe('browser', () => {
       });
     });
 
+    it('disables following symlinks in Puppeteer before launching', async () => {
+      const setFollowSymlinksStub = sinon.stub(puppeteer, 'setFollowSymlinks');
+      const launchStub = sinon
+        .stub(puppeteer, 'launch')
+        .resolves(createMockPuppeteerBrowser());
+      const manager = new BrowserManager(
+        createMockServerConfig({isolated: true}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithExactly(setFollowSymlinksStub, false);
+      sinon.assert.callOrder(setFollowSymlinksStub, launchStub);
+    });
+
+    it('disables following symlinks in Puppeteer before connecting', async () => {
+      const setFollowSymlinksStub = sinon.stub(puppeteer, 'setFollowSymlinks');
+      const connectStub = sinon
+        .stub(puppeteer, 'connect')
+        .resolves(createMockPuppeteerBrowser());
+      const manager = new BrowserManager(
+        createMockServerConfig({browserUrl: 'http://127.0.0.1:9222'}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithExactly(setFollowSymlinksStub, false);
+      sinon.assert.callOrder(setFollowSymlinksStub, connectStub);
+    });
+
     it('connects to a browser when browserUrl is set and disconnects on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch');
