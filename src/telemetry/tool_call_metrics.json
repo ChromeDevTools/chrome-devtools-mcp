@@ -220,10 +220,6 @@
       {
         "name": "page_id",
         "argType": "number"
-      },
-      {
-        "name": "service_worker_id_length",
-        "argType": "number"
       }
     ]
   },
@@ -334,7 +330,8 @@
       },
       {
         "name": "service_worker_id_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "include_stack_traces",

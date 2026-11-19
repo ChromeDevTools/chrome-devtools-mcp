@@ -147,6 +147,21 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          listConsoleMessages(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          listConsoleMessages(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
     it('describes the default preserved navigation history', () => {
       const tool = listConsoleMessages(createMockParsedArguments());
       assert.strictEqual(
@@ -444,7 +459,9 @@ describe('console', () => {
     const server = serverHooks();
 
     it('forwards serviceWorkerId', async () => {
-      const {page, context, response, args} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
 
       await getConsoleMessage(args).handler(
         {params: {msgid: 2, serviceWorkerId: 'sw-1'}, page},
@@ -455,6 +472,21 @@ describe('console', () => {
       sinon.assert.calledOnceWithExactly(response.attachConsoleMessage, 2, {
         serviceWorkerId: 'sw-1',
       });
+    });
+
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          getConsoleMessage(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          getConsoleMessage(createMockParsedArguments()).schema
+        ),
+      );
     });
 
     it('gets a specific console message', async () => {
