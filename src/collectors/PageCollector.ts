@@ -17,6 +17,7 @@ import {
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
+  type RemoteException,
 } from '../third_party/browser.js';
 import {
   createIdGenerator,
@@ -285,7 +286,7 @@ class PageEventSubscriber {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
-    this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
+    this.#page.on('exception', this.#onException);
     this.#attachFrameNavigatedWithinDocumentListener();
   }
 
@@ -295,7 +296,7 @@ class PageEventSubscriber {
     this.#detachFrameNavigatedWithinDocumentListener();
     this.#page.off('framenavigated', this.#onFrameNavigated);
     this.#page.off('issue', this.#onIssueAdded);
-    this.#session.off('Runtime.exceptionThrown', this.#onExceptionThrown);
+    this.#page.off('exception', this.#onException);
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
@@ -314,10 +315,18 @@ class PageEventSubscriber {
     this.#page.emit('devtoolsAggregatedIssue', event.data);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
+  #onException = (exception: RemoteException): void => {
+    const details: Protocol.Runtime.ExceptionDetails | undefined =
+      // @ts-expect-error use internal Puppeteer API to get raw exception details.
+      exception._rawExceptionDetails();
+    if (!details) {
+      return;
+    }
+    // Keep the exception object alive so its stack and cause resolve later.
+    exception.handle()?.move();
     this.#page.emit(
       'uncaughtError',
-      new UncaughtError(event.exceptionDetails, this.#targetId, this.#session),
+      new UncaughtError(details, this.#targetId, this.#session),
     );
   };
 
