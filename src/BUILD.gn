@@ -84,6 +84,7 @@ third_party_bundle("third_party_index_bundle") {
   node_require_shim = true
   external = [
     # Separate files in the same directory.
+    "./browser.js",
     "./cli.js",
     "./lighthouse-devtools-mcp-bundle.js",
 

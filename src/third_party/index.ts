@@ -11,6 +11,7 @@ import 'core-js/proposals/iterator-helpers.js';
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 
+import type * as BrowserBundle from './browser.js';
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
 import * as zod from './zod.js';
 
@@ -66,6 +67,17 @@ export async function getToonEncode(): Promise<(val: unknown) => string> {
 export async function getGcfEncode(): Promise<(val: unknown) => string> {
   const {encodeGeneric} = await import('@blackwell-systems/gcf');
   return encodeGeneric;
+}
+
+let browserBundle: Promise<typeof BrowserBundle> | undefined;
+
+/**
+ * Loads the Puppeteer and DevTools bundle on first use, so that modules which
+ * only need it inside tool handlers can be imported without it.
+ */
+export function loadBrowser(): Promise<typeof BrowserBundle> {
+  browserBundle ??= import('./browser.js');
+  return browserBundle;
 }
 
 let lighthouseBundle: Promise<typeof LighthouseBundle> | undefined;
