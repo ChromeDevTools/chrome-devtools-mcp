@@ -544,6 +544,7 @@ export default defineConfig([
       'src/telemetry/**/*.ts',
       'src/BrowserManager.ts',
       'src/processors/HeapSnapshotManager.ts',
+      'src/ToolHandler.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

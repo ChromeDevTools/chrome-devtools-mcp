@@ -8,8 +8,7 @@ import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
-import {McpResponse, type DataFormat} from './McpResponse.js';
-import {SlimMcpResponse} from './SlimMcpResponse.js';
+import type {McpResponse, DataFormat} from './McpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {
   DisposableStack,
@@ -58,6 +57,29 @@ import {isLocalBrowserEndpoint} from './utils/url.js';
 export const TOOL_CALL_TIMEOUT_MS = 60_000;
 
 class ToolCallTimeoutError extends Error {}
+
+type ResponseFactory = (
+  slim: boolean,
+  config: ReadonlyServerConfig,
+) => McpResponse;
+
+let responseFactory: Promise<ResponseFactory> | undefined;
+
+/**
+ * Loads the response classes on first use, because they import the browser
+ * bundle through the formatters.
+ */
+function loadResponseFactory(): Promise<ResponseFactory> {
+  responseFactory ??= Promise.all([
+    import('./McpResponse.js'),
+    import('./SlimMcpResponse.js'),
+  ]).then(([mcpResponseModule, slimMcpResponseModule]) => (slim, config) => {
+    return slim
+      ? new slimMcpResponseModule.SlimMcpResponse(config)
+      : new mcpResponseModule.McpResponse(config);
+  });
+  return responseFactory;
+}
 
 function buildDisabledMessage(
   toolName: string,
@@ -497,6 +519,8 @@ export class ToolHandler {
     const signal = options?.signal ?? new AbortController().signal;
     signal.throwIfAborted();
     const context = await raceWithSignal(this.getContext(), signal);
+    // Loaded before the call takes its queue, so waiting never holds a queue.
+    const createResponse = await raceWithSignal(loadResponseFactory(), signal);
     let queueGuard: Disposable | undefined;
     try {
       queueGuard = await this.#queueFor(context, rawArgs)?.scheduleTask(signal);
@@ -532,9 +556,7 @@ export class ToolHandler {
     let pageUrl: string | undefined;
     try {
       logger?.(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-      const response = isSlimTool(tool)
-        ? new SlimMcpResponse(this.#config)
-        : new McpResponse(this.#config);
+      const response = createResponse(isSlimTool(tool), this.#config);
       // The execution owns the queue even when its caller stops waiting.
       const execution = isBrowserlessTool(tool)
         ? this.#runBrowserlessTool(tool, params, response, context, signal)
