@@ -50,6 +50,7 @@ This repository contains an MCP server and CLI for Chrome DevTools.
   - Use `sinon.assert.calledWithExactly(stub.secondCall, ...args)` for subsequent calls.
   - Use `sinon.assert.notCalled(stub)` to assert a method was not invoked.
 - **Clean up stubs**: `tests/setup.ts` runs `sinon.restore()` after every test. Do not add `afterEach(() => sinon.restore());` to test suites.
+- **Scope fake timers**: Always pass an explicit `toFake` list without `nextTick` to `sinon.useFakeTimers({toFake: [...]})`. Faking `process.nextTick` deadlocks the `node:test` IPC reporter stream.
 
 ### Test Cleanliness
 
