@@ -59,6 +59,7 @@ describe('cli args parsing', () => {
     usageStatistics: true,
     javascriptEvaluation: true,
     fileNavigations: true,
+    backgroundNewPages: false,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
