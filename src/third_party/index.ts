@@ -58,6 +58,7 @@ export {
   AsyncDisposableStack,
   SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
+export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {PredefinedNetworkConditions} from 'puppeteer-core/internal/cdp/PredefinedNetworkConditions.js';
 // eslint-disable-next-line no-restricted-imports
 export * as StringUtilities from '../../third_party/devtools-frontend/front_end/core/platform/StringUtilities.js';
