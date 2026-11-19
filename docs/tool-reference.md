@@ -78,6 +78,9 @@
   - [`uninstall_pwa`](#uninstall_pwa)
 - **[WebAuthn](#webauthn)** (1 tools)
   - [`configure_webauthn`](#configure_webauthn)
+- **[Code coverage](#code-coverage)** (2 tools)
+  - [`start_coverage`](#start_coverage)
+  - [`stop_coverage`](#stop_coverage)
 
 ## Input automation
 
@@ -932,5 +935,32 @@ third-party developer tools with additional functionality. (requires flag: --cat
 - **isUserVerified** (boolean) _(optional)_: Whether user verification succeeds. Set to false to test a failed verification. Default: true.
 - **protocol** (enum: "ctap2", "u2f") _(optional)_: The authenticator protocol. Default: ctap2.
 - **transport** (enum: "internal", "usb", "nfc", "ble", "hybrid") _(optional)_: "internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.
+
+---
+
+## Code coverage
+
+> NOTE: The Code coverage category is not active by default. Use the '--categoryCoverage' flag.
+
+### `start_coverage`
+
+**Description:** Starts JavaScript and/or CSS coverage on the selected page. Call this, reload or interact with the page, then call [`stop_coverage`](#stop_coverage) for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation, so use reload to include page load. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **css** (boolean) _(optional)_: Collect CSS coverage. Default: true.
+- **js** (boolean) _(optional)_: Collect JavaScript coverage. Default: true.
+- **reload** (boolean) _(optional)_: Reload the selected page after coverage starts. Default: false.
+
+---
+
+### `stop_coverage`
+
+**Description:** Stops coverage on the selected page and returns a compact report. Each resource lists type, total bytes, used bytes, unused bytes, and unused percent. Rows are sorted by unused bytes and capped at the top 20. Errors if [`start_coverage`](#start_coverage) was not called on this page. (requires flag: --categoryCoverage=true)
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---

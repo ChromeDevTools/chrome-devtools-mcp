@@ -31,6 +31,7 @@ export {
   TargetType,
   TimeoutError,
   Tracing,
+  Coverage,
   WebWorker,
   WebMCP,
   WebMCPTool,

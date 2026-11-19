@@ -408,6 +408,274 @@ describe('McpPage', () => {
     return {mcpPage, pptrPage, target, mockSession};
   }
 
+  describe('coverage', () => {
+    const coverageOptions = {js: true, css: true, reload: false};
+
+    it('starts JS and CSS coverage', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      await mcpPage.startCoverage(coverageOptions);
+
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.startJSCoverage, {
+        reportAnonymousScripts: true,
+      });
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.startCSSCoverage);
+      sinon.assert.notCalled(pptrPage.reload);
+      assert.strictEqual(mcpPage.isRunningCoverage(), true);
+    });
+
+    it('starts only CSS coverage when js is false', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      await mcpPage.startCoverage({...coverageOptions, js: false});
+
+      sinon.assert.notCalled(pptrPage.coverage.startJSCoverage);
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.startCSSCoverage);
+    });
+
+    it('reloads after coverage starts when reload is true', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      await mcpPage.startCoverage({...coverageOptions, reload: true});
+
+      sinon.assert.calledOnce(pptrPage.coverage.startJSCoverage);
+      sinon.assert.calledOnceWithExactly(pptrPage.reload, {waitUntil: 'load'});
+    });
+
+    it('errors if coverage is already running', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.startCoverage(coverageOptions);
+
+      await assert.rejects(
+        mcpPage.startCoverage(coverageOptions),
+        /Coverage is already running on page 1\. Call stop_coverage first\./,
+      );
+      sinon.assert.calledOnce(pptrPage.coverage.startJSCoverage);
+    });
+
+    it('errors if js and css are both false', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      await assert.rejects(
+        mcpPage.startCoverage({...coverageOptions, js: false, css: false}),
+        /At least one of js or css must be true\./,
+      );
+      sinon.assert.notCalled(pptrPage.coverage.startJSCoverage);
+      sinon.assert.notCalled(pptrPage.coverage.startCSSCoverage);
+    });
+
+    it('errors if the page is closed', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.isClosed.returns(true);
+
+      await assert.rejects(
+        mcpPage.startCoverage(coverageOptions),
+        /Page 1 is closed\. Coverage cannot be started\./,
+      );
+      sinon.assert.notCalled(pptrPage.coverage.startJSCoverage);
+    });
+
+    it('stops JS coverage if JS coverage fails to start', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.coverage.startJSCoverage.rejects(new Error('JS failed'));
+
+      await assert.rejects(
+        mcpPage.startCoverage(coverageOptions),
+        /Failed to start coverage on page 1: JS failed/,
+      );
+      sinon.assert.calledOnce(pptrPage.coverage.stopJSCoverage);
+      sinon.assert.notCalled(pptrPage.coverage.startCSSCoverage);
+      sinon.assert.notCalled(pptrPage.coverage.stopCSSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+
+      pptrPage.coverage.startJSCoverage.resolves();
+      await mcpPage.startCoverage(coverageOptions);
+      assert.strictEqual(mcpPage.isRunningCoverage(), true);
+    });
+
+    it('stops JS coverage if CSS coverage fails to start', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.coverage.startCSSCoverage.rejects(new Error('CSS failed'));
+
+      await assert.rejects(
+        mcpPage.startCoverage(coverageOptions),
+        /Failed to start coverage on page 1: CSS failed/,
+      );
+      sinon.assert.calledOnce(pptrPage.coverage.stopJSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+
+    it('stops coverage if reload fails', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.reload.rejects(new Error('Navigation failed'));
+
+      await assert.rejects(
+        mcpPage.startCoverage({...coverageOptions, reload: true}),
+        /Failed to start coverage on page 1: Navigation failed/,
+      );
+      sinon.assert.calledOnce(pptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnce(pptrPage.coverage.stopCSSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+
+    it('aggregates unused bytes into a sorted report', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.coverage.stopJSCoverage.resolves([
+        {
+          url: 'https://example.com/small.js',
+          text: 'abc',
+          ranges: [{start: 0, end: 3}],
+        },
+        {
+          url: 'https://example.com/app.js',
+          text: 'usedUNUSED',
+          ranges: [{start: 0, end: 4}],
+        },
+        {
+          url: '',
+          text: 'anon',
+          ranges: [{start: 0, end: 1}],
+        },
+      ]);
+      pptrPage.coverage.stopCSSCoverage.resolves([
+        {
+          url: 'https://example.com/app.css',
+          text: '.a{} .b{}',
+          ranges: [{start: 0, end: 4}],
+        },
+      ]);
+      await mcpPage.startCoverage(coverageOptions);
+
+      const report = await mcpPage.stopCoverage();
+
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+      assert.deepStrictEqual(report.resources[0], {
+        url: 'https://example.com/app.js',
+        type: 'JS',
+        totalBytes: 10,
+        usedBytes: 4,
+        unusedBytes: 6,
+        unusedPercent: 60,
+      });
+      const cssResource = report.resources[1];
+      assert.ok(cssResource);
+      assert.strictEqual(cssResource.url, 'https://example.com/app.css');
+      assert.strictEqual(cssResource.unusedBytes, 5);
+      const anonymous = report.resources.find(item => {
+        return item.url === '(inline/anonymous)';
+      });
+      assert.ok(anonymous);
+      assert.strictEqual(anonymous.unusedBytes, 3);
+      const last = report.resources.at(-1);
+      assert.ok(last);
+      assert.strictEqual(last.url, 'https://example.com/small.js');
+      assert.ok(report.totals.usedBytes < report.totals.totalBytes);
+    });
+
+    it('merges entries with the same URL', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.coverage.stopJSCoverage.resolves([
+        {
+          url: 'https://example.com/app.js',
+          text: 'usedUNUSED',
+          ranges: [{start: 0, end: 4}],
+        },
+        {
+          url: 'https://example.com/app.js',
+          text: 'abcdefghij',
+          ranges: [{start: 0, end: 8}],
+        },
+      ]);
+      await mcpPage.startCoverage(coverageOptions);
+
+      const report = await mcpPage.stopCoverage();
+
+      assert.deepStrictEqual(report.resources, [
+        {
+          url: 'https://example.com/app.js',
+          type: 'JS',
+          totalBytes: 20,
+          usedBytes: 12,
+          unusedBytes: 8,
+          unusedPercent: 40,
+        },
+      ]);
+      assert.strictEqual(report.totals.resources, 1);
+    });
+
+    it('reports a debugger:// URL as inline/anonymous', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.coverage.stopJSCoverage.resolves([
+        {
+          url: 'debugger://VM123',
+          text: 'abcd',
+          ranges: [{start: 0, end: 1}],
+        },
+      ]);
+      await mcpPage.startCoverage(coverageOptions);
+
+      const report = await mcpPage.stopCoverage();
+
+      assert.deepStrictEqual(report.resources, [
+        {
+          url: '(inline/anonymous)',
+          type: 'JS',
+          totalBytes: 4,
+          usedBytes: 1,
+          unusedBytes: 3,
+          unusedPercent: 75,
+        },
+      ]);
+    });
+
+    it('stops all coverage sources if stopJSCoverage rejects', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.startCoverage(coverageOptions);
+      pptrPage.coverage.stopJSCoverage.rejects(new Error('JS stop failed'));
+
+      await assert.rejects(
+        mcpPage.stopCoverage(),
+        /Failed to stop coverage on page 1: JS stop failed/,
+      );
+      sinon.assert.calledTwice(pptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnce(pptrPage.coverage.stopCSSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+
+    it('errors if stop is called without start', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      await assert.rejects(
+        mcpPage.stopCoverage(),
+        /No coverage session is running on page 1\. Call start_coverage first\./,
+      );
+      sinon.assert.notCalled(pptrPage.coverage.stopJSCoverage);
+    });
+
+    it('errors if stop is called after the page is closed', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.startCoverage(coverageOptions);
+      pptrPage.isClosed.returns(true);
+
+      await assert.rejects(
+        mcpPage.stopCoverage(),
+        /Page 1 is closed\. Coverage cannot be stopped\./,
+      );
+      sinon.assert.notCalled(pptrPage.coverage.stopJSCoverage);
+    });
+
+    it('stops coverage on dispose', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.startCoverage(coverageOptions);
+
+      mcpPage.dispose();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopCSSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+  });
+
   function getUidForNode(mcpPage: McpPage, matcher: string): string {
     const textSnapshot = mcpPage.textSnapshot;
     if (!textSnapshot) {
