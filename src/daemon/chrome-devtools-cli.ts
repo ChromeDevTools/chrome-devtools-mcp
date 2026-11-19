@@ -24,7 +24,13 @@ import {
   verifyDaemonVersion,
 } from './client.js';
 import type {DaemonStatusResult} from './types.js';
-import {assertValidSessionId, isDaemonRunning, serializeArgs} from './utils.js';
+import {
+  assertValidSessionId,
+  getDefaultSessionId,
+  isDaemonRunning,
+  serializeArgs,
+  SESSION_ID_ENV_VAR,
+} from './utils.js';
 import {yargs} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
@@ -113,9 +119,10 @@ export async function runCli(
     )
     .option('sessionId', {
       type: 'string',
-      description: 'Session ID for daemon scoping',
-      default: env.CD4A_INTERNAL_DAEMON_SESSION_ID || '',
-      hidden: true,
+      description:
+        'Use a separate daemon, browser and tabs for this ID. Use hex digits and dashes, for example a UUID. Commands without an ID share one default daemon. Pass the same ID to start, status, stop and every tool command.',
+      default: getDefaultSessionId(env),
+      defaultDescription: `$${SESSION_ID_ENV_VAR}`,
       coerce: (sessionId: string) => {
         assertValidSessionId(sessionId);
         return sessionId;
