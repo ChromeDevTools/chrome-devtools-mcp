@@ -12,11 +12,17 @@ import sinon from 'sinon';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from '../../src/collectors/ServiceWorkerCollector.js';
 import {McpWorker} from '../../src/McpWorker.js';
-import {TargetType, type Protocol} from '../../src/third_party/browser.js';
+import {
+  createRemoteException,
+  TargetType,
+  type Protocol,
+} from '../../src/third_party/browser.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {
+  createMockCdpJSHandle,
   createMockPuppeteerBrowser,
   createMockPuppeteerTarget,
+  createMockWebWorker,
 } from '../mocks.js';
 
 describe('ServiceWorkerConsoleCollector', () => {
@@ -86,7 +92,7 @@ describe('ServiceWorkerConsoleCollector', () => {
       url: 'chrome-extension://ext-id/sw.js',
     });
     target.type.returns(TargetType.SERVICE_WORKER);
-    target.createCDPSession.rejects(
+    target.worker.rejects(
       new Error(
         'Protocol error (Target.attachToTarget): No target with given id found',
       ),
@@ -95,7 +101,63 @@ describe('ServiceWorkerConsoleCollector', () => {
     const collector = new ServiceWorkerConsoleCollector(browser);
     await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
     await new Promise(resolve => setTimeout(resolve, 0));
-    sinon.assert.calledOnce(target.createCDPSession);
+    sinon.assert.calledOnce(target.worker);
+    sinon.assert.notCalled(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('ignores protocol timeouts when subscribing to a service worker', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.rejects(new Error('Target.attachToTarget timed out.'));
+
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sinon.assert.calledOnce(target.worker);
+    sinon.assert.notCalled(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('collects uncaught errors from worker exception events', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const worker = createMockWebWorker();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.resolves(worker);
+
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const remoteObject: Protocol.Runtime.RemoteObject = {
+      type: 'object',
+      description: 'Error: boom',
+    };
+    const handle = createMockCdpJSHandle(remoteObject, worker.client);
+    const details: Protocol.Runtime.ExceptionDetails = {
+      exceptionId: 1,
+      exception: remoteObject,
+      text: 'Uncaught',
+      lineNumber: 0,
+      columnNumber: 0,
+      stackTrace: {callFrames: []},
+    };
+    worker.emit('exception', createRemoteException(details, handle));
+
+    sinon.assert.calledOnce(handle.move);
+    sinon.assert.notCalled(target.createCDPSession);
+    const logs = collector.getData('ext-id');
+    assert.strictEqual(logs.length, 1);
+    assert.ok(logs[0] instanceof UncaughtError);
+    assert.strictEqual(logs[0].details, details);
+    assert.strictEqual(logs[0].targetId, 'ext-id');
+    assert.strictEqual(logs[0].session, worker.client);
     collector.dispose();
   });
 });

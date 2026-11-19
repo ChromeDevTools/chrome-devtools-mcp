@@ -9,9 +9,9 @@ import type {
   ConsoleMessage,
   WebWorker,
   Target,
-  CDPSession,
   Protocol,
   Browser,
+  RemoteException,
 } from '../third_party/browser.js';
 import type {McpWorker} from '../McpWorker.js';
 import {
@@ -19,13 +19,13 @@ import {
   stableIdSymbol,
   type WithSymbolId,
 } from '../utils/id.js';
+import {logger} from '../utils/logger.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 
 export class ServiceWorkerSubscriber {
   #target: Target;
   #callback: (item: ConsoleMessage | UncaughtError) => void;
-  #session?: CDPSession;
   #worker?: WebWorker;
 
   constructor(
@@ -37,37 +37,39 @@ export class ServiceWorkerSubscriber {
   }
 
   async subscribe(): Promise<void> {
-    this.#session = await this.#target.createCDPSession();
-    await this.#session.send('Runtime.enable');
-    this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
-
     this.#worker = (await this.#target.worker()) ?? undefined;
     if (this.#worker) {
       this.#worker.on('console', this.#onConsole);
+      this.#worker.on('exception', this.#onException);
     }
   }
 
   async unsubscribe(): Promise<void> {
     if (this.#worker) {
       this.#worker.off('console', this.#onConsole);
+      this.#worker.off('exception', this.#onException);
     }
-    await this.#session?.detach();
   }
 
   #onConsole = (message: ConsoleMessage): void => {
     this.#callback(message);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
-    const url = this.#target.url();
-
-    const extensionId = extractExtensionId(url);
-
-    if (extensionId) {
-      this.#callback(
-        new UncaughtError(event.exceptionDetails, extensionId, this.#session),
-      );
+  #onException = (exception: RemoteException): void => {
+    const extensionId = extractExtensionId(this.#target.url());
+    if (!extensionId || !this.#worker) {
+      return;
     }
+    const details: Protocol.Runtime.ExceptionDetails | undefined =
+      // @ts-expect-error use internal Puppeteer API to get raw exception details.
+      exception._rawExceptionDetails();
+    if (!details) {
+      return;
+    }
+    exception.handle()?.move();
+    this.#callback(
+      new UncaughtError(details, extensionId, this.#worker.client),
+    );
   };
 }
 
@@ -140,7 +142,7 @@ export class ServiceWorkerConsoleCollector {
           this.#serviceWorkerSubscribers.delete(target);
         }
         if (!isIgnoredTargetError(err)) {
-          throw err;
+          logger?.('Failed to subscribe to extension service worker', err);
         }
       }
     }
