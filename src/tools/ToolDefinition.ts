@@ -318,7 +318,10 @@ export interface Response {
     reqId: number,
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
-  attachConsoleMessage(msgid: number): void;
+  attachConsoleMessage(
+    msgid: number,
+    options?: {serviceWorkerId?: string},
+  ): void;
   attachWebAuthnAuthenticator(
     authenticator: WebAuthnAuthenticatorState | undefined,
   ): void;

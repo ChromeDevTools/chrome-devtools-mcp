@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {before, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {Dialog} from 'puppeteer-core';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
@@ -20,7 +22,11 @@ import {
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {installExtension} from '../../src/tools/extensions.js';
-import {createMockParsedArguments, createMockServerConfig} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockParsedArguments,
+  createMockServerConfig,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
@@ -141,6 +147,21 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          listConsoleMessages(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          listConsoleMessages(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
     it('describes the default preserved navigation history', () => {
       const tool = listConsoleMessages(createMockParsedArguments());
       assert.strictEqual(
@@ -436,6 +457,37 @@ describe('console', () => {
 
   describe('get_console_message', () => {
     const server = serverHooks();
+
+    it('forwards serviceWorkerId', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await getConsoleMessage(args).handler(
+        {params: {msgid: 2, serviceWorkerId: 'sw-1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.attachConsoleMessage, 2, {
+        serviceWorkerId: 'sw-1',
+      });
+    });
+
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          getConsoleMessage(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          getConsoleMessage(createMockParsedArguments()).schema
+        ),
+      );
+    });
 
     it('gets a specific console message', async () => {
       await withMcpContext(async (response, context, args) => {

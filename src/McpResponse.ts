@@ -110,6 +110,7 @@ export class McpResponse implements Response {
     responseFilePath?: string;
   };
   #attachedConsoleMessageId?: number;
+  #attachedConsoleMessageServiceWorkerId?: string;
   #attachedTraceSummary?: TraceResult;
   #attachedTraceInsight?: TraceInsightData;
   #attachedLighthouseResult?: LighthouseData;
@@ -313,8 +314,12 @@ export class McpResponse implements Response {
     this.#attachedNetworkRequestOptions = options;
   }
 
-  attachConsoleMessage(msgid: number): void {
+  attachConsoleMessage(
+    msgid: number,
+    options?: {serviceWorkerId?: string},
+  ): void {
     this.#attachedConsoleMessageId = msgid;
+    this.#attachedConsoleMessageServiceWorkerId = options?.serviceWorkerId;
   }
 
   attachWebAuthnAuthenticator(
@@ -600,19 +605,27 @@ export class McpResponse implements Response {
     });
   }
 
-  async #handleAttachedConsoleMessage(): Promise<
-    ConsoleFormatter | IssueFormatter | undefined
-  > {
+  async #handleAttachedConsoleMessage(
+    context: McpContext,
+  ): Promise<ConsoleFormatter | IssueFormatter | undefined> {
     if (!this.#attachedConsoleMessageId) {
       return undefined;
+    }
+    const consoleMessageStableId = this.#attachedConsoleMessageId;
+    if (this.#attachedConsoleMessageServiceWorkerId) {
+      // Service workers have no DevTools universe, so no stack trace is resolved.
+      return await ConsoleFormatter.from(
+        context.getServiceWorkerConsoleMessageById(
+          this.#attachedConsoleMessageServiceWorkerId,
+          consoleMessageStableId,
+        ),
+        {id: consoleMessageStableId, fetchDetailedData: true},
+      );
     }
     if (!this.#page) {
       throw new Error(`Response must have an McpPage`);
     }
-    const message = this.#page.getConsoleMessageById(
-      this.#attachedConsoleMessageId,
-    );
-    const consoleMessageStableId = this.#attachedConsoleMessageId;
+    const message = this.#page.getConsoleMessageById(consoleMessageStableId);
     if ('args' in message || message instanceof UncaughtError) {
       const consoleMessage = message as ConsoleMessage | UncaughtError;
       return await ConsoleFormatter.from(consoleMessage, {
@@ -862,7 +875,7 @@ export class McpResponse implements Response {
     ] = await Promise.all([
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
-      this.#handleAttachedConsoleMessage(),
+      this.#handleAttachedConsoleMessage(context),
       this.#handleThirdPartyDeveloperTools(),
       this.#handleWebMCP(),
       this.#handleConsoleList(context),

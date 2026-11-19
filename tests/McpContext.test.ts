@@ -198,7 +198,9 @@ describe('McpContext', () => {
 
         assert.throws(
           () => context.getServiceWorkerConsoleData(serviceWorkerId),
-          /Service worker not found\./,
+          new RegExp(
+            `Service worker ${serviceWorkerId} not found\\. Call list_pages to get the current sw-N IDs\\.`,
+          ),
         );
 
         sinon.assert.calledOnceWithExactly(getWorkerById, serviceWorkerId);
@@ -206,6 +208,52 @@ describe('McpContext', () => {
         context.dispose();
       });
     }
+  });
+
+  describe('getServiceWorkerConsoleMessageById', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const worker = createMockMcpWorker({
+        id: 'sw-3',
+        url: 'chrome-extension://extension-id/background.js',
+      });
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(worker);
+      const message = Object.assign(
+        new UncaughtError(
+          {
+            exceptionId: 1,
+            text: 'Service worker error',
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          'extension-id',
+        ),
+        {[stableIdSymbol]: 2},
+      );
+      const getById = sinon
+        .stub(ServiceWorkerConsoleCollector.prototype, 'getById')
+        .returns(message);
+
+      const result = context.getServiceWorkerConsoleMessageById('sw-3', 2);
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
+      assert.strictEqual(result, message);
+      context.dispose();
+    });
   });
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {

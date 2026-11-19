@@ -637,9 +637,17 @@ export const commands: Commands = {
         name: 'msgid',
         type: 'number',
         description:
-          'The msgid of a console message on the page from the listed console messages',
+          'The msgid of a console message from list_console_messages: for the page, or for the service worker when serviceWorkerId is set.',
         required: true,
         positional: true,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.',
+        required: false,
+        positional: false,
       },
     },
   },
