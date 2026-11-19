@@ -40,6 +40,21 @@ export function flushLogs(
 }
 
 /**
+ * Removes terminal control sequences from untrusted text before it reaches a
+ * TTY. Strips CSI sequences (ESC [ ... final-byte), OSC sequences (ESC ] ...
+ * terminated by BEL or ST, with payloads), and any remaining C0/C1 controls
+ * except \n. An unterminated OSC affects only its own line. Used for output
+ * lines that interpolate tool-response text, which may contain
+ * page-controlled strings.
+ */
+export function stripTerminalEscapes(value: string): string {
+  return value
+    .replace(/\x1b\[[\x30-\x3f\x20-\x2f]*[\x40-\x7e]/g, '')
+    .replace(/\x1b\][^\x07\x1b\r\n]*(?:\x07|\x1b\\)/g, '')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '');
+}
+
+/**
  * Encodes a value for interpolation into a one-line log or error message. The
  * result is a JSON string literal that also escapes DEL, C1 controls and
  * U+2028/U+2029, which JSON.stringify leaves raw but terminals and line

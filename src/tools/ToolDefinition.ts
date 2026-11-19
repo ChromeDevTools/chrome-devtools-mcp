@@ -27,26 +27,24 @@ import type {
   ContextFilterOptions,
   HeapSnapshotFormatOptions,
 } from '../formatters/HeapSnapshotFormatter.js';
-import {
-  zod,
-  type Dialog,
-  type ElementHandle,
-  type Extension,
-  type GetPWAStateOptions,
-  type InstallPWAOptions,
-  type LaunchPWAOptions,
-  type PWAState,
-  type ScreenRecorder,
-  type ScreenRecording,
-  type UninstallPWAOptions,
-  type Viewport,
-  type DevTools,
-  type Flags,
-  type Protocol,
-  type Page,
-  type RunnerResult,
-  type WebMCPTool,
-} from '../third_party/index.js';
+import {zod, type Flags, type RunnerResult} from '../third_party/index.js';
+import type {
+  Dialog,
+  ElementHandle,
+  Extension,
+  GetPWAStateOptions,
+  InstallPWAOptions,
+  LaunchPWAOptions,
+  PWAState,
+  ScreenRecorder,
+  ScreenRecording,
+  UninstallPWAOptions,
+  Viewport,
+  DevTools,
+  Protocol,
+  Page,
+  WebMCPTool,
+} from '../third_party/browser.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
@@ -311,7 +309,7 @@ export interface Response {
    */
   includeConsoleErrorsFrom(page: ContextPage): void;
   setIncludeCssStyles(
-    matchedStyles: MatchedStyles,
+    styles: ElementCssStyles,
     options: CssFormatterOptions & PaginationOptions,
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
@@ -483,6 +481,12 @@ export type BrowserlessContext = Readonly<{
 }>;
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+export type ComputedStyles = ReadonlyMap<string, string>;
+
+export interface ElementCssStyles {
+  matchedStyles: MatchedStyles;
+  computedStyles?: ComputedStyles | null;
+}
 
 export type WebAuthnProtocol = 'ctap2' | 'u2f';
 export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
@@ -522,7 +526,7 @@ export type ContextPage = Readonly<{
   init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
-  getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  getCssStylesForUid(uid: string): Promise<ElementCssStyles>;
   configureWebAuthn(
     config: WebAuthnAuthenticatorConfig,
   ): Promise<WebAuthnAuthenticatorState | undefined>;

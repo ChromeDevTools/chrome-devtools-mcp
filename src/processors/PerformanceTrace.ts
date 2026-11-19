@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import {logger} from '../utils/logger.js';
 import {parseTraceEventsFromBuffer} from './ChunkedTraceParser.js';
 

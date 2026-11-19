@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../third_party/index.js';
 import {
   TimeoutError,
-  zod,
   type ElementHandle,
   type KeyInput,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';

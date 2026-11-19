@@ -11,7 +11,7 @@ import type {
   HeapSnapshotDiffObject,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
 import {truncateText} from '../utils/text.js';
 

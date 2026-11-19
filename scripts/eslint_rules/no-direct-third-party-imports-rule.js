@@ -6,7 +6,8 @@
 
 /**
  * ESLint rule that prevents value (non-type) imports of third-party packages
- * that should go through the `src/third_party/index.ts` barrel file.
+ * that should go through the `src/third_party/index.ts` or
+ * `src/third_party/browser.ts` barrel files.
  *
  * Type-only imports are allowed because they are erased at compile time and
  * do not affect the bundle.
@@ -101,7 +102,7 @@ export default {
     schema: [],
     messages: {
       noDirectImport:
-        'Do not import "{{source}}" directly. Use the re-export from "src/third_party/index.js" (or "src/third_party/cli.js" on the CLI path) instead so the import survives bundling. (Type-only imports are fine.)',
+        'Do not import "{{source}}" directly. Use the re-export from "src/third_party/index.js", "src/third_party/browser.js" (Puppeteer and DevTools), or "src/third_party/cli.js" (CLI path) instead so the import survives bundling. (Type-only imports are fine.)',
     },
   },
   defaultOptions: [],

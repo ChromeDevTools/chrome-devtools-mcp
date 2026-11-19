@@ -11,8 +11,8 @@ import {
   SymbolizedError,
 } from '../devtools/DevtoolsUtils.js';
 import {UncaughtError} from '../collectors/PageCollector.js';
-import * as DevTools from '../third_party/index.js';
-import type {ConsoleMessage, Protocol} from '../third_party/index.js';
+import * as DevTools from '../third_party/browser.js';
+import type {ConsoleMessage, Protocol} from '../third_party/browser.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';

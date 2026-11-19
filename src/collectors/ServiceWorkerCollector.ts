@@ -12,7 +12,7 @@ import type {
   CDPSession,
   Protocol,
   Browser,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 import type {McpWorker} from '../McpWorker.js';
 import {
   createIdGenerator,

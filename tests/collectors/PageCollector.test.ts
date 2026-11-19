@@ -21,7 +21,7 @@ import {
   PageCollector,
   type ListenerMap,
 } from '../../src/collectors/PageCollector.js';
-import {DevTools, FrameEvent} from '../../src/third_party/index.js';
+import {DevTools, FrameEvent} from '../../src/third_party/browser.js';
 
 import {createMockPuppeteerPage} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';

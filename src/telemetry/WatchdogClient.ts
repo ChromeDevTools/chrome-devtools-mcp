@@ -9,23 +9,19 @@ import {fileURLToPath} from 'node:url';
 
 import {logger} from '../utils/logger.js';
 
-import type {WatchdogMessage, OsType} from './types.js';
+import type {LoggingAttrs, WatchdogMessage} from './types.js';
+
+export interface WatchdogClientConfig extends LoggingAttrs {
+  parentPid: number;
+  logFile?: string;
+  clearcutForceFlushIntervalMs?: number;
+  clearcutIncludePidHeader?: boolean;
+}
 
 export class WatchdogClient {
   #childProcess: ChildProcess;
 
-  constructor(
-    config: {
-      parentPid: number;
-      appVersion: string;
-      osType: OsType;
-      logFile?: string;
-      clearcutEndpoint?: string;
-      clearcutForceFlushIntervalMs?: number;
-      clearcutIncludePidHeader?: boolean;
-    },
-    options?: {spawn?: typeof spawn},
-  ) {
+  constructor(config: WatchdogClientConfig, options?: {spawn?: typeof spawn}) {
     const watchdogPath = fileURLToPath(
       new URL('./watchdog/main.js', import.meta.url),
     );
@@ -35,13 +31,12 @@ export class WatchdogClient {
       `--parent-pid=${config.parentPid}`,
       `--app-version=${config.appVersion}`,
       `--os-type=${config.osType}`,
+      `--session-id=${config.sessionId}`,
+      `--clearcut-endpoint=${config.clearcutEndpoint}`,
     ];
 
     if (config.logFile) {
       args.push(`--log-file=${config.logFile}`);
-    }
-    if (config.clearcutEndpoint) {
-      args.push(`--clearcut-endpoint=${config.clearcutEndpoint}`);
     }
     if (config.clearcutForceFlushIntervalMs) {
       args.push(

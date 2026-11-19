@@ -110,6 +110,14 @@ export enum McpClient {
   MCP_CLIENT_OTHER = 3,
 }
 
+// Attributes that every logged event carries and where it is sent.
+export interface LoggingAttrs {
+  appVersion: string;
+  osType: OsType;
+  sessionId: string;
+  clearcutEndpoint: string;
+}
+
 // IPC types for messages between the main process and the
 // telemetry watchdog process.
 export enum WatchdogMessageType {

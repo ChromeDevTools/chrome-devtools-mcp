@@ -5,7 +5,7 @@
  */
 
 import type {mcpOptions} from '../config/mcp-options.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 
 import {stripUnderscoreBeforeNumber} from './transformation.js';
 import type {FlagUsage} from './types.js';

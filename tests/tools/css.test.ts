@@ -9,7 +9,8 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {DevTools, zod} from '../../src/third_party/index.js';
+import {zod} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {getCssStyles} from '../../src/tools/css.js';
 import {createHandlerMocks} from '../mocks.js';
 
@@ -23,14 +24,20 @@ describe('get_css_styles', () => {
 
     assert.strictEqual(params.pageSize, 10);
     assert.strictEqual(params.pageIdx, 0);
+    assert.strictEqual(params.computedProperties, undefined);
   });
 
-  it('retrieves matched styles for a uid and passes to response', async () => {
+  it('retrieves matched and computed styles for a uid and passes to response', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const mockStyles = sinon.createStubInstance(
       DevTools.CSSMatchedStyles.CSSMatchedStyles,
     );
-    page.getMatchedStylesForUid.resolves(mockStyles);
+    const mockComputedStyles = new Map([['display', 'block']]);
+    const styles = {
+      matchedStyles: mockStyles,
+      computedStyles: mockComputedStyles,
+    };
+    page.getCssStylesForUid.resolves(styles);
 
     await getCssStyles(args).handler(
       {params: {uid: 'element-1', pageSize: 10, pageIdx: 0}, page},
@@ -38,46 +45,46 @@ describe('get_css_styles', () => {
       context,
     );
 
-    sinon.assert.calledOnceWithExactly(
-      page.getMatchedStylesForUid,
-      'element-1',
-    );
-    sinon.assert.calledOnceWithExactly(
-      response.setIncludeCssStyles,
-      mockStyles,
-      {
-        uid: 'element-1',
-        pageSize: 10,
-        pageIdx: 0,
-      },
-    );
+    sinon.assert.calledOnceWithExactly(page.getCssStylesForUid, 'element-1');
+    sinon.assert.calledOnceWithExactly(response.setIncludeCssStyles, styles, {
+      uid: 'element-1',
+      pageSize: 10,
+      pageIdx: 0,
+      computedProperties: undefined,
+    });
   });
 
-  it('passes pagination options to response', async () => {
+  it('passes pagination and computedProperties options to response', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const mockStyles = sinon.createStubInstance(
       DevTools.CSSMatchedStyles.CSSMatchedStyles,
     );
-    page.getMatchedStylesForUid.resolves(mockStyles);
+    const styles = {
+      matchedStyles: mockStyles,
+      computedStyles: null,
+    };
+    page.getCssStylesForUid.resolves(styles);
 
     await getCssStyles(args).handler(
-      {params: {uid: 'element-1', pageSize: 10, pageIdx: 2}, page},
+      {
+        params: {
+          uid: 'element-1',
+          pageSize: 10,
+          pageIdx: 2,
+          computedProperties: ['position', 'z-index'],
+        },
+        page,
+      },
       response,
       context,
     );
 
-    sinon.assert.calledOnceWithExactly(
-      page.getMatchedStylesForUid,
-      'element-1',
-    );
-    sinon.assert.calledOnceWithExactly(
-      response.setIncludeCssStyles,
-      mockStyles,
-      {
-        uid: 'element-1',
-        pageSize: 10,
-        pageIdx: 2,
-      },
-    );
+    sinon.assert.calledOnceWithExactly(page.getCssStylesForUid, 'element-1');
+    sinon.assert.calledOnceWithExactly(response.setIncludeCssStyles, styles, {
+      uid: 'element-1',
+      pageSize: 10,
+      pageIdx: 2,
+      computedProperties: ['position', 'z-index'],
+    });
   });
 });

@@ -452,6 +452,74 @@ Styles for button (uid: "elem-at-4"):
   }
 `;
 
+exports[`CssFormatter > formats computed styles alongside matched rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-computed",
+    "selector": "div.box"
+  },
+  "rules": [
+    {
+      "type": "computed",
+      "properties": {
+        "color": "rgb(255, 0, 0)",
+        "display": "block",
+        "height": "40px",
+        "padding-bottom": "8px",
+        "padding-left": "8px",
+        "padding-right": "8px",
+        "padding-top": "8px",
+        "user-select": "none",
+        "width": "120px"
+      }
+    },
+    {
+      "type": "matched",
+      "selector": ".box",
+      "source": "app.css",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "8px",
+          "status": "active"
+        },
+        {
+          "name": "user-select",
+          "value": "none",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats computed styles alongside matched rules toString 1`] = `
+Styles for div.box (uid: "elem-computed"):
+
+  Computed styles:
+    color: rgb(255, 0, 0);
+    display: block;
+    height: 40px;
+    padding-bottom: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    user-select: none;
+    width: 120px;
+
+  .box (app.css) {
+    color: red;
+    padding: 8px;
+    user-select: none;
+  }
+`;
+
 exports[`CssFormatter > formats constructed stylesheets with and without sourceURL pragma toJSON 1`] = `
 {
   "element": {
@@ -1135,6 +1203,42 @@ Styles for table#data (uid: "table-1"):
   table[attributes style] {
     border: 1px;
   }
+`;
+
+exports[`CssFormatter > includes requested computedProperties and expands shorthands toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-computed-extra",
+    "selector": "div#card"
+  },
+  "rules": [
+    {
+      "type": "computed",
+      "properties": {
+        "display": "flex",
+        "height": "100px",
+        "overflow-x": "hidden",
+        "overflow-y": "auto",
+        "position": "static",
+        "width": "200px",
+        "--brand": "#00aaff"
+      }
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > includes requested computedProperties and expands shorthands toString 1`] = `
+Styles for div#card (uid: "elem-computed-extra"):
+
+  Computed styles:
+    display: flex;
+    height: 100px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: static;
+    width: 200px;
+    --brand: #00aaff;
 `;
 
 exports[`CssFormatter > maps invalid and disabled property statuses toJSON 1`] = `

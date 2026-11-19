@@ -50,6 +50,7 @@ import type {
   HeapSnapshotDiff,
   HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
+import type {Result, RunnerResult} from '../src/third_party/index.js';
 import {
   Accessibility,
   CdpBrowser,
@@ -82,9 +83,7 @@ import {
   type Page,
   type Protocol,
   type Realm,
-  type Result,
-  type RunnerResult,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;
@@ -687,6 +686,7 @@ export function createMockCSSProperty(
     ),
   );
   prop.parseValue.callThrough();
+  prop.getLonghandProperties.callThrough();
   return prop;
 }
 
@@ -710,7 +710,10 @@ export function createMockCSSStyleDeclaration(
     DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
   );
   style.type = options.type ?? DevTools.CSSStyleDeclaration.Type.Regular;
-  style.allProperties.returns(properties);
+  style.allProperties.returns([
+    ...properties,
+    ...properties.flatMap(prop => prop.getLonghandProperties()),
+  ]);
   style.leadingProperties.returns(properties);
   style.parentRule = options.rule ?? null;
   style.animationName.returns(options.animationName ?? '');

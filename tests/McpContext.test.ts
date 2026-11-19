@@ -28,7 +28,7 @@ import {
   ScreenRecorder,
   type Target,
   TargetType,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {
   parseRawTraceBuffer,
   type TraceResult,

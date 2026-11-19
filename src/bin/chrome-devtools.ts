@@ -24,6 +24,7 @@ import {
   assertValidSessionId,
 } from '../daemon/utils.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
+import {stripTerminalEscapes} from '../utils/logger.js';
 import {hideBin, yargs} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
@@ -284,13 +285,15 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
 
         if (response.success) {
           console.log(
-            await handleResponse(
-              JSON.parse(response.result) as unknown as CallToolResult,
-              argv['output-format'] as 'json' | 'md',
+            stripTerminalEscapes(
+              await handleResponse(
+                JSON.parse(response.result) as unknown as CallToolResult,
+                argv['output-format'] as 'json' | 'md',
+              ),
             ),
           );
         } else {
-          console.error('Error:', response.error);
+          console.error('Error:', stripTerminalEscapes(String(response.error)));
         }
 
         const versionWarning = await versionWarningPromise;

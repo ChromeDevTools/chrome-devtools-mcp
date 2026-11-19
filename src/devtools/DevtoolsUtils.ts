@@ -9,7 +9,7 @@ import {
   type CDPSession,
   type ConsoleMessage,
   type Protocol,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
