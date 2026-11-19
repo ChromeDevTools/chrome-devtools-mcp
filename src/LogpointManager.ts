@@ -342,6 +342,12 @@ export class LogpointManager {
     // Source maps are loaded lazily in the DevTools universe and original
     // sources only appear in the workspace once their source map has loaded.
     let match = this.#matchUISourceCode(url);
+    if (!match) {
+      // The page may have parsed the script already without the debugger
+      // model knowing it yet, for example right after a navigation.
+      await this.#flushDebuggerEvents();
+      match = this.#matchUISourceCode(url);
+    }
     let timedOut = false;
     if (match && !isFromSourceMap(match)) {
       // The script may be a transpiled file served at the URL of its original
@@ -383,6 +389,18 @@ export class LogpointManager {
     throw new Error(
       `No parsed script or original source file matches "${url}". The url must match the URL of a script as served to the browser or an original source file from a source map, exactly or as a path suffix.${timedOut ? ` Some source maps were still loading after ${SOURCE_MAP_LOAD_TIMEOUT_MS / 1000} seconds; retry if the file comes from a source map.` : ''}${similar.length ? ` Sources with the same file name: ${similar.join(', ')}.` : ''}`,
     );
+  }
+
+  /**
+   * Waits until the debugger model has received the scripts the page has
+   * parsed so far. A navigation is awaited on the session of the page, while
+   * `Debugger.scriptParsed` events arrive on the session of the DevTools
+   * universe, so they can still be in flight when the navigation is done.
+   * Events and responses of one session are ordered: once the response to a
+   * command arrives, the events sent before it have been handled.
+   */
+  async #flushDebuggerEvents(): Promise<void> {
+    await this.#target.runtimeAgent().invoke_getHeapUsage();
   }
 
   /** The scripts and source-map sources of the page in the workspace. */
