@@ -5,12 +5,10 @@
  */
 
 import type {mcpOptions} from '../config/mcp-options.js';
-import {DevTools} from '../third_party/browser.js';
+import {StringUtilities} from '../third_party/index.js';
 
 import {stripUnderscoreBeforeNumber} from './transformation.js';
 import type {FlagUsage} from './types.js';
-
-const {StringUtilities} = DevTools.Platform;
 
 type CliOptions = typeof mcpOptions;
 
