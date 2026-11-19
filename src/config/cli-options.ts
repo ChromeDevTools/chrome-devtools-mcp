@@ -2069,6 +2069,59 @@ export const commands: Commands = {
       },
     },
   },
+  start_coverage: {
+    description:
+      'Starts JavaScript and/or CSS coverage on the selected page. Call this, reload or interact with the page, then call stop_coverage for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation, so use reload to include page load. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)',
+    category: 'Code coverage',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      js: {
+        name: 'js',
+        type: 'boolean',
+        description: 'Collect JavaScript coverage. Default: true.',
+        required: false,
+        positional: false,
+        default: true,
+      },
+      css: {
+        name: 'css',
+        type: 'boolean',
+        description: 'Collect CSS coverage. Default: true.',
+        required: false,
+        positional: false,
+        default: true,
+      },
+      reload: {
+        name: 'reload',
+        type: 'boolean',
+        description:
+          'Reload the selected page after coverage starts. Default: false.',
+        required: false,
+        positional: false,
+        default: false,
+      },
+    },
+  },
+  stop_coverage: {
+    description:
+      'Stops coverage on the selected page and returns a compact report. Each resource lists type, total bytes, used bytes, unused bytes, and unused percent. Rows are sorted by unused bytes and capped at the top 20. Errors if start_coverage was not called on this page. (requires flag: --categoryCoverage=true)',
+    category: 'Code coverage',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+    },
+  },
   take_heapsnapshot: {
     description:
       'Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',

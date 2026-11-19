@@ -177,6 +177,15 @@ chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome ext
 chrome-devtools trigger_extension_action "extension_id" # Triggers the default action of an extension by its ID
 ```
 
+## Code coverage (requires `--categoryCoverage=true`)
+
+```bash
+chrome-devtools start --categoryCoverage
+chrome-devtools start_coverage 1 --reload true
+chrome-devtools click 1 "uid"
+chrome-devtools stop_coverage 1
+```
+
 ## Progressive Web Apps (requires `--categoryPwa=true`)
 
 ```bash

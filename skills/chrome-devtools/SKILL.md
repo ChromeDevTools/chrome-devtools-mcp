@@ -10,6 +10,7 @@ Additional tooling can be enabled by providing the following flags:
 
 - For extension tooling, use the `--categoryExtensions` flag.
 - For memory tooling, use the `--memoryDebugging` flag.
+- For code coverage tooling, use the `--categoryCoverage` flag.
 
 **Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`.
 Note: For `evaluate_script`, `pageId` is required when targeting pages. However, when `--categoryExtensions` is enabled, `pageId` is optional so you can pass `serviceWorkerId` instead to evaluate inside an extension background service worker.
@@ -33,6 +34,12 @@ Note: For `evaluate_script`, `pageId` is required when targeting pages. However,
 ### Tool selection
 
 - **Network mocks**: `mock_network` and `remove_network_mock` require `--categoryNetworkMocks` at server startup.
+- **Code coverage**: `start_coverage` and `stop_coverage` require
+  `--categoryCoverage`. Use them to measure unused JavaScript and CSS
+  after a reload or interaction. Coverage is not retained across
+  navigations, so the report covers only the document loaded after the
+  last navigation. Coverage and performance traces cannot run at the same
+  time because coverage collection skews timings.
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
 - **CSS & Styling inspection**: Use `get_css_styles` to inspect computed styles, matched rules, cascade, and CSS variables (pass `computedProperties` for unmatched defaults). Treat the output as authoritative.

@@ -21,7 +21,7 @@ import {
   traceResultIsSuccess,
 } from '../../src/processors/PerformanceTrace.js';
 import {DevTools} from '../../src/third_party/browser.js';
-import {createHandlerMocks} from '../mocks.js';
+import {createHandlerMocks, createMockMcpPage} from '../mocks.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 
@@ -235,6 +235,27 @@ describe('performance', () => {
         'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
       );
       sinon.assert.notCalled(page.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(page.pptrPage.goto);
+    });
+
+    it('errors if coverage is running on a page', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.isRunningPerformanceTrace.returns(false);
+      const other = createMockMcpPage({id: 2});
+      other.isRunningCoverage.returns(true);
+      context.getPages.returns([page, other]);
+
+      await assert.rejects(
+        startTrace(args).handler(
+          {params: {reload: true, autoStop: false}, page},
+          response,
+          context,
+        ),
+        /Coverage is running on page 2\. Coverage skews trace timings, so call stop_coverage before performance_start_trace\./,
+      );
+
+      sinon.assert.notCalled(page.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(page.pptrPage.tracing.start);
       sinon.assert.notCalled(page.pptrPage.goto);
     });
 

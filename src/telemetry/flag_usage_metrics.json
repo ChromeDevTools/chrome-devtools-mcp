@@ -506,5 +506,13 @@
   {
     "name": "background_new_pages",
     "flagType": "boolean"
+  },
+  {
+    "name": "category_coverage_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_coverage",
+    "flagType": "boolean"
   }
 ]

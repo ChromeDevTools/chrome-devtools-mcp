@@ -173,6 +173,10 @@ See the full [Tool Reference][tool-reference] for a complete list of all support
 
 Find the complete list of server parameters (e.g., `--headless`, `--isolated`, `--slim`) and how to configure WebSocket connections in the [Configuration Guide][configuration-guide].
 
+Opt-in categories such as `--categoryCoverage` (JavaScript and CSS
+coverage) are disabled by default. See the Configuration Guide for the
+full list of `--category*` flags.
+
 For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. See the [Slim tool reference][slim-tool-reference].
 
 ## Advanced Usage

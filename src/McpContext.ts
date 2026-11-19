@@ -133,6 +133,10 @@ const FEATURE_CONTROLLERS: readonly FeatureController[] = [
     onDisable: context => context.releasePerformanceTrace(),
   },
   {
+    gate: {category: ToolCategory.COVERAGE},
+    onDisable: context => context.releaseCoverage(),
+  },
+  {
     gate: {category: ToolCategory.DEBUGGING, conditions: ['devtoolsComments']},
     onDisable: context => context.releaseDevToolsComments(),
   },
@@ -334,6 +338,25 @@ export class McpContext implements Context, BrowserlessContext {
       }
       this.logger?.(
         'The running performance trace was discarded because performance tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Stops any running coverage sessions when coverage tools are disabled.
+   */
+  async releaseCoverage(): Promise<void> {
+    for (const mcpPage of this.#allMcpPages()) {
+      if (!mcpPage.isRunningCoverage()) {
+        continue;
+      }
+      try {
+        await mcpPage.stopCoverage();
+      } catch (err) {
+        this.logger?.('Failed to stop coverage', err);
+      }
+      this.logger?.(
+        'The running coverage session was discarded because coverage tools were disabled.',
       );
     }
   }

@@ -438,6 +438,18 @@ describe('McpServer', () => {
       assert.ok(names.includes('execute_webmcp_tool'));
     });
 
+    it('omits coverage tools by default', async () => {
+      const names = await listToolNames();
+      assert.ok(!names.includes('start_coverage'));
+      assert.ok(!names.includes('stop_coverage'));
+    });
+
+    it('has coverage tools when categoryCoverage is enabled', async () => {
+      const names = await listToolNames(['--categoryCoverage']);
+      assert.ok(names.includes('start_coverage'));
+      assert.ok(names.includes('stop_coverage'));
+    });
+
     it('has memory debugging tools', async () => {
       const names = await listToolNames(['--memoryDebugging']);
       assert.ok(names.includes('get_heapsnapshot_summary'));
