@@ -389,6 +389,26 @@ Arg #2: null
 Arg #3: true
 `;
 
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats the position of a wasm frame as a hex byte offset toJSONDetailed 1`] = `
+{
+  "id": 18,
+  "type": "log",
+  "text": "from wasm",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at $run (wasm://wasm/c9772ffe:0x2d)\\nat start (main.js:5:13)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats the position of a wasm frame as a hex byte offset toStringDetailed 1`] = `
+ID: 18
+Message: log> from wasm
+### Stack trace
+at $run (wasm://wasm/c9772ffe:0x2d)
+at start (main.js:5:13)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > handles \"Execution context is not available\" error in args toJSONDetailed 1`] = `
 {
   "id": 6,

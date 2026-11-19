@@ -325,6 +325,46 @@ new WebAssembly.Instance(new WebAssembly.Module(bytes), {
       });
     });
 
+    it('includes preserved stack traces of uncaught errors', async () => {
+      server.addRoute('/thrower.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function throwFromOld() {
+  throw new Error('uncaught before navigation');
+}
+throwFromOld();`);
+      });
+      server.addHtmlRoute(
+        '/first.html',
+        `<script src="${server.getRoute('/thrower.js')}"></script>`,
+      );
+      server.addHtmlRoute('/second.html', '<title>second</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/first.html'));
+        await page.pptrPage.goto(server.getRoute('/second.html'));
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(
+          textContent.includes(
+            'Uncaught Error: uncaught before navigation (0 args)\n' +
+              `  at throwFromOld (${server.getRoute('/thrower.js')}:2:9)`,
+          ),
+          textContent,
+        );
+      });
+    });
+
     it('keeps preserved frames raw after a cross-site navigation', async () => {
       server.addRoute('/old.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');
@@ -792,6 +832,44 @@ console.error('inline-line-4');
         assert.match(rawText, /inline-line-4/);
         assert.match(rawText, /\(inline\.html:4:9\)/);
         assert.doesNotMatch(rawText, /VM\d+/);
+      });
+    });
+
+    it('keeps the stack trace of a message after a navigation', async () => {
+      server.addRoute('/old.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function logFromOld() {
+  console.log('before navigation');
+}
+logFromOld();`);
+      });
+      server.addHtmlRoute(
+        '/old.html',
+        `<script src="${server.getRoute('/old.js')}"></script>`,
+      );
+      server.addHtmlRoute('/new.html', '<title>new</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/old.html'));
+        await page.pptrPage.goto(server.getRoute('/new.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(
+          rawText.includes(
+            '### Stack trace\n' +
+              `at logFromOld (${server.getRoute('/old.js')}:2:11)`,
+          ),
+          rawText,
+        );
       });
     });
 
