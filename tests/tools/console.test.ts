@@ -366,17 +366,16 @@ throwFromOld();`);
     });
 
     it('keeps preserved frames raw after a cross-site navigation', async () => {
-      server.addRoute('/old.js', (_req, res) => {
-        res.setHeader('Content-Type', 'text/javascript');
-        res.statusCode = 200;
-        res.end(`function logFromOld() {
-  console.log('before navigation');
-}
-logFromOld();`);
-      });
+      // Unlike a script from the network, an inline script gets the same id
+      // on every run.
       server.addHtmlRoute(
         '/old.html',
-        `<script src="${server.getRoute('/old.js')}"></script>`,
+        `<script>
+function logFromOld() {
+  console.log('before navigation');
+}
+logFromOld();
+</script>`,
       );
       // Script ids restart in the new renderer process, so the scripts of the
       // new page reuse the ids of the old one.
@@ -384,11 +383,19 @@ logFromOld();`);
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage();
-        await page.pptrPage.goto(server.getRoute('/old.html'));
-        // localhost and 127.0.0.1 are different sites.
-        await page.pptrPage.goto(
-          server.getRoute('/new.html').replace('127.0.0.1', 'localhost'),
+        const model = page.devtoolsUniverse?.target.model(
+          DevTools.DebuggerModel,
         );
+        assert.ok(model);
+        const oldUrl = server.getRoute('/old.html');
+        await page.pptrPage.goto(oldUrl);
+        const [oldScript] = model.scriptsForSourceURL(oldUrl);
+        assert.ok(oldScript);
+        // localhost and 127.0.0.1 are different sites.
+        const newUrl = server
+          .getRoute('/new.html')
+          .replace('127.0.0.1', 'localhost');
+        await page.pptrPage.goto(newUrl);
 
         await listConsoleMessages(args).handler(
           {
@@ -400,9 +407,14 @@ logFromOld();`);
         );
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
+        assert.strictEqual(
+          model.scriptForId(oldScript.scriptId)?.sourceURL,
+          newUrl,
+          'A script of the new page should reuse the script id of old.html',
+        );
         assert.match(
           textContent,
-          /at logFromOld \(http:\/\/127\.0\.0\.1:\d+\/old\.js:2:11\)/,
+          /at logFromOld \(http:\/\/127\.0\.0\.1:\d+\/old\.html:3:11\)/,
         );
       });
     });
