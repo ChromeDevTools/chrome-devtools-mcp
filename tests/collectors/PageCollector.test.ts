@@ -7,12 +7,6 @@
 import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
-import type {
-  ConsoleMessage,
-  Frame,
-  HTTPRequest,
-  Protocol,
-} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -21,7 +15,14 @@ import {
   PageCollector,
   type ListenerMap,
 } from '../../src/collectors/PageCollector.js';
-import {DevTools, FrameEvent} from '../../src/third_party/browser.js';
+import {
+  DevTools,
+  FrameEvent,
+  type ConsoleMessage,
+  type Frame,
+  type HTTPRequest,
+  type Protocol,
+} from '../../src/third_party/browser.js';
 
 import {createMockPuppeteerPage} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
