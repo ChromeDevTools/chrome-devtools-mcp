@@ -751,7 +751,7 @@ export class McpPage implements ContextPage {
         `Coverage is already running on page ${this.id}. Call stop_coverage first.`,
       );
     }
-    const {js, css, reload} = options;
+    const {js, css} = options;
     if (!js && !css) {
       throw new Error('At least one of js or css must be true.');
     }
@@ -771,9 +771,6 @@ export class McpPage implements ContextPage {
         await this.pptrPage.coverage.startCSSCoverage();
       }
       this.#coverageSession = started;
-      if (reload) {
-        await this.pptrPage.reload({waitUntil: 'load'});
-      }
     } catch (error) {
       this.#coverageSession = undefined;
       await this.#stopCoverageSources(started);

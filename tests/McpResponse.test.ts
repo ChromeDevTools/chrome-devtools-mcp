@@ -202,7 +202,29 @@ describe('McpResponse', () => {
       text,
       /Totals: 1 resources, 10 total bytes, 4 used, 6 unused \(60.0% unused\)/,
     );
-    assert.ok('coverage' in structuredContent);
+    assert.deepStrictEqual(
+      (structuredContent as {coverage?: unknown}).coverage,
+      {
+        resources: [
+          {
+            url: 'https://example.com/app.js',
+            type: 'JS',
+            totalBytes: 10,
+            usedBytes: 4,
+            unusedBytes: 6,
+            unusedPercent: 60,
+          },
+        ],
+        omitted: 0,
+        totals: {
+          resources: 1,
+          totalBytes: 10,
+          usedBytes: 4,
+          unusedBytes: 6,
+          unusedPercent: 60,
+        },
+      },
+    );
   });
 
   it('list pages', async t => {

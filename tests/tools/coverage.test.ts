@@ -37,7 +37,6 @@ describe('start_coverage', () => {
         params: {
           js: true,
           css: true,
-          reload: false,
         },
         page,
       },
@@ -48,38 +47,10 @@ describe('start_coverage', () => {
     sinon.assert.calledOnceWithExactly(page.startCoverage, {
       js: true,
       css: true,
-      reload: false,
     });
     sinon.assert.calledOnceWithExactly(
       response.appendResponseLine,
       'JavaScript and CSS coverage collection has started. Interact with the page, then call stop_coverage to get the report.',
-    );
-  });
-
-  it('mentions a reload when reload is true', async () => {
-    const {page, context, response, args} = createHandlerMocks();
-
-    await startCoverage(args).handler(
-      {
-        params: {
-          js: true,
-          css: false,
-          reload: true,
-        },
-        page,
-      },
-      response,
-      context,
-    );
-
-    sinon.assert.calledOnceWithExactly(page.startCoverage, {
-      js: true,
-      css: false,
-      reload: true,
-    });
-    sinon.assert.calledOnceWithExactly(
-      response.appendResponseLine,
-      'JavaScript coverage collection has started and the page was reloaded. Interact with the page, then call stop_coverage to get the report.',
     );
   });
 
@@ -91,7 +62,6 @@ describe('start_coverage', () => {
         params: {
           js: false,
           css: true,
-          reload: false,
         },
         page,
       },
@@ -102,7 +72,6 @@ describe('start_coverage', () => {
     sinon.assert.calledOnceWithExactly(page.startCoverage, {
       js: false,
       css: true,
-      reload: false,
     });
     sinon.assert.calledOnceWithExactly(
       response.appendResponseLine,
@@ -116,7 +85,7 @@ describe('start_coverage', () => {
 
     await assert.rejects(
       startCoverage(args).handler(
-        {params: {js: true, css: true, reload: false}, page},
+        {params: {js: true, css: true}, page},
         response,
         context,
       ),
@@ -216,13 +185,13 @@ describe('coverage in a browser', () => {
           params: {
             js: true,
             css: true,
-            reload: true,
           },
           page: mcpPage,
         },
         response,
         context,
       );
+      await mcpPage.pptrPage.reload({waitUntil: 'load'});
       await mcpPage.pptrPage.click('#go');
       await stopCoverage(args).handler(
         {params: {}, page: mcpPage},

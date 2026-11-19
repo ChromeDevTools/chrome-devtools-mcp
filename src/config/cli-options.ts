@@ -2071,7 +2071,7 @@ export const commands: Commands = {
   },
   start_coverage: {
     description:
-      'Starts JavaScript and/or CSS coverage on the selected page. Call this, reload or interact with the page, then call stop_coverage for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation, so use reload to include page load. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)',
+      'Starts JavaScript and/or CSS coverage on the selected page. Call this, interact with the page, then call stop_coverage for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation. To include page load, call navigate_page with type reload after this tool. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)',
     category: 'Code coverage',
     args: {
       pageId: {
@@ -2096,15 +2096,6 @@ export const commands: Commands = {
         required: false,
         positional: false,
         default: true,
-      },
-      reload: {
-        name: 'reload',
-        type: 'boolean',
-        description:
-          'Reload the selected page after coverage starts. Default: false.',
-        required: false,
-        positional: false,
-        default: false,
       },
     },
   },

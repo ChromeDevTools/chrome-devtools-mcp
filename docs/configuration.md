@@ -70,7 +70,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--categoryCoverage`/ `--category-coverage`**
-  Set to true to include tools that collect JavaScript and CSS coverage. Coverage collection is heavy and should not run during a performance trace.
+  Set to true to include tools that collect JavaScript and CSS coverage. Coverage collection is heavy and cannot run during a performance trace.
   - **Type:** boolean
   - **Default:** `false`
 

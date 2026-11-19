@@ -181,7 +181,8 @@ chrome-devtools trigger_extension_action "extension_id" # Triggers the default a
 
 ```bash
 chrome-devtools start --categoryCoverage
-chrome-devtools start_coverage 1 --reload true
+chrome-devtools start_coverage 1
+chrome-devtools navigate_page 1 --type "reload"
 chrome-devtools click 1 "uid"
 chrome-devtools stop_coverage 1
 ```

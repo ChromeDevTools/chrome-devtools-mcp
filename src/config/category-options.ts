@@ -134,8 +134,7 @@ const categoryOverrides: Record<
   },
   [ToolCategory.COVERAGE]: {
     describe:
-      'Set to true to include tools that collect JavaScript and CSS coverage. ' +
-      'Coverage collection is heavy and should not run during a performance trace.',
+      'Set to true to include tools that collect JavaScript and CSS coverage. Coverage collection is heavy and cannot run during a performance trace.',
     offByDefault: true,
   },
 };

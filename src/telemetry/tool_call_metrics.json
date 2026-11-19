@@ -1483,10 +1483,6 @@
       {
         "name": "css",
         "argType": "boolean"
-      },
-      {
-        "name": "reload",
-        "argType": "boolean"
       }
     ]
   },

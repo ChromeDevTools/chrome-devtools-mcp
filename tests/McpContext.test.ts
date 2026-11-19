@@ -2097,13 +2097,49 @@ describe('McpContext', () => {
       });
       const mcpPage = context.getSelectedMcpPage();
       await mcpPage.init();
-      await mcpPage.startCoverage({js: true, css: true, reload: false});
+      await mcpPage.startCoverage({js: true, css: true});
 
       await context.releaseCoverage();
 
       sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopJSCoverage);
       sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopCSSCoverage);
       assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+
+    it('continues to the next page when stopping coverage fails on one page', async () => {
+      const {page: firstPptrPage, target: firstTarget} = createPageTarget();
+      const {page: secondPptrPage, target: secondTarget} = createPageTarget();
+      const context = await createMockContext({
+        config: createMockServerConfig({categoryCoverage: true}),
+        targets: [firstTarget, secondTarget],
+      });
+      const [firstPage, secondPage] = context.getPages();
+      assert.ok(firstPage);
+      assert.ok(secondPage);
+      await firstPage.init();
+      await secondPage.init();
+      await firstPage.startCoverage({js: true, css: true});
+      await secondPage.startCoverage({js: true, css: true});
+      firstPptrPage.coverage.stopJSCoverage.rejects(new Error('stop failed'));
+
+      await context.releaseCoverage();
+
+      sinon.assert.calledTwice(firstPptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnceWithExactly(
+        firstPptrPage.coverage.stopCSSCoverage,
+      );
+      sinon.assert.calledOnceWithExactly(
+        secondPptrPage.coverage.stopJSCoverage,
+      );
+      sinon.assert.calledOnceWithExactly(
+        secondPptrPage.coverage.stopCSSCoverage,
+      );
+      sinon.assert.callOrder(
+        firstPptrPage.coverage.stopJSCoverage,
+        secondPptrPage.coverage.stopJSCoverage,
+      );
+      assert.strictEqual(firstPage.isRunningCoverage(), false);
+      assert.strictEqual(secondPage.isRunningCoverage(), false);
     });
 
     it('stops the running performance trace and clears recorded traces', async () => {
