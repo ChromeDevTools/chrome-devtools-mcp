@@ -22,7 +22,12 @@ import {McpServer} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {PipeTransport} from '../third_party/index.js';
-import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+  saveLogsToFile,
+} from '../utils/logger.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
@@ -199,7 +204,10 @@ async function handleRequest(msg: DaemonMessage): Promise<{
         socketPath,
         startDate: startDate.toISOString(),
         version: VERSION,
-        args: mcpServerArgs,
+        // `status` is the documented health check, so its output is pasted into
+        // reports and CI logs. Redact here rather than at the print site, so a
+        // bearer token or an endpoint token never leaves this process.
+        args: redactDaemonArgsForLogging(mcpServerArgs),
       };
       return {
         success: true,
