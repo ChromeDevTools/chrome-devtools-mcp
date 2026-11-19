@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {MAX_NAME_LENGTH} from '../formatters/HeapSnapshotFormatter.js';
+import {
+  DEFAULT_MAX_NODE_IDS,
+  MAX_NAME_LENGTH,
+} from '../formatters/HeapSnapshotFormatter.js';
 import {zod} from '../third_party/index.js';
 import {byteSizeRangeSchema} from '../utils/bytes.js';
 
@@ -512,6 +515,14 @@ export const getHeapSnapshotDuplicateStrings: BrowserlessToolFactory =
       filePath: zod
         .string()
         .describe('A path to a .heapsnapshot file to read.'),
+      maxNodeIds: zod
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          `Maximum node IDs per group. Defaults to ${DEFAULT_MAX_NODE_IDS}. Set to the group count to include all IDs.`,
+        ),
       pageIdx: pageIdxSchema,
       pageSize: pageSizeSchema,
       maxNameLength: maxNameLengthSchema,
@@ -525,6 +536,7 @@ export const getHeapSnapshotDuplicateStrings: BrowserlessToolFactory =
         pageIdx: request.params.pageIdx,
         pageSize: request.params.pageSize,
         maxNameLength: request.params.maxNameLength,
+        maxNodeIds: request.params.maxNodeIds,
       });
     },
   }));

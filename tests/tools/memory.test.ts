@@ -704,7 +704,12 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotDuplicateStrings,
         duplicateStrings,
-        {pageIdx: 0, pageSize: 50, maxNameLength: undefined},
+        {
+          pageIdx: 0,
+          pageSize: 50,
+          maxNameLength: undefined,
+          maxNodeIds: undefined,
+        },
       );
     });
 
@@ -720,6 +725,7 @@ describe('memory', () => {
             pageIdx: 2,
             pageSize: 10,
             maxNameLength: 1000,
+            maxNodeIds: 2000,
           },
         },
         response,
@@ -733,7 +739,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotDuplicateStrings,
         duplicateStrings,
-        {pageIdx: 2, pageSize: 10, maxNameLength: 1000},
+        {pageIdx: 2, pageSize: 10, maxNameLength: 1000, maxNodeIds: 2000},
       );
     });
   });
