@@ -11,12 +11,12 @@ import path from 'node:path';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
-  Mutex,
   puppeteer,
   type Browser,
   type ChromeReleaseChannel,
   type LaunchOptions,
 } from './third_party/browser.js';
+import {Mutex} from './third_party/index.js';
 import {
   logger,
   puppeteerLogger,
