@@ -57,6 +57,7 @@ import {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
+import {downloadBehaviorFor} from './utils/downloadsDir.js';
 import {
   fileUrlToPathWithPosixFallback,
   getTempFilePath,
@@ -600,7 +601,11 @@ export class McpContext implements Context, BrowserlessContext {
     if (isolatedContextName !== undefined) {
       let ctx = this.#isolatedContexts.get(isolatedContextName);
       if (!ctx) {
-        ctx = await this.browser.createBrowserContext();
+        ctx = await this.browser.createBrowserContext({
+          downloadBehavior: downloadBehaviorFor(
+            this.#config.resolved.downloadsDir,
+          ),
+        });
         this.#isolatedContexts.set(isolatedContextName, ctx);
       }
       page = await ctx.newPage({background});

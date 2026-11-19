@@ -262,6 +262,7 @@ ts_library("mcp_lib") {
     "utils/bytes.ts",
     "utils/check-for-updates.ts",
     "utils/disclaimers.ts",
+    "utils/downloadsDir.ts",
     "utils/errorHandling.ts",
     "utils/files.ts",
     "utils/id.ts",

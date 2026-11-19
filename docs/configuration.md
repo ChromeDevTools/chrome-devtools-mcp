@@ -161,6 +161,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
 
+- **`--downloadsDir`/ `--downloads-dir`**
+  Directory where Chrome saves downloaded files without a save prompt. Created when the browser starts if missing. Refused if the path exists and is not a directory. Applied with Puppeteer downloadBehavior to the default browser context on launch or connect, and to isolated contexts this server creates. Omit to keep Chrome's default prompt and location.
+  - **Type:** string
+
 - **`--pageIdRouting`/ `--page-id-routing`**
   Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.
   - **Type:** boolean

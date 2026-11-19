@@ -33,6 +33,8 @@ Note: For `evaluate_script`, `pageId` is required when targeting pages. However,
 ### Tool selection
 
 - **Network mocks**: `mock_network` and `remove_network_mock` require `--categoryNetworkMocks` at server startup.
+- **Downloads**: Start the server with `--downloadsDir <path>` so Chrome saves
+  files there without a prompt.
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
 - **CSS & Styling inspection**: Use `get_css_styles` to inspect computed styles, matched rules, cascade, and CSS variables (pass `computedProperties` for unmatched defaults). Treat the output as authoritative.

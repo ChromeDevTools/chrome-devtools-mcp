@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -28,7 +29,7 @@ import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
-import {createTempFile} from './utils.js';
+import {createTempDir, createTempFile} from './utils.js';
 
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
   const locator = new ConfigLocator();
@@ -106,6 +107,23 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       browserUrl: 'http://localhost:3000',
+    });
+  });
+
+  describe('downloadsDir', () => {
+    it('stores the absolute path without creating the directory', () => {
+      using dir = createTempDir('downloads-cli-');
+      const nested = path.join(dir.path, 'nested');
+      const args = parseConfig(['--downloadsDir', nested]);
+      assert.strictEqual(args.downloadsDir, nested);
+      assert.strictEqual(fs.existsSync(nested), false);
+    });
+
+    it('refuses a whitespace-only path', () => {
+      assert.throws(
+        () => parseConfig(['--downloadsDir', '   ']),
+        /Invalid downloadsDir\. Expected a directory path/,
+      );
     });
   });
 
