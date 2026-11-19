@@ -140,6 +140,9 @@ const mcpServerArgs = process.argv.slice(2);
 let running: {mcpServer: McpServer; idleTimer: IdleTimer} | null = null;
 let server: Server | null = null;
 
+const SHUTTING_DOWN_ERROR =
+  'The chrome-devtools daemon is shutting down. Run the command again to start a new daemon.';
+
 async function setupMCPServer(): Promise<void> {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
   const configParser = new ConfigParser(VERSION);
@@ -194,6 +197,11 @@ async function handleRequest(msg: DaemonMessage): Promise<{
       const result = await active.idleTimer.track(() =>
         active.mcpServer.callTool(tool, args),
       );
+      // A tool call that fails because the daemon is shutting down gets a hint
+      // to run the command again.
+      if (isCleaningUp && result.isError) {
+        throw new Error(SHUTTING_DOWN_ERROR);
+      }
 
       return {
         success: true,

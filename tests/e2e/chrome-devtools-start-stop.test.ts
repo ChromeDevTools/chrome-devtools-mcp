@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {sendCommand} from '../../src/daemon/client.js';
 import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
@@ -40,6 +41,40 @@ describe('chrome-devtools', {concurrency: true}, () => {
     );
 
     await assertDaemonIsNotRunning(sessionId);
+  });
+
+  it('asks to run a tool call again when stop interrupts it', async t => {
+    const sessionId = createCliSession(t);
+    const startResult = await runCli(['start'], sessionId);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+    const listPages = await sendCommand(
+      {method: 'invoke_tool', tool: 'list_pages', args: {}},
+      sessionId,
+    );
+    assert.ok(listPages.success, JSON.stringify(listPages));
+
+    const longCall = sendCommand(
+      {
+        method: 'invoke_tool',
+        tool: 'evaluate_script',
+        args: {
+          function: '() => new Promise(resolve => setTimeout(resolve, 10000))',
+          pageId: 1,
+        },
+      },
+      sessionId,
+    );
+    await sendCommand({method: 'stop'}, sessionId);
+
+    assert.deepStrictEqual(await longCall, {
+      success: false,
+      error:
+        'The chrome-devtools daemon is shutting down. Run the command again to start a new daemon.',
+    });
   });
 
   it('can start the daemon with userDataDir', async t => {
