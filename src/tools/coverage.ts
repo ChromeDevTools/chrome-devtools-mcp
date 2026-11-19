@@ -25,11 +25,12 @@ export const startCoverage: PageToolFactory = definePageTool(() => ({
   name: 'start_coverage',
   description:
     'Starts JavaScript and/or CSS coverage on the selected page. ' +
-    'Call this, reload or interact with the page, then call ' +
+    'Call this, interact with the page, then call ' +
     `${STOP_COVERAGE_TOOL_NAME} for a compact unused-bytes report. ` +
     'Coverage is not retained across navigations: the report only covers ' +
-    'the document loaded after the last navigation, so use reload to ' +
-    'include page load. Starting twice without stopping is an error. ' +
+    'the document loaded after the last navigation. To include page load, ' +
+    'call navigate_page with type reload after this tool. ' +
+    'Starting twice without stopping is an error. ' +
     'Coverage cannot run during a performance trace because it skews timings.',
   annotations: {
     category: ToolCategory.COVERAGE,
@@ -44,12 +45,6 @@ export const startCoverage: PageToolFactory = definePageTool(() => ({
       .boolean()
       .default(true)
       .describe('Collect CSS coverage. Default: true.'),
-    reload: zod
-      .boolean()
-      .default(false)
-      .describe(
-        'Reload the selected page after coverage starts. Default: false.',
-      ),
   },
   blockedByDialog: true,
   concurrency: 'page',
@@ -60,11 +55,10 @@ export const startCoverage: PageToolFactory = definePageTool(() => ({
         'A performance trace is running. Coverage skews trace timings, so stop the trace with performance_stop_trace before calling start_coverage.',
       );
     }
-    const {js, css, reload} = request.params;
-    await request.page.startCoverage({js, css, reload});
-    const reloaded = reload ? ' and the page was reloaded' : '';
+    const {js, css} = request.params;
+    await request.page.startCoverage({js, css});
     response.appendResponseLine(
-      `${coverageTypesLabel(js, css)} coverage collection has started${reloaded}. ` +
+      `${coverageTypesLabel(js, css)} coverage collection has started. ` +
         `Interact with the page, then call ${STOP_COVERAGE_TOOL_NAME} to get the report.`,
     );
   },

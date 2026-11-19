@@ -2086,7 +2086,7 @@ export const commands: Commands = {
   },
   start_coverage: {
     description:
-      'Starts JavaScript and/or CSS coverage on the selected page. Call this, reload or interact with the page, then call stop_coverage for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation, so use reload to include page load. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)',
+      'Starts JavaScript and/or CSS coverage on the selected page. Call this, interact with the page, then call stop_coverage for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation. To include page load, call navigate_page with type reload after this tool. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings.',
     category: 'Code coverage',
     args: {
       pageId: {
@@ -2112,20 +2112,11 @@ export const commands: Commands = {
         positional: false,
         default: true,
       },
-      reload: {
-        name: 'reload',
-        type: 'boolean',
-        description:
-          'Reload the selected page after coverage starts. Default: false.',
-        required: false,
-        positional: false,
-        default: false,
-      },
     },
   },
   stop_coverage: {
     description:
-      'Stops coverage on the selected page and returns a compact report. Each resource lists type, total bytes, used bytes, unused bytes, and unused percent. Rows are sorted by unused bytes and capped at the top 20. Errors if start_coverage was not called on this page. (requires flag: --categoryCoverage=true)',
+      'Stops coverage on the selected page and returns a compact report. Each resource lists type, total bytes, used bytes, unused bytes, and unused percent. Rows are sorted by unused bytes and capped at the top 20. Errors if start_coverage was not called on this page.',
     category: 'Code coverage',
     args: {
       pageId: {

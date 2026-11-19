@@ -34,12 +34,7 @@ Note: For `evaluate_script`, `pageId` is required when targeting pages. However,
 ### Tool selection
 
 - **Network mocks**: `mock_network` and `remove_network_mock` require `--categoryNetworkMocks` at server startup.
-- **Code coverage**: `start_coverage` and `stop_coverage` require
-  `--categoryCoverage`. Use them to measure unused JavaScript and CSS
-  after a reload or interaction. Coverage is not retained across
-  navigations, so the report covers only the document loaded after the
-  last navigation. Coverage and performance traces cannot run at the same
-  time because coverage collection skews timings.
+- **Code coverage**: Use `start_coverage`, then `navigate_page` with `type: reload` or interactions, then `stop_coverage` to measure unused JavaScript and CSS.
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
 - **CSS & Styling inspection**: Use `get_css_styles` to inspect computed styles, matched rules, cascade, and CSS variables (pass `computedProperties` for unmatched defaults). Treat the output as authoritative.

@@ -944,14 +944,13 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `start_coverage`
 
-**Description:** Starts JavaScript and/or CSS coverage on the selected page. Call this, reload or interact with the page, then call [`stop_coverage`](#stop_coverage) for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation, so use reload to include page load. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)
+**Description:** Starts JavaScript and/or CSS coverage on the selected page. Call this, interact with the page, then call [`stop_coverage`](#stop_coverage) for a compact unused-bytes report. Coverage is not retained across navigations: the report only covers the document loaded after the last navigation. To include page load, call [`navigate_page`](#navigate_page) with type reload after this tool. Starting twice without stopping is an error. Coverage cannot run during a performance trace because it skews timings. (requires flag: --categoryCoverage=true)
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **css** (boolean) _(optional)_: Collect CSS coverage. Default: true.
 - **js** (boolean) _(optional)_: Collect JavaScript coverage. Default: true.
-- **reload** (boolean) _(optional)_: Reload the selected page after coverage starts. Default: false.
 
 ---
 

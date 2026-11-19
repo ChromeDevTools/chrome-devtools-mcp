@@ -551,7 +551,6 @@ export interface CoverageReport {
 export interface StartCoverageOptions {
   js: boolean;
   css: boolean;
-  reload: boolean;
 }
 
 /**
