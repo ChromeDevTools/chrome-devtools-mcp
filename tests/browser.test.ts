@@ -21,7 +21,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks} from './server.js';
-import {getExecutablePath} from './utils.js';
+import {createTempDir, getExecutablePath} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -89,6 +89,97 @@ describe('browser', () => {
         connectStub.firstCall.args[0].wsOptions?.headers,
         headers,
       );
+      await manager.close();
+    });
+
+    it('launches with downloadBehavior and creates the downloadsDir', async () => {
+      using dir = createTempDir('downloads-launch-');
+      const downloadsDir = path.join(dir.path, 'nested');
+      const launchStub = sinon
+        .stub(puppeteer, 'launch')
+        .resolves(createMockPuppeteerBrowser());
+      const manager = new BrowserManager(
+        createMockServerConfig({headless: true, isolated: true, downloadsDir}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        downloadBehavior: {policy: 'allow', downloadPath: downloadsDir},
+      });
+      assert.ok(fs.statSync(downloadsDir).isDirectory());
+      await manager.close();
+    });
+
+    it('launches without downloadBehavior when downloadsDir is unset', async () => {
+      const launchStub = sinon
+        .stub(puppeteer, 'launch')
+        .resolves(createMockPuppeteerBrowser());
+      const manager = new BrowserManager(
+        createMockServerConfig({headless: true, isolated: true}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        downloadBehavior: undefined,
+      });
+      await manager.close();
+    });
+
+    it('refuses to launch when downloadsDir is a file', async () => {
+      using dir = createTempDir('downloads-file-');
+      const downloadsDir = path.join(dir.path, 'file.txt');
+      fs.writeFileSync(downloadsDir, 'not a dir');
+      const launchStub = sinon.stub(puppeteer, 'launch');
+      const manager = new BrowserManager(
+        createMockServerConfig({headless: true, isolated: true, downloadsDir}),
+      );
+
+      await assert.rejects(
+        manager.ensureBrowser(),
+        /Could not create the directory \(EEXIST\)/,
+      );
+      sinon.assert.notCalled(launchStub);
+    });
+
+    it('refuses to connect when downloadsDir is a file', async () => {
+      using dir = createTempDir('downloads-file-');
+      const downloadsDir = path.join(dir.path, 'file.txt');
+      fs.writeFileSync(downloadsDir, 'not a dir');
+      const connectStub = sinon.stub(puppeteer, 'connect');
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          browserUrl: 'http://127.0.0.1:9222',
+          downloadsDir,
+        }),
+      );
+
+      await assert.rejects(
+        manager.ensureBrowser(),
+        /Could not create the directory \(EEXIST\)/,
+      );
+      sinon.assert.notCalled(connectStub);
+    });
+
+    it('connects with downloadBehavior when downloadsDir is set', async () => {
+      using dir = createTempDir('downloads-connect-');
+      const connectStub = sinon
+        .stub(puppeteer, 'connect')
+        .resolves(createMockPuppeteerBrowser());
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          browserUrl: 'http://127.0.0.1:9222',
+          downloadsDir: dir.path,
+        }),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(connectStub, {
+        browserURL: 'http://127.0.0.1:9222',
+        downloadBehavior: {policy: 'allow', downloadPath: dir.path},
+      });
       await manager.close();
     });
 

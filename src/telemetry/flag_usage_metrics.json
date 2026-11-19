@@ -510,5 +510,9 @@
   {
     "name": "idle_timeout_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "downloads_dir_present",
+    "flagType": "boolean"
   }
 ]
