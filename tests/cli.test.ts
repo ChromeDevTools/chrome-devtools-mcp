@@ -59,6 +59,7 @@ describe('cli args parsing', () => {
     usageStatistics: true,
     javascriptEvaluation: true,
     fileNavigations: true,
+    backgroundNewPages: false,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
@@ -144,6 +145,20 @@ describe('cli args parsing', () => {
       channel: 'stable',
       browserUrl: undefined,
     });
+  });
+
+  it('rejects browser urls without an http or https scheme', async () => {
+    for (const value of [
+      'localhost:9222',
+      'ws://127.0.0.1:9222',
+      'file:///tmp/chrome',
+      'chrome://inspect',
+    ]) {
+      assert.throws(
+        () => parseConfig(['--browserUrl', value]),
+        /must use http:\/\/ or https:\/\/ protocol/,
+      );
+    }
   });
 
   it('parses with executable path', async () => {
@@ -1451,6 +1466,27 @@ describe('cli literal args', () => {
     }
   });
 
+  it('shields number-like tokens that yargs does not read as numbers', () => {
+    for (const input of [
+      ['fill', '1', '1_1', '-1e5'],
+      ['fill', '1', '1_1', '-5.'],
+      ['handle_dialog', '1', 'accept', '--promptText', '-1e5'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+  });
+
+  it('leaves tokens that yargs reads as negative numbers to yargs', () => {
+    const input = ['fill', '1', '1_1', '-.5'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
   it('leaves unknown dash tokens alone once positionals are filled', () => {
     const input = ['fill', '1', '1_1', 'x', '--pageid', '2'];
     assert.deepStrictEqual(shield(input).shielded, input);
@@ -1481,6 +1517,38 @@ describe('cli literal args', () => {
     ]);
     assert.deepStrictEqual(literalIndexes, [6]);
     assert.strictEqual(restored[6], '--weird');
+  });
+
+  it('shields dash tokens that follow a free-form string option', () => {
+    for (const input of [
+      ['emulate', '1', '--geolocation', '-33.86,151.2'],
+      ['query_heapsnapshot_objects', 'a.heapsnapshot', '--selfSize', '-1MB'],
+      ['handle_dialog', '1', 'accept', '--promptText', '- item'],
+      ['type_text', '1', 'a', '--submitKey', '-'],
+      ['emulate', '1', '--user-agent', '--weird'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+  });
+
+  it('leaves other dash tokens that follow an option to yargs', () => {
+    for (const input of [
+      // A negative number, which yargs takes as the value.
+      ['handle_dialog', '1', 'accept', '--promptText', '-5'],
+      // A known option of the command.
+      ['emulate', '1', '--geolocation', '--userAgent', 'x'],
+      // After an option that takes a number or a fixed set of choices.
+      ['emulate', '1', '--cpuThrottlingRate', '-x'],
+      ['emulate', '1', '--colorScheme', '-x'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
   });
 
   it('accepts kebab-case and negated forms of known options', () => {

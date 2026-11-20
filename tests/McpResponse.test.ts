@@ -17,7 +17,7 @@ import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/index.js';
+import {DevTools, type Extension} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {
@@ -896,6 +896,31 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reads an attached message from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const message = createMockConsoleMessage({
+      type: 'log',
+      text: 'logged by the service worker',
+    });
+    context.getServiceWorkerConsoleMessageById.returns(message);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachConsoleMessage(2, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleMessageById,
+      'sw-1',
+      2,
+    );
+    sinon.assert.notCalled(page.getConsoleMessageById);
+    assert.ok(
+      getTextContent(content[0]).includes('logged by the service worker'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
@@ -1276,7 +1301,7 @@ describe('extensions', () => {
       const emptyText = getTextContent(emptyResult.content[0]);
       assert.ok(
         emptyText.includes('No unpacked extensions found.'),
-        'Should show message for ampty extensions',
+        'Should show message for empty extensions',
       );
 
       response.resetResponseLineForTesting();
@@ -1740,15 +1765,75 @@ describe('webmcp', () => {
           ),
         ),
       });
-      response.setIncludeCssStyles(mockStyles, {
-        uid: '1_1',
-        pageSize: 2,
-        pageIdx: 0,
-      });
+      response.setIncludeCssStyles(
+        {matchedStyles: mockStyles},
+        {
+          uid: '1_1',
+          pageSize: 2,
+          pageIdx: 0,
+        },
+      );
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-2 of 5'));
     });
+  });
+
+  it('includes computed styles only on the first page of css styles', async () => {
+    const context = createMockMcpContext();
+    const mockStyles = createMockCSSMatchedStyles({
+      node: 'button#btn',
+      nodeStyles: Array.from({length: 4}, (_, idx) =>
+        createMockCSSStyleDeclaration(
+          [createMockCSSProperty('color', `color-${idx}`)],
+          {rule: createMockCSSStyleRule(`.rule-${idx}`)},
+        ),
+      ),
+    });
+    const computedStyles = new Map([
+      ['color', 'rgb(0, 0, 0)'],
+      ['display', 'inline-block'],
+      ['height', '32px'],
+      ['width', '80px'],
+    ]);
+    const styles = {matchedStyles: mockStyles, computedStyles};
+
+    const pageZeroResponse = new McpResponse(createMockServerConfig());
+    pageZeroResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 0,
+    });
+    const pageZeroResult = await pageZeroResponse.handle(context);
+    const pageZeroText = getTextContent(pageZeroResult.content[0]);
+    assert.ok(pageZeroText.includes('Showing 1-2 of 5 (Page 1 of 3).'));
+    assert.ok(pageZeroText.includes('Computed styles:'));
+    assert.ok(pageZeroText.includes('.rule-0'));
+    assert.ok(!pageZeroText.includes('.rule-1'));
+
+    const pageOneResponse = new McpResponse(createMockServerConfig());
+    pageOneResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 1,
+    });
+    const pageOneResult = await pageOneResponse.handle(context);
+    const pageOneText = getTextContent(pageOneResult.content[0]);
+    assert.ok(pageOneText.includes('Showing 3-4 of 5 (Page 2 of 3).'));
+    assert.ok(!pageOneText.includes('Computed styles:'));
+    assert.ok(pageOneText.includes('.rule-1'));
+    assert.ok(pageOneText.includes('.rule-2'));
+
+    const fallbackResponse = new McpResponse(createMockServerConfig());
+    fallbackResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 99,
+    });
+    const fallbackResult = await fallbackResponse.handle(context);
+    assert.ok(
+      getTextContent(fallbackResult.content[0]).includes('Computed styles:'),
+    );
   });
 });
 

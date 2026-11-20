@@ -5,13 +5,13 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {
-  zod,
-  type BoundingBox,
-  type ElementHandle,
-  type Page,
-  type ScreenshotClip,
-} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {
+  BoundingBox,
+  ElementHandle,
+  Page,
+  ScreenshotClip,
+} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
@@ -186,6 +186,12 @@ export const screenshot: PageToolFactory = definePageTool(
           .describe(
             'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
           ),
+        omitBackground: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.',
+          ),
         filePath: zod
           .string()
           .optional()
@@ -258,6 +264,7 @@ export const screenshot: PageToolFactory = definePageTool(
             type: format,
             quality,
             optimizeForSpeed: true,
+            omitBackground: request.params.omitBackground,
             clip,
           });
         } else if (element) {
@@ -265,6 +272,7 @@ export const screenshot: PageToolFactory = definePageTool(
             type: format,
             quality,
             optimizeForSpeed: true,
+            omitBackground: request.params.omitBackground,
           });
         } else {
           screenshot = await page.screenshot({
@@ -272,6 +280,7 @@ export const screenshot: PageToolFactory = definePageTool(
             fullPage,
             quality,
             optimizeForSpeed: true,
+            omitBackground: request.params.omitBackground,
           });
         }
 

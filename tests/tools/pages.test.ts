@@ -8,7 +8,6 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -21,6 +20,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
+import type {Dialog} from '../../src/third_party/browser.js';
 import {zod} from '../../src/third_party/index.js';
 import {
   createHandlerMocks,
@@ -260,6 +260,54 @@ describe('pages', () => {
         response.includeConsoleErrorsFrom,
         page.pptrPage.goto,
       );
+    });
+    it('opens pages in the background when backgroundNewPages is set', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        backgroundNewPages: true,
+      });
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com'}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, true, undefined);
+    });
+    it('keeps the isolated context when backgroundNewPages is set', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        backgroundNewPages: true,
+      });
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com', isolatedContext: 'ctx'}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, true, 'ctx');
+    });
+    it('drops the background param from the schema when backgroundNewPages is set', () => {
+      const {args} = createHandlerMocks({backgroundNewPages: true});
+      const tool = newPage(args);
+      assert.ok(!('background' in tool.schema));
+      assert.match(tool.description, /background/);
+      const {args: defaultArgs} = createHandlerMocks();
+      assert.ok('background' in newPage(defaultArgs).schema);
+    });
+    it('passes background false through when backgroundNewPages is off', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com', background: false}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, false, undefined);
     });
     it('closes the new tab and restores the selection when navigation fails', async () => {
       const {
@@ -1178,7 +1226,7 @@ describe('pages', () => {
       });
     });
 
-    it('reload with accpeting the beforeunload dialog', async () => {
+    it('reload with accepting the beforeunload dialog', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 
 /**
  * BaseClass that is noop or throws for methods.

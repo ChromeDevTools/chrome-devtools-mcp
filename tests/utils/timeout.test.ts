@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {TimeoutError} from '../../src/third_party/index.js';
+import {TimeoutError} from '../../src/third_party/browser.js';
 import {withTimeout} from '../../src/utils/timeout.js';
 
 describe('withTimeout', () => {

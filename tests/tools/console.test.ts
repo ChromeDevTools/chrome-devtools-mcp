@@ -8,19 +8,27 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {before, describe, it} from 'node:test';
 
-import type {Dialog} from 'puppeteer-core';
+import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {DevTools, type CdpWebWorker} from '../../src/third_party/index.js';
+import {
+  DevTools,
+  type CdpWebWorker,
+  type Dialog,
+} from '../../src/third_party/browser.js';
 import {
   getConsoleMessage,
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {installExtension} from '../../src/tools/extensions.js';
-import {createMockParsedArguments, createMockServerConfig} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockParsedArguments,
+  createMockServerConfig,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
@@ -141,6 +149,21 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          listConsoleMessages(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          listConsoleMessages(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
     it('describes the default preserved navigation history', () => {
       const tool = listConsoleMessages(createMockParsedArguments());
       assert.strictEqual(
@@ -437,6 +460,37 @@ describe('console', () => {
   describe('get_console_message', () => {
     const server = serverHooks();
 
+    it('forwards serviceWorkerId', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await getConsoleMessage(args).handler(
+        {params: {msgid: 2, serviceWorkerId: 'sw-1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.attachConsoleMessage, 2, {
+        serviceWorkerId: 'sw-1',
+      });
+    });
+
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          getConsoleMessage(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          getConsoleMessage(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
     it('gets a specific console message', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage();
@@ -460,6 +514,40 @@ describe('console', () => {
           textContent.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
         );
+      });
+    });
+
+    it('resolves Error arguments after evaluateHandle', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent('<p>page</p>');
+        await listConsoleMessages(args).handler(
+          {params: {}, page},
+          response,
+          context,
+        );
+        // Object ids are numbered per session. So far Puppeteer's session and
+        // the DevTools universe's session have wrapped the same objects, so
+        // the Error below would get the same objectId on both, and a lookup
+        // on the wrong session would still find it. Wrapping this object on
+        // Puppeteer's session only makes the ids differ, as they do after any
+        // evaluate_script call.
+        await page.pptrPage.evaluateHandle(() => ({}));
+        await page.pptrPage.evaluate(() => {
+          function logError() {
+            console.error('failed', new Error('boom'));
+          }
+          logError();
+        });
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /Arg #1: Error: boom\nat logError /);
       });
     });
 

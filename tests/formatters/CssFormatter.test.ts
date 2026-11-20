@@ -11,7 +11,7 @@ import {
   type ResolvedContainerDetails,
   type UidResolver,
 } from '../../src/formatters/CssFormatter.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {
   createMockCSSAtRule,
   createMockCSSInlineStyle,
@@ -45,7 +45,7 @@ describe('CssFormatter', () => {
     'formats element label with id, class, and uid and no styles',
     () => {
       const matchedStyles = createMockCSSMatchedStyles({node: 'div#main'});
-      return new CssFormatter(matchedStyles, {uid: '1_1'});
+      return new CssFormatter({matchedStyles}, {uid: '1_1'});
     },
   );
 
@@ -62,7 +62,7 @@ describe('CssFormatter', () => {
         propertyStates: new Map([[prop1, 'Overloaded']]),
       });
 
-      return new CssFormatter(matchedStyles, {uid: '1_2'});
+      return new CssFormatter({matchedStyles}, {uid: '1_2'});
     },
   );
 
@@ -90,7 +90,7 @@ describe('CssFormatter', () => {
       nodeForStyleMap: new Map([[attributesStyle, tableNode]]),
     });
 
-    return new CssFormatter(matchedStyles, {uid: 'table-1'});
+    return new CssFormatter({matchedStyles}, {uid: 'table-1'});
   });
 
   describe('rule subsets', () => {
@@ -129,16 +129,19 @@ describe('CssFormatter', () => {
     }
 
     formatterTest('matched rules all 3 rules', () => {
-      return new CssFormatter(createMatchedStylesForRuleSubsets(), {
-        uid: 'btn-1',
-      });
+      return new CssFormatter(
+        {matchedStyles: createMatchedStylesForRuleSubsets()},
+        {
+          uid: 'btn-1',
+        },
+      );
     });
 
     formatterTest('matched rules subset - last rule', () => {
       const matchedStyles = createMatchedStylesForRuleSubsets();
-      const fullFormatter = new CssFormatter(matchedStyles, {uid: 'btn-1'});
+      const fullFormatter = new CssFormatter({matchedStyles}, {uid: 'btn-1'});
       return new CssFormatter(
-        matchedStyles,
+        {matchedStyles},
         {uid: 'btn-1'},
         fullFormatter.rules.slice(2, 3),
       );
@@ -167,7 +170,7 @@ describe('CssFormatter', () => {
       ],
     });
 
-    return new CssFormatter(matchedStyles, {uid: 'data-elem'});
+    return new CssFormatter({matchedStyles}, {uid: 'data-elem'});
   });
 
   formatterTest('formats mixed inline and matched rules', () => {
@@ -187,7 +190,7 @@ describe('CssFormatter', () => {
       ],
     });
 
-    return new CssFormatter(matchedStyles, {uid: '1_1'});
+    return new CssFormatter({matchedStyles}, {uid: '1_1'});
   });
 
   formatterTest('formats nested CSS rules with nesting ancestors', () => {
@@ -206,7 +209,7 @@ describe('CssFormatter', () => {
         ),
       ],
     });
-    return new CssFormatter(matchedStyles, {uid: 'elem-child'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-child'});
   });
 
   formatterTest(
@@ -235,7 +238,7 @@ describe('CssFormatter', () => {
           ),
         ],
       });
-      return new CssFormatter(matchedStyles, {uid: 'elem-constructed'});
+      return new CssFormatter({matchedStyles}, {uid: 'elem-constructed'});
     },
   );
 
@@ -252,7 +255,7 @@ describe('CssFormatter', () => {
         ),
       ],
     });
-    return new CssFormatter(matchedStyles, {uid: 'elem-injected'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-injected'});
   });
 
   formatterTest('formats inspector stylesheet rules', () => {
@@ -269,7 +272,7 @@ describe('CssFormatter', () => {
         ),
       ],
     });
-    return new CssFormatter(matchedStyles, {uid: 'elem-inspector'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-inspector'});
   });
 
   formatterTest('formats @navigation ancestor rule', () => {
@@ -282,7 +285,7 @@ describe('CssFormatter', () => {
     );
     const matchedStyles = createMockCSSMatchedStyles({nodeStyles: [style]});
 
-    return new CssFormatter(matchedStyles, {uid: 'elem-nav'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-nav'});
   });
 
   formatterTest('resolves container queries with node uid', async () => {
@@ -321,10 +324,13 @@ describe('CssFormatter', () => {
       },
     });
 
-    return new CssFormatter(matchedStyles, {
-      uid: 'elem-widget',
-      containerDetails,
-    });
+    return new CssFormatter(
+      {matchedStyles},
+      {
+        uid: 'elem-widget',
+        containerDetails,
+      },
+    );
   });
 
   formatterTest('maps invalid and disabled property statuses', () => {
@@ -343,7 +349,7 @@ describe('CssFormatter', () => {
     ]);
     const matchedStyles = createMockCSSMatchedStyles({nodeStyles: [style]});
 
-    return new CssFormatter(matchedStyles, {uid: 'elem-diag'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-diag'});
   });
 
   formatterTest(
@@ -360,7 +366,7 @@ describe('CssFormatter', () => {
         {rule},
       );
       const matchedStyles = createMockCSSMatchedStyles({nodeStyles: [style]});
-      return new CssFormatter(matchedStyles, {uid: 'btn-1'});
+      return new CssFormatter({matchedStyles}, {uid: 'btn-1'});
     },
   );
 
@@ -373,7 +379,7 @@ describe('CssFormatter', () => {
       {rule},
     );
     const matchedStyles = createMockCSSMatchedStyles({nodeStyles: [style]});
-    return new CssFormatter(matchedStyles, {uid: 'item-1'});
+    return new CssFormatter({matchedStyles}, {uid: 'item-1'});
   });
 
   formatterTest(
@@ -393,7 +399,7 @@ describe('CssFormatter', () => {
         parentNode: 'section#parent-sec',
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'child-1'});
+      return new CssFormatter({matchedStyles}, {uid: 'child-1'});
     },
   );
 
@@ -417,7 +423,7 @@ describe('CssFormatter', () => {
         parentNode: 'div#wrapper',
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'child-elem'});
+      return new CssFormatter({matchedStyles}, {uid: 'child-elem'});
     },
   );
 
@@ -448,7 +454,7 @@ describe('CssFormatter', () => {
         ]),
         matchingSelectorsMap: new Map([[pseudoRule, [0]]]),
       });
-      return new CssFormatter(matchedStyles, {uid: 'btn-pseudo'});
+      return new CssFormatter({matchedStyles}, {uid: 'btn-pseudo'});
     },
   );
 
@@ -511,10 +517,13 @@ describe('CssFormatter', () => {
       const resolveUid: UidResolver = (backendId: number) =>
         backendId === 10 ? 'cont-10' : undefined;
 
-      return new CssFormatter(matchedStyles, {
-        uid: 'para-1',
-        resolveUid,
-      });
+      return new CssFormatter(
+        {matchedStyles},
+        {
+          uid: 'para-1',
+          resolveUid,
+        },
+      );
     },
   );
 
@@ -529,7 +538,7 @@ describe('CssFormatter', () => {
       range: {startLine: 10, startColumn: 0, endLine: 14, endColumn: 1},
     });
     const matchedStyles = createMockCSSMatchedStyles({atRules: [atRule]});
-    return new CssFormatter(matchedStyles, {uid: 'elem-at-1'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-at-1'});
   });
 
   formatterTest('formats @font-face at-rule without name', () => {
@@ -540,7 +549,7 @@ describe('CssFormatter', () => {
       ],
     });
     const matchedStyles = createMockCSSMatchedStyles({atRules: [atRule]});
-    return new CssFormatter(matchedStyles, {uid: 'elem-at-2'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-at-2'});
   });
 
   formatterTest('formats at-rule when present in atRules', () => {
@@ -551,7 +560,7 @@ describe('CssFormatter', () => {
     const matchedStyles = createMockCSSMatchedStyles({
       atRules: [atRule],
     });
-    return new CssFormatter(matchedStyles, {uid: 'elem-at-4'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-at-4'});
   });
 
   formatterTest('formats active and inactive @position-try rules', () => {
@@ -571,7 +580,7 @@ describe('CssFormatter', () => {
       positionTryRules: [posActive, posInactive],
     });
 
-    return new CssFormatter(matchedStyles, {uid: 'elem-pos'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-pos'});
   });
 
   formatterTest(
@@ -597,7 +606,7 @@ describe('CssFormatter', () => {
         registeredProperties: [propStylesheet, propProgrammatic],
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'elem-prop'});
+      return new CssFormatter({matchedStyles}, {uid: 'elem-prop'});
     },
   );
 
@@ -615,7 +624,7 @@ describe('CssFormatter', () => {
         cssVariables: {'--x': '10px'},
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'elem-func'});
+      return new CssFormatter({matchedStyles}, {uid: 'elem-func'});
     },
   );
 
@@ -640,7 +649,7 @@ describe('CssFormatter', () => {
         keyframes: [keyframesRule],
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'elem-kf'});
+      return new CssFormatter({matchedStyles}, {uid: 'elem-kf'});
     },
   );
 
@@ -664,7 +673,7 @@ describe('CssFormatter', () => {
       },
     });
 
-    return new CssFormatter(matchedStyles, {uid: 'elem-var'});
+    return new CssFormatter({matchedStyles}, {uid: 'elem-var'});
   });
 
   formatterTest(
@@ -681,7 +690,66 @@ describe('CssFormatter', () => {
         cssVariables: {'--gap': '8px'},
       });
 
-      return new CssFormatter(matchedStyles, {uid: 'elem-var-omitted'});
+      return new CssFormatter({matchedStyles}, {uid: 'elem-var-omitted'});
+    },
+  );
+
+  formatterTest('formats computed styles alongside matched rules', () => {
+    const style = createMockCSSStyleDeclaration(
+      [
+        createMockCSSProperty('color', 'red'),
+        createMockCSSProperty('padding', '8px'),
+        createMockCSSProperty('user-select', 'none'),
+      ],
+      {rule: createMockCSSStyleRule('.box', {sourceURL: 'app.css'})},
+    );
+    const matchedStyles = createMockCSSMatchedStyles({
+      node: 'div.box',
+      nodeStyles: [style],
+    });
+    const computedStyles = new Map([
+      ['color', 'rgb(255, 0, 0)'],
+      ['display', 'block'],
+      ['height', '40px'],
+      ['padding-top', '8px'],
+      ['padding-right', '8px'],
+      ['padding-bottom', '8px'],
+      ['padding-left', '8px'],
+      ['position', 'static'],
+      ['user-select', 'none'],
+      ['-webkit-user-select', 'none'],
+      ['width', '120px'],
+      ['--brand', '#ff0000'],
+    ]);
+
+    return new CssFormatter(
+      {matchedStyles, computedStyles},
+      {uid: 'elem-computed'},
+    );
+  });
+
+  formatterTest(
+    'includes requested computedProperties and expands shorthands',
+    () => {
+      const matchedStyles = createMockCSSMatchedStyles({node: 'div#card'});
+      const computedStyles = new Map([
+        ['display', 'flex'],
+        ['height', '100px'],
+        ['overflow-x', 'hidden'],
+        ['overflow-y', 'auto'],
+        ['position', 'static'],
+        ['width', '200px'],
+        ['z-index', 'auto'],
+        ['--brand', '#00aaff'],
+      ]);
+
+      return new CssFormatter(
+        {matchedStyles, computedStyles},
+        {
+          uid: 'elem-computed-extra',
+          computedProperties: ['position', 'overflow', '--brand'],
+        },
+      );
     },
   );
 });

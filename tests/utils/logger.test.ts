@@ -16,6 +16,7 @@ import {
   redactUrlForLogging,
   puppeteerLogger,
   saveLogsToFile,
+  stripTerminalEscapes,
 } from '../../src/utils/logger.js';
 
 describe('puppeteerLogger', () => {
@@ -94,6 +95,56 @@ describe('escapeForLog', () => {
       assert.strictEqual(escapeForLog(`a${char}b`), `"a${escaped}b"`);
       assert.strictEqual(JSON.parse(escapeForLog(`a${char}b`)), `a${char}b`);
     }
+  });
+});
+
+describe('stripTerminalEscapes', () => {
+  it('strips the OSC title-overwrite and SGR sequences from PoC bytes', () => {
+    const poc = '\x1b]0;PWned-TITLE\x07\x1b[31mESCAPE-INJECTION\x1b[0m';
+    assert.strictEqual(stripTerminalEscapes(poc), 'ESCAPE-INJECTION');
+  });
+
+  it('removes OSC sequences entirely, payloads included, BEL and ST', () => {
+    assert.strictEqual(stripTerminalEscapes('\x1b]8;;http://e.test\x07x'), 'x');
+    assert.strictEqual(stripTerminalEscapes('\x1b]52;c;ZWxpemE\x1b\\x'), 'x');
+  });
+
+  it('strips CSI sequences of every parameter and final-byte shape', () => {
+    assert.strictEqual(stripTerminalEscapes('\x1b[?25lx'), 'x');
+    assert.strictEqual(stripTerminalEscapes('\x1b[38;2;1;2;3mx'), 'x');
+    assert.strictEqual(stripTerminalEscapes('\x1b[31mx'), 'x');
+  });
+
+  it('strips 8-bit C1 introducers before UTF-8 encoding', () => {
+    assert.strictEqual(stripTerminalEscapes('31mx'), '31mx');
+    assert.strictEqual(stripTerminalEscapes('0;title\x07x'), '0;titlex');
+  });
+
+  it('keeps newlines and printable text untouched', () => {
+    assert.strictEqual(stripTerminalEscapes('a\nb c'), 'a\nb c');
+    assert.strictEqual(stripTerminalEscapes('msg1\nmsg2\n'), 'msg1\nmsg2\n');
+  });
+
+  it('strips DCS, APC and PM introducers, leaving payload text inert', () => {
+    assert.strictEqual(
+      stripTerminalEscapes('\x1bP$qpayload\x1b\\x'),
+      'P$qpayload\\x',
+    );
+    assert.strictEqual(
+      stripTerminalEscapes('\x1b_apayload\x07x'),
+      '_apayloadx',
+    );
+    assert.strictEqual(stripTerminalEscapes('\x1b^payload\x07x'), '^payloadx');
+  });
+
+  it('cannot swallow text beyond the unterminated OSC line', () => {
+    const evil = '\x1b]0;x\nlegit-text\x07\x1b[31mreal';
+    assert.strictEqual(stripTerminalEscapes(evil), ']0;x\nlegit-textreal');
+  });
+
+  it('is idempotent on already-stripped output', () => {
+    const once = stripTerminalEscapes('\x1b]0;PWned\x07\x1b[31mx\x1b[0m');
+    assert.strictEqual(stripTerminalEscapes(once), once);
   });
 });
 

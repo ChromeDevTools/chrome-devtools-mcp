@@ -5,13 +5,17 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import childProcess, {spawn} from 'node:child_process';
 import crypto from 'node:crypto';
-import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import fs, {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import net from 'node:net';
 import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
+import sinon from 'sinon';
+
 import {
+  sendCommand,
   handleResponse,
   startDaemon,
   stopDaemon,
@@ -24,6 +28,60 @@ import {
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
+import {createTempDir} from '../utils.js';
+
+describe('stopDaemon signal failures', () => {
+  it('rejects and keeps the PID file when SIGKILL throws EPERM', async () => {
+    using dir = createTempDir('cdm-stop-denied-');
+    const {sessionId, pid, clock, kill, unlink} = setupStopDaemonSignalFailure(
+      dir.path,
+    );
+
+    const stopped = assert.rejects(stopDaemon(sessionId), {
+      message: `Failed to stop daemon (pid ${pid}): kill EPERM`,
+    });
+    await Promise.all([clock.tickAsync(10_000), stopped]);
+
+    sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
+    sinon.assert.notCalled(unlink);
+    assert.strictEqual(getDaemonPid(sessionId), pid);
+  });
+
+  it('ignores SIGKILL ESRCH in the error handler and removes the PID file', async () => {
+    using dir = createTempDir('cdm-stop-exited-');
+    const {sessionId, pid, pidFilePath, clock, kill, unlink} =
+      setupStopDaemonSignalFailure(dir.path);
+    kill
+      .withArgs(pid, 'SIGKILL')
+      .throws(Object.assign(new Error('kill ESRCH'), {code: 'ESRCH'}));
+
+    const stopped = assert.doesNotReject(stopDaemon(sessionId));
+    await Promise.all([clock.tickAsync(10_000), stopped]);
+
+    sinon.assert.calledWithExactly(kill, pid, 'SIGKILL');
+    sinon.assert.calledOnceWithExactly(unlink, pidFilePath);
+    assert.strictEqual(getDaemonPid(sessionId), null);
+  });
+});
+
+function setupStopDaemonSignalFailure(runtimeDir: string) {
+  sinon
+    .stub(process, 'env')
+    .value({...process.env, XDG_RUNTIME_DIR: runtimeDir});
+  const sessionId = crypto.randomUUID();
+  const pid = 1234567895;
+  const pidFilePath = getPidFilePath(sessionId);
+  mkdirSync(dirname(pidFilePath), {recursive: true});
+  writeFileSync(pidFilePath, String(pid));
+  const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
+  sinon.stub(fs, 'existsSync').callThrough().withArgs('/proc').returns(false);
+  sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
+  sinon.stub(net, 'createConnection').throws(new Error('socket unreachable'));
+  const denied = Object.assign(new Error('kill EPERM'), {code: 'EPERM'});
+  const kill = sinon.stub(process, 'kill').throws(denied);
+  const unlink = sinon.spy(fs, 'unlinkSync');
+  return {sessionId, pid, pidFilePath, clock, kill, unlink};
+}
 
 describe('daemon client', () => {
   let sessionId: string;
@@ -323,5 +381,137 @@ describe('daemon client', () => {
       const response = await handleResponse(webpContentResponse, 'md');
       assert.ok(response.includes('.webp'));
     });
+  });
+});
+
+describe('daemon response deadline', () => {
+  let socket: net.Socket;
+  let destroy: sinon.SinonStub<Parameters<net.Socket['destroy']>, net.Socket>;
+
+  beforeEach(() => {
+    const pidFile = getPidFilePath('');
+    sinon.stub(fs, 'existsSync').callThrough().withArgs(pidFile).returns(true);
+    sinon
+      .stub(fs, 'readFileSync')
+      .callThrough()
+      .withArgs(pidFile, 'utf-8')
+      .returns(String(process.pid))
+      .withArgs(`/proc/${process.pid}/cmdline`, 'utf-8')
+      .returns(`node\0${DAEMON_SCRIPT_PATH}\0`);
+    sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
+    socket = new net.Socket();
+    sinon.stub(socket, 'write').returns(true);
+    sinon.stub(socket, 'end').returns(socket);
+    destroy = sinon.stub(socket, 'destroy').returns(socket);
+    sinon.stub(net, 'createConnection').returns(socket);
+  });
+
+  it('receives a tool result after the default socket deadline', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const result = sendCommand(
+      {method: 'invoke_tool', tool: 'navigate_page', args: {timeout: 120_000}},
+      '',
+    );
+    const expected = {success: true, result: 'loaded', error: null};
+    const received = result.catch((error: unknown) => error);
+    await clock.tickAsync(75_000);
+    socket.emit('data', Buffer.from(JSON.stringify(expected) + '\0'));
+    assert.deepStrictEqual(await received, expected);
+  });
+
+  it('still times out when a long-running tool never responds', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const result = sendCommand(
+      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 120_000}},
+      '',
+    );
+    const assertion = assert.rejects(
+      result,
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(179_999);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+  });
+
+  it('status still times out at exactly 60 seconds', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const assertion = assert.rejects(
+      sendCommand({method: 'status'}, ''),
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(59_999);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
+  });
+
+  it('adds the response grace period to a short tool timeout', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const assertion = assert.rejects(
+      sendCommand(
+        {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 5000}},
+        '',
+      ),
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(64_999);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
+  });
+
+  for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
+    it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const result = sendCommand(
+        {method: 'invoke_tool', tool: 'wait_for', args: {timeout}},
+        '',
+      );
+      const assertion = assert.rejects(
+        result,
+        /Timeout waiting for daemon response/,
+      );
+      await clock.tickAsync(59_999);
+      sinon.assert.notCalled(destroy);
+      await clock.tickAsync(1);
+      await assertion;
+      sinon.assert.calledOnceWithExactly(destroy);
+    });
+  }
+
+  it('does not overflow the timer for an extremely large tool timeout', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const result = sendCommand(
+      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 2 ** 31}},
+      '',
+    );
+    const assertion = assert.rejects(
+      result,
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(60_000);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(2 ** 31 - 1 - 60_000);
+    await assertion;
+  });
+
+  it('preserves an explicit socket deadline', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const assertion = assert.rejects(
+      sendCommand(
+        {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 120_000}},
+        '',
+        1000,
+      ),
+      /Timeout waiting for daemon response/,
+    );
+    await clock.tickAsync(1000);
+    await assertion;
   });
 });

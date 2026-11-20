@@ -44,7 +44,7 @@ describe('WaitForHelper', () => {
   });
 
   it('resolves timeout immediately when dialog aborts during an action that does not throw', async () => {
-    const clock = sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const pptrPage = createMockPuppeteerPage();
     pptrPage.url.returns('https://example.com');
     pptrPage.waitForNavigation.returns(Promise.withResolvers<null>().promise);

@@ -16,9 +16,9 @@ import {
   ProtocolError,
   ProtocolErrorCode,
   zod,
-  type Browser,
   type CallToolResult,
 } from './third_party/index.js';
+import type {Browser} from './third_party/browser.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
 import {
@@ -34,10 +34,11 @@ import {
   type ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {getErrorMessage, toError} from './utils/errorHandling.js';
+import {fileUrlToPathWithPosixFallback} from './utils/files.js';
 import {logger} from './utils/logger.js';
 import {raceWithSignal} from './utils/raceWithSignal.js';
 import type {TaskQueue} from './utils/TaskRunner.js';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
 import {isLocalBrowserEndpoint} from './utils/url.js';
 
@@ -113,7 +114,9 @@ async function validateAndResolvePathOrUrl(
   }
   if (url) {
     if (url.protocol === 'file:') {
-      return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
+      return pathToFileURL(
+        await context.validatePath(fileUrlToPathWithPosixFallback(url)),
+      ).href;
     }
     if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
       // Only pass a remote URL through unchanged for parameters whose sink

@@ -24,12 +24,6 @@
 
 import './setupDevTools.js';
 
-import {
-  EventEmitter,
-  type Frame,
-  type Mouse,
-  type SerializedAXNode,
-} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
@@ -50,12 +44,14 @@ import type {
   HeapSnapshotDiff,
   HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
+import type {Result, RunnerResult} from '../src/third_party/index.js';
 import {
   Accessibility,
   CdpBrowser,
   CdpExtension,
   CdpFrame,
   CdpHTTPRequest,
+  CdpJSHandle,
   CdpMouse,
   CdpPage,
   CDPSession,
@@ -64,6 +60,7 @@ import {
   DevTools,
   Dialog,
   ElementHandle,
+  EventEmitter,
   Locator,
   Target,
   TargetType,
@@ -72,6 +69,8 @@ import {
   WebMCP,
   WebMCPTool,
   type Browser,
+  type Frame,
+  type Mouse,
   type ResourceType,
   type BrowserContext,
   type ConsoleMessageLocation,
@@ -81,9 +80,8 @@ import {
   type Page,
   type Protocol,
   type Realm,
-  type Result,
-  type RunnerResult,
-} from '../src/third_party/index.js';
+  type SerializedAXNode,
+} from '../src/third_party/browser.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;
@@ -467,6 +465,16 @@ export function createMockDialog(
   return dialog;
 }
 
+export function createMockCdpJSHandle(
+  remoteObject: Protocol.Runtime.RemoteObject,
+  session: CDPSession,
+): sinon.SinonStubbedInstance<CdpJSHandle> {
+  const handle = sinon.createStubInstance(CdpJSHandle);
+  handle.remoteObject.returns(remoteObject);
+  sinon.stub(handle, 'client').get(() => session);
+  return handle;
+}
+
 export function createMockElementHandle(): {
   handle: sinon.SinonStubbedInstance<ElementHandle<Element>>;
   locator: sinon.SinonStubbedInstance<Locator<Element>>;
@@ -676,6 +684,7 @@ export function createMockCSSProperty(
     ),
   );
   prop.parseValue.callThrough();
+  prop.getLonghandProperties.callThrough();
   return prop;
 }
 
@@ -699,7 +708,10 @@ export function createMockCSSStyleDeclaration(
     DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
   );
   style.type = options.type ?? DevTools.CSSStyleDeclaration.Type.Regular;
-  style.allProperties.returns(properties);
+  style.allProperties.returns([
+    ...properties,
+    ...properties.flatMap(prop => prop.getLonghandProperties()),
+  ]);
   style.leadingProperties.returns(properties);
   style.parentRule = options.rule ?? null;
   style.animationName.returns(options.animationName ?? '');

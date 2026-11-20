@@ -5,7 +5,8 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod, type CdpPage} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {CdpPage} from '../third_party/browser.js';
 import {logger} from '../utils/logger.js';
 import {validateUrl} from '../utils/url.js';
 
@@ -107,19 +108,26 @@ export const closePage: ToolFactory = defineTool(() => ({
 export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
   return {
     name: 'new_page',
-    description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
+    description: `Open a new tab and load a URL. Use project URL if not specified otherwise.${
+      args?.backgroundNewPages ? ' The tab always opens in the background.' : ''
+    }`,
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: false,
     },
     schema: {
       url: zod.string().describe('URL to load in a new page.'),
-      background: zod
-        .boolean()
-        .optional()
-        .describe(
-          'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
-        ),
+      // With --backgroundNewPages the server decides, so the model is not offered the choice.
+      ...(args?.backgroundNewPages
+        ? {}
+        : {
+            background: zod
+              .boolean()
+              .optional()
+              .describe(
+                'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+              ),
+          }),
       isolatedContext: zod
         .string()
         .optional()
@@ -147,7 +155,9 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
         // Nothing is selected, so there is no selection to restore on failure.
       }
       const page = await context.newPage(
-        request.params.background,
+        args?.backgroundNewPages
+          ? true
+          : (request.params as {background?: boolean}).background,
         request.params.isolatedContext,
       );
       response.includeConsoleErrorsFrom(page);

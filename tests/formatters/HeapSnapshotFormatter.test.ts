@@ -20,7 +20,7 @@ import {
   type HeapSnapshotAggregate,
   type HeapSnapshotDiffObject,
 } from '../../src/processors/HeapSnapshotManager.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {createMockContextAnalysisResult} from '../mocks.js';

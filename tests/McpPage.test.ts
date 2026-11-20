@@ -14,13 +14,13 @@ import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {
   DevTools,
   Frame,
   Locator,
   ScreenRecorder,
-  type JSONSchema7Definition,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
@@ -1883,7 +1883,7 @@ describe('McpPage', () => {
     });
   });
 
-  describe('getMatchedStylesForUid()', () => {
+  describe('getCssStylesForUid()', () => {
     const server = serverHooks();
 
     function getSelectors(
@@ -1900,19 +1900,24 @@ describe('McpPage', () => {
       return selectors;
     }
 
-    async function getSelectorsForUid(
+    async function getStylesAndSelectorsForUid(
       uid: string,
       mcpPage: McpPage,
-    ): Promise<string[]> {
-      const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+    ): Promise<{
+      selectors: string[];
+      computedStyles: ReadonlyMap<string, string>;
+    }> {
+      const {matchedStyles, computedStyles} =
+        await mcpPage.getCssStylesForUid(uid);
       assert.ok(matchedStyles);
-      return getSelectors(matchedStyles);
+      assert.ok(computedStyles);
+      return {selectors: getSelectors(matchedStyles), computedStyles};
     }
 
     it('throws when snapshot has not been captured', async () => {
       const {mcpPage} = await createMcpPage();
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /No snapshot found for page/,
       );
     });
@@ -1933,7 +1938,7 @@ describe('McpPage', () => {
         verbose: false,
       });
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /Element uid "node_1" not found on page/,
       );
     });
@@ -1955,12 +1960,12 @@ describe('McpPage', () => {
         verbose: false,
       });
       await assert.rejects(
-        () => mcpPage.getMatchedStylesForUid('node_1'),
+        () => mcpPage.getCssStylesForUid('node_1'),
         /Failed to resolve backend node ID for element with uid "node_1"/,
       );
     });
 
-    it('retrieves matched styles across elements, shadow roots, and iframes', async () => {
+    it('retrieves matched and computed styles across elements, shadow roots, and iframes', async () => {
       server.addHtmlRoute(
         '/iframe_content.html',
         html`
@@ -2046,7 +2051,9 @@ describe('McpPage', () => {
         // 1. Regular element
         {
           const uid = getUidForNode(mcpPage, 'Click Me');
-          const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+          const {matchedStyles, computedStyles} =
+            await mcpPage.getCssStylesForUid(uid);
+          assert.ok(computedStyles);
           const inlineStyle = matchedStyles
             .nodeStyles()
             .find(s => s.type === DevTools.CSSStyleDeclaration.Type.Inline);
@@ -2054,27 +2061,53 @@ describe('McpPage', () => {
           const selectors = getSelectors(matchedStyles);
           assert.ok(selectors.includes('#my-button'));
           assert.ok(selectors.includes('.btn-primary'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(0, 128, 0)');
+          assert.strictEqual(computedStyles.get('font-size'), '16px');
+          assert.strictEqual(computedStyles.get('padding-top'), '8px');
         }
 
         // 2. Open shadow root
         {
           const uid = getUidForNode(mcpPage, 'Open Shadow Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.shadow-btn-open'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(100, 200, 50)');
         }
 
         // 3. Closed shadow root
         {
           const uid = getUidForNode(mcpPage, 'Closed Shadow Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.shadow-btn-closed'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(200, 50, 100)');
         }
 
         // 4. Iframe
         {
           const uid = getUidForNode(mcpPage, 'Iframe Button');
-          const selectors = await getSelectorsForUid(uid, mcpPage);
+          const {selectors, computedStyles} = await getStylesAndSelectorsForUid(
+            uid,
+            mcpPage,
+          );
           assert.ok(selectors.includes('.frame-btn'));
+          assert.strictEqual(computedStyles.get('color'), 'rgb(255, 255, 255)');
+        }
+
+        // 5. Fallback when getComputedStyle returns null
+        {
+          sinon
+            .stub(DevTools.CSSModel.CSSModel.prototype, 'getComputedStyle')
+            .resolves(null);
+          const uid = getUidForNode(mcpPage, 'Click Me');
+          const result = await mcpPage.getCssStylesForUid(uid);
+          assert.ok(result.matchedStyles);
+          assert.strictEqual(result.computedStyles, null);
         }
       });
     });
