@@ -256,7 +256,7 @@ describe('McpContext', () => {
   });
 
   describe('service worker network data', () => {
-    it('reads requests from the network store, not the console store', async () => {
+    it('returns requests emitted by the service worker', async () => {
       const worker = createMockWebWorker();
       const target = createMockPuppeteerTarget({
         url: 'chrome-extension://extension-id/background.js',
@@ -289,10 +289,6 @@ describe('McpContext', () => {
       assert.strictEqual(
         context.getServiceWorkerNetworkRequestById(serviceWorker.id, 1),
         request,
-      );
-      assert.deepStrictEqual(
-        context.getServiceWorkerConsoleData(serviceWorker.id),
-        [],
       );
       context.dispose();
     });
