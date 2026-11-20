@@ -39,6 +39,7 @@ interface CliOption {
   description: string;
   required: boolean;
   positional: boolean;
+  isFilePath?: boolean;
   default?: unknown;
   enum?: unknown[];
 }
@@ -126,9 +127,12 @@ async function generateCli() {
       io: 'input',
     }) as JsonSchema;
     const options = schemaToCLIOptions(tool.name, inputSchema);
+    const fileArgNames = new Set(Object.keys(tool.verifyFilesSchema));
     const args: Record<string, CliOption> = {};
     for (const opt of options) {
-      args[opt.name] = opt;
+      args[opt.name] = fileArgNames.has(opt.name)
+        ? {...opt, isFilePath: true}
+        : opt;
     }
 
     const categoryEnum = tool.annotations.category;
@@ -189,6 +193,8 @@ export interface ArgDef {
   required: boolean;
   /** Whether the arg is a positional on the command line, otherwise a flag. */
   positional: boolean;
+  /** Whether the CLI resolves a relative value against its cwd. */
+  isFilePath?: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
