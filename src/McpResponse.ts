@@ -612,7 +612,7 @@ export class McpResponse implements Response {
     }
     const consoleMessageStableId = this.#attachedConsoleMessageId;
     if (this.#attachedConsoleMessageServiceWorkerId) {
-      // Service workers have no DevTools universe, so no stack trace is resolved.
+      // Service workers have no DevTools universe; stacks use raw frames.
       return await ConsoleFormatter.from(
         context.getServiceWorkerConsoleMessageById(
           this.#attachedConsoleMessageServiceWorkerId,
