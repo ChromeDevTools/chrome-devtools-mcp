@@ -47,6 +47,7 @@ ts_library("tests") {
     "e2e/chrome-devtools-performance.test.ts",
     "e2e/chrome-devtools-start-stop.test.ts",
     "e2e/chrome-devtools-status.test.ts",
+    "e2e/lazy-startup.test.ts",
     "e2e/telemetry.test.ts",
     "formatters/CommentFormatter.test.ts",
     "formatters/ConsoleFormatter.test.ts",
