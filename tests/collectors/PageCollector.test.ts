@@ -694,7 +694,6 @@ describe('ConsoleCollector', () => {
 
     page.emit(
       'exception',
-      // @ts-expect-error the internal RemoteException type differs from the public one.
       createRemoteException({
         exceptionId: 1,
         exception: {type: 'object', description: 'SyntaxError: Expected {'},

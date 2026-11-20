@@ -17,7 +17,6 @@ import {
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
-  type RemoteException,
 } from '../third_party/browser.js';
 import {
   createIdGenerator,
@@ -315,15 +314,23 @@ class PageEventSubscriber {
     this.#page.emit('devtoolsAggregatedIssue', event.data);
   };
 
-  #onException = (exception: RemoteException): void => {
-    const details: Protocol.Runtime.ExceptionDetails | undefined =
-      // @ts-expect-error use internal Puppeteer API to get raw exception details.
-      exception._rawExceptionDetails();
+  #onException = (exception: unknown): void => {
+    if (typeof exception !== 'object' || exception === null) {
+      return;
+    }
+    const details =
+      '_rawExceptionDetails' in exception &&
+      typeof exception._rawExceptionDetails === 'function'
+        ? (exception._rawExceptionDetails() as
+            Protocol.Runtime.ExceptionDetails | undefined)
+        : undefined;
     if (!details) {
       return;
     }
     // Keep the exception object alive so its stack and cause resolve later.
-    exception.handle()?.move();
+    if ('handle' in exception && typeof exception.handle === 'function') {
+      (exception.handle() as {move?: () => void} | undefined)?.move?.();
+    }
     this.#page.emit(
       'uncaughtError',
       new UncaughtError(details, this.#targetId, this.#session),

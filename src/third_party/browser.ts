@@ -9,6 +9,7 @@ import './index.js';
 
 // eslint-disable-next-line no-restricted-imports
 import * as DevToolsRoot from '../../third_party/devtools-frontend/front_end/core/root/root.js';
+import {createClientError} from 'puppeteer-core/internal/cdp/utils.js';
 
 export {
   Accessibility,
@@ -47,7 +48,8 @@ export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
 export {PUPPETEER_REVISIONS} from 'puppeteer-core/internal/revisions.js';
-export {createRemoteException} from 'puppeteer-core/internal/cdp/utils.js';
+export {createClientError as createRemoteException};
+export type RemoteException = unknown;
 export {
   computeExecutablePath,
   resolveDefaultUserDataDir,

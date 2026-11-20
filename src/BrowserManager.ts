@@ -29,70 +29,96 @@ import {isAllowedUrl} from './utils/url.js';
  * temporarily unreachable (for example, Chrome has not started listening on
  * the debugging port yet, or the connection was reset during startup).
  */
-const TRANSIENT_ERROR_CODES = new Set([
+const TRANSIENT_CONNECT_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
-  'ETIMEDOUT',
   'EPIPE',
+  'EAI_AGAIN',
+  'UND_ERR_SOCKET',
+  'ETIMEDOUT',
   'EHOSTUNREACH',
   'ENETUNREACH',
-  'EAI_AGAIN',
 ]);
 
-/** Lower-cased message fragments emitted by `ws`/puppeteer for transport drops. */
 const TRANSIENT_ERROR_MESSAGES = [
   'socket hang up',
   'websocket was closed before the connection was established',
   'websocket connection failed',
 ];
 
-/** Lower-cased message fragments that always indicate a permanent failure. */
 const PERMANENT_ERROR_MESSAGES = ['unexpected server response', 'invalid url'];
 
-const TRANSIENT_CODE_IN_MESSAGE = new RegExp(
-  `\\b(?:${[...TRANSIENT_ERROR_CODES].join('|')})\\b`,
-);
+/** Total connect attempts, including the first one. */
+export const CONNECT_RETRY_ATTEMPTS = 3;
+/**
+ * Delay before the first retry. Each subsequent retry doubles it, so the
+ * default schedule waits 250ms then 500ms (at most ~750ms of added latency
+ * before the last error is surfaced).
+ */
+export const CONNECT_RETRY_BASE_DELAY_MS = 250;
 
-type Classification = 'transient' | 'permanent' | 'unknown';
+function hasErrorProperty(obj: object): obj is {error: unknown} {
+  return 'error' in obj;
+}
 
-function classifyConnectError(
+function hasCodeProperty(obj: object): obj is {code: string} {
+  return 'code' in obj && typeof obj.code === 'string';
+}
+
+export function extractTransientConnectCode(
   error: unknown,
-  seen: Set<unknown>,
-): Classification {
-  if (!(error instanceof Error) || seen.has(error)) {
-    return 'unknown';
+  seen: Set<unknown> = new Set<unknown>(),
+): string | undefined {
+  if (typeof error !== 'object' || error === null || seen.has(error)) {
+    return undefined;
   }
   seen.add(error);
-  const message = error.message.toLowerCase();
-  // Permanent signals win: an HTTP rejection of the WebSocket upgrade (e.g.
-  // the 403 Chrome returns when the user denies the auto-connect consent
-  // dialog) or a malformed endpoint will never succeed on retry.
+
+  if (!(error instanceof Error)) {
+    return hasErrorProperty(error)
+      ? extractTransientConnectCode(error.error, seen)
+      : undefined;
+  }
+
   if (
     error instanceof TypeError ||
-    PERMANENT_ERROR_MESSAGES.some(m => message.includes(m))
+    PERMANENT_ERROR_MESSAGES.some(m => error.message.toLowerCase().includes(m))
   ) {
-    return 'permanent';
+    return undefined;
   }
-  const code = (error as NodeJS.ErrnoException).code;
-  if (
-    (code && TRANSIENT_ERROR_CODES.has(code)) ||
-    TRANSIENT_ERROR_MESSAGES.some(m => message.includes(m)) ||
-    TRANSIENT_CODE_IN_MESSAGE.test(error.message)
-  ) {
-    return 'transient';
-  }
-  // Node's fetch/net report dual-stack failures (::1 and 127.0.0.1) as an
-  // AggregateError; treat it as transient only if every inner error is.
-  if (error instanceof AggregateError && error.errors.length > 0) {
-    const inner = error.errors.map(e => classifyConnectError(e, seen));
-    if (inner.includes('permanent')) {
-      return 'permanent';
+
+  if (error instanceof AggregateError) {
+    if (error.errors.length === 0) {
+      return undefined;
     }
-    if (inner.every(c => c === 'transient')) {
-      return 'transient';
+    let firstCode: string | undefined;
+    for (const inner of error.errors) {
+      const code = extractTransientConnectCode(inner, seen);
+      if (!code) {
+        return undefined;
+      }
+      firstCode ??= code;
+    }
+    return firstCode;
+  }
+
+  if (error.cause !== undefined) {
+    const causeCode = extractTransientConnectCode(error.cause, seen);
+    if (causeCode) {
+      return causeCode;
     }
   }
-  return classifyConnectError(error.cause, seen);
+
+  if (hasCodeProperty(error) && TRANSIENT_CONNECT_CODES.has(error.code)) {
+    return error.code;
+  }
+
+  const message = error.message.toLowerCase();
+  if (TRANSIENT_ERROR_MESSAGES.some(m => message.includes(m))) {
+    return 'transient_message';
+  }
+
+  return undefined;
 }
 
 /**
@@ -105,17 +131,8 @@ function classifyConnectError(
  * `--auto-connect` consent dialog — is treated as permanent and not retried.
  */
 export function isTransientConnectError(error: unknown): boolean {
-  return classifyConnectError(error, new Set()) === 'transient';
+  return extractTransientConnectCode(error) !== undefined;
 }
-
-/** Total connect attempts, including the first one. */
-export const CONNECT_RETRY_ATTEMPTS = 3;
-/**
- * Delay before the first retry. Each subsequent retry doubles it, so the
- * default schedule waits 250ms then 500ms (at most ~750ms of added latency
- * before the last error is surfaced).
- */
-export const CONNECT_RETRY_BASE_DELAY_MS = 250;
 
 /**
  * Wraps puppeteer.connect() with a bounded exponential-backoff retry for
@@ -135,15 +152,17 @@ export async function connectWithRetry(
     try {
       return await puppeteer.connect(options);
     } catch (error) {
-      if (attempt >= maxAttempts || !isTransientConnectError(error)) {
+      const code = extractTransientConnectCode(error);
+      if (attempt >= maxAttempts || !code) {
         throw error;
       }
       const delay = Math.max(0, baseDelayMs) * 2 ** (attempt - 1);
       logger?.(
-        `Transient connect failure (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms`,
-        error,
+        `Connection attempt ${attempt} failed with transient code ${code}, retrying in ${delay}ms...`,
       );
-      await new Promise(resolve => setTimeout(resolve, delay));
+      if (delay > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   }
 }

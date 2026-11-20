@@ -13,7 +13,7 @@ import sinon from 'sinon';
 
 import {
   BrowserManager,
-  extractTransientConnectCode,
+  connectWithRetry,
   isTransientConnectError,
 } from '../src/BrowserManager.js';
 import {puppeteer, type Browser} from '../src/third_party/browser.js';
