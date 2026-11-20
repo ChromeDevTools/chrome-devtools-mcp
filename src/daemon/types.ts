@@ -29,5 +29,7 @@ export interface DaemonStatusResult {
   socketPath: string;
   startDate: string;
   version: string;
+  // Redacted with `redactDaemonArgsForLogging`, so this is safe to print but
+  // is not the daemon's literal argv.
   args: string[];
 }
