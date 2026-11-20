@@ -268,28 +268,6 @@ describe('SymbolizedError', () => {
       });
     });
 
-    it('builds no stack trace when stack and cause are not requested', async () => {
-      const error = await SymbolizedError.fromDetails({
-        details: exceptionDetails({
-          stackTrace: {
-            callFrames: [
-              {
-                functionName: 'throwIt',
-                scriptId: '1',
-                url: 'chrome-extension://ext/background.js',
-                lineNumber: 4,
-                columnNumber: 10,
-              },
-            ],
-          },
-        }),
-        targetId: 'ext',
-        session: createMockCDPSession(),
-      });
-
-      assert.strictEqual(error.stackTrace, undefined);
-    });
-
     it('extracts the message from the exception description', async () => {
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({

@@ -900,6 +900,52 @@ console.error('inline-line-4');
       });
     });
 
+    it('resolves the stack of an unhandled rejection in a dedicated worker', async () => {
+      server.addRoute('/worker.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`setTimeout(() => {
+  Promise.reject(new Error('worker-rejected'));
+}, 50);`);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>new Worker('/worker.js');</script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        let error: UncaughtError | undefined;
+        await waitExecutionFor(async () => {
+          error = page
+            .getConsoleData()
+            .find(
+              (item): item is UncaughtError => item instanceof UncaughtError,
+            );
+          assert.ok(error);
+        }, 5000);
+        assert.ok(error);
+
+        await getConsoleMessage(args).handler(
+          {
+            params: {msgid: response.getConsoleMessageStableId(error)},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(
+          rawText.includes('Uncaught (in promise) Error: worker-rejected'),
+          rawText,
+        );
+        assert.ok(rawText.includes('worker.js:2'), rawText);
+      });
+    });
+
     it('applies source maps to stack traces of Error object (with cause) console.log arguments', async t => {
       server.addRoute('/main.min.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');
