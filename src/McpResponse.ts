@@ -107,6 +107,7 @@ export class McpResponse implements Response {
   #attachedNetworkRequestOptions?: {
     requestFilePath?: string;
     responseFilePath?: string;
+    serviceWorkerId?: string;
   };
   #attachedConsoleMessageId?: number;
   #attachedConsoleMessageServiceWorkerId?: string;
@@ -310,7 +311,11 @@ export class McpResponse implements Response {
 
   attachNetworkRequest(
     reqId: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: {
+      requestFilePath?: string;
+      responseFilePath?: string;
+      serviceWorkerId?: string;
+    },
   ): void {
     this.#attachedNetworkRequestId = reqId;
     this.#attachedNetworkRequestOptions = options;
@@ -589,12 +594,22 @@ export class McpResponse implements Response {
     if (!this.#attachedNetworkRequestId) {
       return undefined;
     }
-    if (!this.#page) {
-      throw new Error(`Response must have an McpPage`);
+    const serviceWorkerId =
+      this.#attachedNetworkRequestOptions?.serviceWorkerId;
+    let request: HTTPRequest;
+    if (serviceWorkerId) {
+      request = context.getServiceWorkerNetworkRequestById(
+        serviceWorkerId,
+        this.#attachedNetworkRequestId,
+      );
+    } else {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      request = this.#page.getNetworkRequestById(
+        this.#attachedNetworkRequestId,
+      );
     }
-    const request = this.#page.getNetworkRequestById(
-      this.#attachedNetworkRequestId,
-    );
     return await NetworkFormatter.from(request, {
       requestId: this.#attachedNetworkRequestId,
       requestIdResolver: req => this.getNetworkRequestStableId(req),

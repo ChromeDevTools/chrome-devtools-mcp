@@ -45,7 +45,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [
 export const listNetworkRequests: PageToolFactory = definePageTool(
   (args: ParsedArguments) => ({
     name: 'list_network_requests',
-    description: `Lists the most recent requests for the target page since the last navigation.`,
+    description: `Lists the most recent requests for the target page since the last navigation.${args.categoryExtensions ? ' With serviceWorkerId, lists the requests of that extension service worker instead: kept across service worker restarts (up to 1000 per extension), and requests made before the server attached to the service worker are not included.' : ''}`,
     annotations: {
       category: ToolCategory.NETWORK,
       readOnlyHint: true,
@@ -86,7 +86,7 @@ export const listNetworkRequests: PageToolFactory = definePageTool(
               .string()
               .optional()
               .describe(
-                'List requests made by the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set.',
+                'List requests made by the service worker with this ID shown by list_pages (sw-N) instead of the page. The page selected by pageId is still used for the call and its console errors may be appended.',
               ),
           }
         : {}),
@@ -121,64 +121,83 @@ export const listNetworkRequests: PageToolFactory = definePageTool(
   }),
 );
 
-export const getNetworkRequest: PageToolFactory = definePageTool(() => ({
-  name: 'get_network_request',
-  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
-  annotations: {
-    category: ToolCategory.NETWORK,
-    readOnlyHint: false,
-  },
-  schema: {
-    reqid: zod
-      .number()
-      .optional()
-      .describe(
-        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
-      ),
-    requestFilePath: zod
-      .string()
-      .optional()
-      .describe(
-        'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
-      ),
-    responseFilePath: zod
-      .string()
-      .optional()
-      .describe(
-        'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
-      ),
-  },
-  blockedByDialog: true,
-  concurrency: 'page',
-  verifyFilesSchema: {
-    requestFilePath: true,
-    responseFilePath: true,
-  },
-  handler: async (request, response) => {
-    if (request.params.reqid) {
-      response.attachNetworkRequest(request.params.reqid, {
-        requestFilePath: request.params.requestFilePath,
-        responseFilePath: request.params.responseFilePath,
-      });
-    } else {
-      const data = await request.page.getDevToolsData();
-      response.attachDevToolsData(data);
-      const reqid = data?.cdpRequestId
-        ? request.page.resolveCdpRequestId(data.cdpRequestId)
-        : undefined;
-      if (reqid) {
-        response.attachNetworkRequest(reqid, {
-          requestFilePath: request.params.requestFilePath,
-          responseFilePath: request.params.responseFilePath,
-        });
-      } else {
-        response.appendResponseLine(
-          `Nothing is currently selected in the DevTools Network panel.`,
+export const getNetworkRequest: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => ({
+    name: 'get_network_request',
+    description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
+    annotations: {
+      category: ToolCategory.NETWORK,
+      readOnlyHint: false,
+    },
+    schema: {
+      reqid: zod
+        .number()
+        .optional()
+        .describe(
+          'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
+        ),
+      requestFilePath: zod
+        .string()
+        .optional()
+        .describe(
+          'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
+        ),
+      responseFilePath: zod
+        .string()
+        .optional()
+        .describe(
+          'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
+        ),
+      ...(args.categoryExtensions
+        ? {
+            serviceWorkerId: zod
+              .string()
+              .optional()
+              .describe(
+                'Get the request from the service worker with this ID shown by list_pages (sw-N) instead of the page. Requires reqid, using the reqid listed for that service worker.',
+              ),
+          }
+        : {}),
+    },
+    blockedByDialog: true,
+    concurrency: 'page',
+    verifyFilesSchema: {
+      requestFilePath: true,
+      responseFilePath: true,
+    },
+    handler: async (request, response) => {
+      const {serviceWorkerId} = request.params;
+      if (serviceWorkerId && !request.params.reqid) {
+        throw new Error(
+          `reqid is required when serviceWorkerId is set (got serviceWorkerId=${serviceWorkerId}).`,
         );
       }
-    }
-  },
-}));
+      if (request.params.reqid) {
+        response.attachNetworkRequest(request.params.reqid, {
+          requestFilePath: request.params.requestFilePath,
+          responseFilePath: request.params.responseFilePath,
+          ...(serviceWorkerId ? {serviceWorkerId} : {}),
+        });
+      } else {
+        const data = await request.page.getDevToolsData();
+        response.attachDevToolsData(data);
+        const reqid = data?.cdpRequestId
+          ? request.page.resolveCdpRequestId(data.cdpRequestId)
+          : undefined;
+        if (reqid) {
+          response.attachNetworkRequest(reqid, {
+            requestFilePath: request.params.requestFilePath,
+            responseFilePath: request.params.responseFilePath,
+          });
+        } else {
+          response.appendResponseLine(
+            `Nothing is currently selected in the DevTools Network panel.`,
+          );
+        }
+      }
+    },
+  }),
+);
 
 const mockFilterSchema = {
   route: zod

@@ -365,12 +365,13 @@
 - **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
 - **requestFilePath** (string) _(optional)_: The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.
 - **responseFilePath** (string) _(optional)_: The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.
+- **serviceWorkerId** (string) _(optional)_: Get the request from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. Requires reqid, using the reqid listed for that service worker.
 
 ---
 
 ### `list_network_requests`
 
-**Description:** Lists the most recent requests for the target page since the last navigation.
+**Description:** Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead: kept across service worker restarts (up to 1000 per extension), and requests made before the server attached to the service worker are not included.
 
 **Parameters:**
 
@@ -379,7 +380,7 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
-- **serviceWorkerId** (string) _(optional)_: List requests made by the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. pageId is ignored when set.
+- **serviceWorkerId** (string) _(optional)_: List requests made by the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. The page selected by pageId is still used for the call and its console errors may be appended.
 
 ---
 

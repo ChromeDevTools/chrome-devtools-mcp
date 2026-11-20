@@ -44,6 +44,7 @@ import {
   createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
+  createMockWebWorker,
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks, TestServer} from './server.js';
@@ -254,10 +255,16 @@ describe('McpContext', () => {
     });
   });
 
-  describe('getServiceWorkerNetworkData', () => {
-    it('resolves the service worker ID to the collector extension ID', async () => {
+  describe('service worker network data', () => {
+    it('reads requests from the network store, not the console store', async () => {
+      const worker = createMockWebWorker();
+      const target = createMockPuppeteerTarget({
+        url: 'chrome-extension://extension-id/background.js',
+        type: TargetType.SERVICE_WORKER,
+      });
+      target.worker.resolves(worker);
       const browser = createMockPuppeteerBrowser();
-      browser.targets.returns([]);
+      browser.targets.returns([target]);
       const context = await createConnectedMcpContext(
         browser,
         {
@@ -268,22 +275,25 @@ describe('McpContext', () => {
         },
         Locator,
       );
-      const getWorkerById = sinon.stub(context, 'getWorkerById').returns(
-        createMockMcpWorker({
-          id: 'sw-3',
-          url: 'chrome-extension://extension-id/background.js',
-        }),
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const [serviceWorker] = context.getWorkers();
+      assert.ok(serviceWorker);
+      const request = createMockHTTPRequest();
+
+      worker.emit('request', request);
+
+      assert.deepStrictEqual(
+        context.getServiceWorkerNetworkData(serviceWorker.id),
+        [request],
       );
-      const requests = [createMockHTTPRequest()];
-      const getData = sinon
-        .stub(ExtensionItemStore.prototype, 'getData')
-        .returns(requests);
-
-      const result = context.getServiceWorkerNetworkData('sw-3');
-
-      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
-      sinon.assert.calledOnceWithExactly(getData, 'extension-id');
-      assert.strictEqual(result, requests);
+      assert.strictEqual(
+        context.getServiceWorkerNetworkRequestById(serviceWorker.id, 1),
+        request,
+      );
+      assert.deepStrictEqual(
+        context.getServiceWorkerConsoleData(serviceWorker.id),
+        [],
+      );
       context.dispose();
     });
   });

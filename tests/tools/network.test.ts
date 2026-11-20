@@ -568,6 +568,57 @@ describe('network', () => {
   });
 
   describe('get_network_request', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          getNetworkRequest(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          getNetworkRequest(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
+    it('forwards serviceWorkerId when reqid is provided', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await getNetworkRequest(args).handler(
+        {params: {reqid: 3, serviceWorkerId: 'sw-1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 3, {
+        requestFilePath: undefined,
+        responseFilePath: undefined,
+        serviceWorkerId: 'sw-1',
+      });
+      sinon.assert.notCalled(page.getDevToolsData);
+    });
+
+    it('rejects serviceWorkerId without reqid', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await assert.rejects(
+        getNetworkRequest(args).handler(
+          {params: {serviceWorkerId: 'sw-1'}, page},
+          response,
+          context,
+        ),
+        /reqid is required when serviceWorkerId is set \(got serviceWorkerId=sw-1\)/,
+      );
+
+      sinon.assert.notCalled(page.getDevToolsData);
+      sinon.assert.notCalled(response.attachNetworkRequest);
+    });
     it('attaches request with explicit reqid', async () => {
       const {page, context, response, args} = createHandlerMocks();
 
