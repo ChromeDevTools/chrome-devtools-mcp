@@ -9,7 +9,6 @@ import type {
   ConsoleMessage,
   WebWorker,
   Target,
-  Protocol,
   Browser,
   RemoteException,
 } from '../third_party/browser.js';
@@ -44,7 +43,7 @@ export class ServiceWorkerSubscriber {
     }
   }
 
-  async unsubscribe(): Promise<void> {
+  unsubscribe(): void {
     if (this.#worker) {
       this.#worker.off('console', this.#onConsole);
       this.#worker.off('exception', this.#onException);
@@ -60,16 +59,14 @@ export class ServiceWorkerSubscriber {
     if (!extensionId || !this.#worker) {
       return;
     }
-    const details: Protocol.Runtime.ExceptionDetails | undefined =
-      // @ts-expect-error use internal Puppeteer API to get raw exception details.
-      exception._rawExceptionDetails();
-    if (!details) {
-      return;
-    }
-    exception.handle()?.move();
-    this.#callback(
-      new UncaughtError(details, extensionId, this.#worker.client),
+    const error = UncaughtError.fromException(
+      exception,
+      extensionId,
+      this.#worker.client,
     );
+    if (error) {
+      this.#callback(error);
+    }
   };
 }
 
@@ -107,11 +104,7 @@ export class ServiceWorkerConsoleCollector {
     this.#browser.off('targetcreated', this.#onTargetCreated);
     this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
     for (const subscriber of this.#serviceWorkerSubscribers.values()) {
-      subscriber.unsubscribe().catch(err => {
-        if (!isIgnoredTargetError(err)) {
-          // Swallow error as we are tearing down the system
-        }
-      });
+      subscriber.unsubscribe();
     }
     this.#serviceWorkerSubscribers.clear();
   }
@@ -135,30 +128,27 @@ export class ServiceWorkerConsoleCollector {
       try {
         await subscriber.subscribe();
         if (this.#serviceWorkerSubscribers.get(target) !== subscriber) {
-          await subscriber.unsubscribe();
+          subscriber.unsubscribe();
         }
       } catch (err) {
         if (this.#serviceWorkerSubscribers.get(target) === subscriber) {
           this.#serviceWorkerSubscribers.delete(target);
         }
         if (!isIgnoredTargetError(err)) {
-          logger?.('Failed to subscribe to extension service worker', err);
+          logger?.(
+            `Failed to subscribe to service worker of extension ${extensionId} (${origin})`,
+            err,
+          );
         }
       }
     }
   };
 
-  #onTargetDestroyed = async (target: Target): Promise<void> => {
+  #onTargetDestroyed = (target: Target): void => {
     const subscriber = this.#serviceWorkerSubscribers.get(target);
     if (subscriber) {
       this.#serviceWorkerSubscribers.delete(target);
-      try {
-        await subscriber.unsubscribe();
-      } catch (err) {
-        if (!isIgnoredTargetError(err)) {
-          throw err;
-        }
-      }
+      subscriber.unsubscribe();
     }
   };
 

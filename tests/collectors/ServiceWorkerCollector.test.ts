@@ -106,7 +106,7 @@ describe('ServiceWorkerConsoleCollector', () => {
     collector.dispose();
   });
 
-  it('ignores protocol timeouts when subscribing to a service worker', async () => {
+  it('logs protocol timeouts when subscribing to a service worker without throwing', async () => {
     const browser = createMockPuppeteerBrowser();
     const target = createMockPuppeteerTarget({
       url: 'chrome-extension://ext-id/sw.js',
