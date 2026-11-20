@@ -881,6 +881,17 @@ export class McpContext implements Context, BrowserlessContext {
     return this.#serviceWorkerCollector?.network.getData(extensionId) ?? [];
   }
 
+  getServiceWorkerNetworkRequestById(
+    serviceWorkerId: string,
+    reqid: number,
+  ): HTTPRequest {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    if (!this.#serviceWorkerCollector) {
+      throw new Error('Service worker network data is not available.');
+    }
+    return this.#serviceWorkerCollector.network.getById(extensionId, reqid);
+  }
+
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {
     // Build a reverse lookup from BrowserContext instance → name.
     const contextToName = new Map<BrowserContext, string>();
