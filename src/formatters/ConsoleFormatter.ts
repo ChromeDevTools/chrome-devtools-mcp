@@ -6,6 +6,10 @@
 
 import {
   createStackTraceForConsoleMessage,
+  type FormattableAsyncFragment,
+  type FormattableFragment,
+  type FormattableFrame,
+  type FormattableStackTrace,
   type SessionLike,
   type TargetUniverse,
   SymbolizedError,
@@ -24,14 +28,12 @@ export interface ConsoleFormatterOptions {
   id: number;
   devTools?: TargetUniverse;
   resolvedArgsForTesting?: unknown[];
-  resolvedStackTraceForTesting?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+  resolvedStackTraceForTesting?: FormattableStackTrace;
   resolvedCauseForTesting?: SymbolizedError;
   isIgnoredForTesting?: IgnoreCheck;
 }
 
-export type IgnoreCheck = (
-  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
-) => boolean;
+export type IgnoreCheck = (frame: FormattableFrame) => boolean;
 
 interface ConsoleMessageConcise {
   type: string;
@@ -84,7 +86,7 @@ export class ConsoleFormatter {
   readonly #argCount: number;
   readonly #resolvedArgs: unknown[];
 
-  readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+  readonly #stack?: FormattableStackTrace;
   readonly #cause?: SymbolizedError;
   readonly #includeStackInConcise: boolean;
 
@@ -97,7 +99,7 @@ export class ConsoleFormatter {
     isIgnored: IgnoreCheck;
     argCount?: number;
     resolvedArgs?: unknown[];
-    stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+    stack?: FormattableStackTrace;
     cause?: SymbolizedError;
     includeStackInConcise?: boolean;
   }) {
@@ -142,7 +144,7 @@ export class ConsoleFormatter {
 
     if (msg instanceof UncaughtError) {
       const error = await SymbolizedError.fromDetails({
-        devTools: options?.devTools,
+        devTools: msg.fromOtherTarget ? undefined : options?.devTools,
         details: msg.details,
         targetId: msg.targetId,
         session: msg.session,
@@ -206,7 +208,7 @@ export class ConsoleFormatter {
       );
     }
 
-    let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    let stack: FormattableStackTrace | undefined;
     if (options.resolvedStackTraceForTesting) {
       stack = options.resolvedStackTraceForTesting;
     } else if (
@@ -348,7 +350,7 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
       text: string;
       argCount: number;
       isIgnored: IgnoreCheck;
-      stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+      stack?: FormattableStackTrace;
       cause?: SymbolizedError;
       includeStackInConcise?: boolean;
     },
@@ -429,7 +431,7 @@ function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}): string {
 const STACK_TRACE_MAX_LINES = 50;
 
 function formatStackTrace(
-  stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace,
+  stackTrace: FormattableStackTrace,
   cause: SymbolizedError | undefined,
   formatter: {isIgnored: IgnoreCheck},
   options?: {includeNote?: boolean},
@@ -450,7 +452,7 @@ function formatStackTrace(
 }
 
 function formatStackTraceInner(
-  stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
+  stackTrace: FormattableStackTrace | undefined,
   cause: SymbolizedError | undefined,
   formatter: {isIgnored: IgnoreCheck},
 ): string[] {
@@ -468,7 +470,7 @@ function formatStackTraceInner(
 }
 
 function formatFragment(
-  fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
+  fragment: FormattableFragment,
   formatter: {isIgnored: IgnoreCheck},
 ): string[] {
   const frames = fragment.frames.filter(frame => !formatter.isIgnored(frame));
@@ -476,7 +478,7 @@ function formatFragment(
 }
 
 function formatAsyncFragment(
-  fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
+  fragment: FormattableAsyncFragment,
   formatter: {isIgnored: IgnoreCheck},
 ): string[] {
   const formattedFrames = formatFragment(fragment, formatter);
@@ -491,9 +493,7 @@ function formatAsyncFragment(
   return [separator, ...formattedFrames];
 }
 
-function formatFrame(
-  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
-): string {
+function formatFrame(frame: FormattableFrame): string {
   let result = `at ${frame.name ?? '<anonymous>'}`;
   if (frame.uiSourceCode) {
     const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);

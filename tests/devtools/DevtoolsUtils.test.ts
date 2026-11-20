@@ -209,6 +209,87 @@ describe('SymbolizedError', () => {
   }
 
   describe('fromDetails', () => {
+    it('builds a raw stack trace when there is no DevTools universe', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          stackTrace: {
+            callFrames: [
+              {
+                functionName: 'throwIt',
+                scriptId: '1',
+                url: 'chrome-extension://ext/background.js',
+                lineNumber: 4,
+                columnNumber: 10,
+              },
+            ],
+            parent: {
+              description: 'setTimeout',
+              callFrames: [
+                {
+                  functionName: '',
+                  scriptId: '1',
+                  url: 'chrome-extension://ext/background.js',
+                  lineNumber: 1,
+                  columnNumber: 2,
+                },
+              ],
+            },
+          },
+        }),
+        targetId: 'ext',
+        session: createMockCDPSession(),
+        includeStackAndCause: true,
+      });
+
+      assert.deepStrictEqual(error.stackTrace, {
+        syncFragment: {
+          frames: [
+            {
+              url: 'chrome-extension://ext/background.js',
+              name: 'throwIt',
+              line: 5,
+              column: 11,
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                url: 'chrome-extension://ext/background.js',
+                name: undefined,
+                line: 2,
+                column: 3,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('builds no stack trace when stack and cause are not requested', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          stackTrace: {
+            callFrames: [
+              {
+                functionName: 'throwIt',
+                scriptId: '1',
+                url: 'chrome-extension://ext/background.js',
+                lineNumber: 4,
+                columnNumber: 10,
+              },
+            ],
+          },
+        }),
+        targetId: 'ext',
+        session: createMockCDPSession(),
+      });
+
+      assert.strictEqual(error.stackTrace, undefined);
+    });
+
     it('extracts the message from the exception description', async () => {
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({
