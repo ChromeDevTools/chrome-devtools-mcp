@@ -151,4 +151,57 @@ describe('devToolsActivePortPermissionError', () => {
       undefined,
     );
   });
+
+  it('uses generic file-permission hint on darwin with EACCES', () => {
+    sinon.stub(os, 'platform').returns('darwin');
+    const eaccesError = Object.assign(new Error('EACCES: permission denied'), {
+      code: 'EACCES',
+    });
+    const puppeteerPermissionError = new Error(
+      'Could not read DevToolsActivePort for chrome at /Users/test/DevToolsActivePort: permission denied',
+      {cause: eaccesError},
+    );
+    const formatted = devToolsActivePortPermissionError(
+      puppeteerPermissionError,
+    );
+    assert.ok(formatted);
+    assert.strictEqual(
+      formatted.message,
+      'Could not connect to Chrome: reading DevToolsActivePort was denied by file permissions. Check that the current user can read the Chrome profile directory, then try again.',
+    );
+    assert.strictEqual(formatted.cause, puppeteerPermissionError);
+  });
+
+  it('matches Puppeteer active port errors by message prefix and cause errno code', () => {
+    sinon.stub(os, 'platform').returns('darwin');
+    const epermError = Object.assign(
+      new Error('EPERM: operation not permitted'),
+      {code: 'EPERM'},
+    );
+    const withoutSuffix = new Error(
+      'Could not read DevToolsActivePort for chrome at /Users/test/DevToolsActivePort',
+      {cause: epermError},
+    );
+    const formatted = devToolsActivePortPermissionError(withoutSuffix);
+    assert.ok(formatted);
+    assert.strictEqual(
+      formatted.message,
+      'Could not connect to Chrome: macOS blocked reading DevToolsActivePort. Grant the host application (such as your terminal or IDE) access to Google Chrome in System Settings > Privacy & Security > Files & Folders, then try again.',
+    );
+    assert.strictEqual(formatted.cause, withoutSuffix);
+
+    const enoentError = Object.assign(
+      new Error('ENOENT: no such file or directory'),
+      {code: 'ENOENT'},
+    );
+    assert.strictEqual(
+      devToolsActivePortPermissionError(
+        new Error(
+          'Could not read DevToolsActivePort for chrome at /Users/test/DevToolsActivePort: permission denied',
+          {cause: enoentError},
+        ),
+      ),
+      undefined,
+    );
+  });
 });
