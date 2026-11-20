@@ -19,6 +19,7 @@ import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {ConfigWatcher} from '../src/config/ConfigWatcher.js';
 import {mcpOptions} from '../src/config/mcp-options.js';
+import {getIssueDescription} from '../src/devtools/issueDescriptions.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
@@ -97,6 +98,20 @@ describe('McpServer', () => {
     const tools = await listServerTools(server);
     return tools.map(tool => tool.name);
   }
+
+  it('loads issue descriptions on the first tool call instead of startup', async () => {
+    const {server} = await createTestServer();
+
+    assert.strictEqual(
+      getIssueDescription('bounceTrackingMitigations.md'),
+      null,
+    );
+
+    await server.callTool('list_pages', {});
+
+    assert.ok(getIssueDescription('bounceTrackingMitigations.md'));
+    await server.close();
+  });
 
   it('creates the context on the first tool call with the navigation limit', async () => {
     const context = createMockMcpContext();

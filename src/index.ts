@@ -315,17 +315,16 @@ export class McpServer {
     options: McpServerOptions,
   ): Promise<McpServer> {
     const server = new McpServer(config, options);
-    await server.#init();
+    server.#init();
     return server;
   }
 
-  async #init(): Promise<void> {
+  #init(): void {
     // Tool definitions take a ParsedArguments snapshot; reload recreates them.
     for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
     this.#setToolCallRequestHandler();
-    await loadIssueDescriptions();
   }
 
   #combinedRoots(): Root[] | undefined {
@@ -371,8 +370,11 @@ export class McpServer {
     if (this.#context) {
       return Promise.resolve(this.#context);
     }
-    this.#contextPromise ??= import('./McpContext.js')
-      .then(mcpContextModule => {
+    this.#contextPromise ??= Promise.all([
+      import('./McpContext.js'),
+      loadIssueDescriptions(),
+    ])
+      .then(([mcpContextModule]) => {
         const context = mcpContextModule.McpContext.create(logger, {
           config: this.#config,
           heapSnapshotManager: this.#heapSnapshotManager,
