@@ -271,9 +271,8 @@ export function createRawStackTrace(
     callFrames.map(frame => ({
       url: frame.url,
       name: frame.functionName || undefined,
-      // CDP positions are 0-based; the output uses 1-based positions.
-      line: frame.lineNumber + 1,
-      column: frame.columnNumber + 1,
+      line: frame.lineNumber,
+      column: frame.columnNumber,
     }));
   const asyncFragments = [];
   for (

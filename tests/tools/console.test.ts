@@ -11,6 +11,7 @@ import {before, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -865,19 +866,28 @@ console.error('inline-line-4');
       });
       server.addHtmlRoute(
         '/index.html',
-        `<!DOCTYPE html><script>
-          const worker = new Worker('/worker.js');
-          worker.onerror = () => { window.thrown = true; };
-        </script>`,
+        `<!DOCTYPE html><script>new Worker('/worker.js');</script>`,
       );
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
-        await page.pptrPage.waitForFunction(() => 'thrown' in window);
+        let error: UncaughtError | undefined;
+        await waitExecutionFor(async () => {
+          error = page
+            .getConsoleData()
+            .find(
+              (item): item is UncaughtError => item instanceof UncaughtError,
+            );
+          assert.ok(error);
+        }, 5000);
+        assert.ok(error);
 
         await getConsoleMessage(args).handler(
-          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          {
+            params: {msgid: response.getConsoleMessageStableId(error)},
+            page,
+          },
           response,
           context,
         );

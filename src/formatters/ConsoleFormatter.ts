@@ -499,7 +499,8 @@ function formatFrame(frame: FormattableFrame): string {
     const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
     result += ` (${location.linkText(/* skipTrim */ false, /* showColumnNumber */ true)})`;
   } else if (frame.url) {
-    result += ` (${frame.url}:${frame.line}:${frame.column})`;
+    // Frame positions are 0-based; the output uses 1-based positions.
+    result += ` (${frame.url}:${frame.line + 1}:${frame.column + 1})`;
   }
   return result;
 }
