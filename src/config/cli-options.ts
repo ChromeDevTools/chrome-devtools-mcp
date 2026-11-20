@@ -1436,7 +1436,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead: kept across service worker restarts (up to 1000 per extension), and requests made before the server attached to the service worker are not included.',
+      'Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead.',
     category: 'Network',
     args: {
       pageId: {

@@ -631,6 +631,7 @@ describe('network', () => {
       sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
         requestFilePath: undefined,
         responseFilePath: undefined,
+        serviceWorkerId: undefined,
       });
       sinon.assert.notCalled(page.getDevToolsData);
     });
@@ -654,6 +655,7 @@ describe('network', () => {
       sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
         requestFilePath: '/path/req.txt',
         responseFilePath: '/path/res.txt',
+        serviceWorkerId: undefined,
       });
     });
 
