@@ -247,8 +247,8 @@ describe('SymbolizedError', () => {
             {
               url: 'chrome-extension://ext/background.js',
               name: 'throwIt',
-              line: 5,
-              column: 11,
+              line: 4,
+              column: 10,
             },
           ],
         },
@@ -259,8 +259,8 @@ describe('SymbolizedError', () => {
               {
                 url: 'chrome-extension://ext/background.js',
                 name: undefined,
-                line: 2,
-                column: 3,
+                line: 1,
+                column: 2,
               },
             ],
           },

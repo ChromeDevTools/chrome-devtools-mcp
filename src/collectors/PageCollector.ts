@@ -77,9 +77,13 @@ export class UncaughtError {
     if (handleSession === session) {
       return new UncaughtError(details, targetId, session);
     }
-    const handleTargetId: string =
+    let handleTargetId = targetId;
+    try {
       // @ts-expect-error use internal Puppeteer API to get target ID
-      handleSession.target()?._targetId ?? targetId;
+      handleTargetId = handleSession.target()._targetId;
+    } catch {
+      // `target()` throws for a session without a target; keep the given target.
+    }
     return new UncaughtError(details, handleTargetId, handleSession, true);
   }
 }
@@ -294,7 +298,6 @@ class PageEventSubscriber {
   #seenKeys = new Set<string>();
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
-  #session: CDPSession;
   #targetId: string;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
@@ -302,9 +305,9 @@ class PageEventSubscriber {
   constructor(page: Page) {
     this.#page = page;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    this.#session = this.#page._client() as CDPSession;
+    const session: CDPSession = this.#page._client();
     // @ts-expect-error use internal Puppeteer API to get target ID
-    this.#targetId = this.#session.target()._targetId;
+    this.#targetId = session.target()._targetId;
   }
 
   #resetIssueAggregator(): void {
@@ -356,10 +359,13 @@ class PageEventSubscriber {
   };
 
   #onException = (exception: RemoteException): void => {
+    // Read at event time: prerender activation swaps the page session.
+    // @ts-expect-error use existing CDP client (internal Puppeteer API).
+    const pageSession: CDPSession = this.#page._client();
     const error = UncaughtError.fromException(
       exception,
       this.#targetId,
-      this.#session,
+      pageSession,
     );
     if (error) {
       this.#page.emit('uncaughtError', error);
