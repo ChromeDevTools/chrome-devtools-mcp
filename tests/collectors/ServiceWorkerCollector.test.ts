@@ -106,7 +106,7 @@ describe('ServiceWorkerConsoleCollector', () => {
     collector.dispose();
   });
 
-  it('logs protocol timeouts when subscribing to a service worker without throwing', async () => {
+  it('does not throw when subscribing to a service worker times out', async () => {
     const browser = createMockPuppeteerBrowser();
     const target = createMockPuppeteerTarget({
       url: 'chrome-extension://ext-id/sw.js',
@@ -119,6 +119,26 @@ describe('ServiceWorkerConsoleCollector', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     sinon.assert.calledOnce(target.worker);
     sinon.assert.notCalled(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('removes the exception listener when the service worker target is destroyed', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const worker = createMockWebWorker();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.resolves(worker);
+
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.strictEqual(worker.listenerCount('exception'), 1);
+
+    browser.emit('targetdestroyed', target);
+
+    assert.strictEqual(worker.listenerCount('exception'), 0);
     collector.dispose();
   });
 
