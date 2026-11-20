@@ -32,15 +32,23 @@ export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
   readonly session?: CDPSession;
+  /**
+   * True when the exception was thrown by another target than the page that
+   * reported it, such as a dedicated worker. The page's DevTools universe
+   * cannot resolve the scripts of that target.
+   */
+  readonly fromOtherTarget: boolean;
 
   constructor(
     details: Protocol.Runtime.ExceptionDetails,
     targetId: string,
     session?: CDPSession,
+    fromOtherTarget = false,
   ) {
     this.details = details;
     this.targetId = targetId;
     this.session = session;
+    this.fromOtherTarget = fromOtherTarget;
   }
 }
 
@@ -254,7 +262,6 @@ class PageEventSubscriber {
   #seenKeys = new Set<string>();
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
-  #session: CDPSession;
   #targetId: string;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
@@ -262,9 +269,9 @@ class PageEventSubscriber {
   constructor(page: Page) {
     this.#page = page;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    this.#session = this.#page._client() as CDPSession;
+    const session: CDPSession = this.#page._client();
     // @ts-expect-error use internal Puppeteer API to get target ID
-    this.#targetId = this.#session.target()._targetId;
+    this.#targetId = session.target()._targetId;
   }
 
   #resetIssueAggregator(): void {
@@ -322,11 +329,27 @@ class PageEventSubscriber {
     if (!details) {
       return;
     }
+    const handle = exception.handle();
     // Keep the exception object alive so its stack and cause resolve later.
-    exception.handle()?.move();
+    handle?.move();
+    // Read at event time: prerender activation swaps the page session.
+    // @ts-expect-error use existing CDP client (internal Puppeteer API).
+    const pageSession: CDPSession = this.#page._client();
+    // Exceptions of dedicated workers are forwarded to the page. Their objects
+    // and scripts belong to the worker session and target, not the page.
+    const session: CDPSession =
+      // @ts-expect-error use internal Puppeteer API to get the handle session.
+      handle?.client ?? pageSession;
+    let targetId = this.#targetId;
+    try {
+      // @ts-expect-error use internal Puppeteer API to get target ID
+      targetId = session.target()._targetId;
+    } catch {
+      // `target()` throws for a session without a target; keep the page target.
+    }
     this.#page.emit(
       'uncaughtError',
-      new UncaughtError(details, this.#targetId, this.#session),
+      new UncaughtError(details, targetId, session, session !== pageSession),
     );
   };
 
