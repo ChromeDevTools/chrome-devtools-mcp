@@ -10,6 +10,7 @@ import {
   buildCommand,
   getCommandArgSpec,
   registerCommandArgs,
+  resolveFileArg,
   shieldLiteralArgs,
 } from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
@@ -258,9 +259,12 @@ export async function runCli(
           }
 
           const commandArgs: Record<string, unknown> = {};
-          for (const argName of Object.keys(args)) {
+          for (const [argName, arg] of Object.entries(args)) {
             if (argName in argv) {
-              commandArgs[argName] = restoreLiteralArg(argv[argName]);
+              const value = restoreLiteralArg(argv[argName]);
+              commandArgs[argName] = arg.isFilePath
+                ? resolveFileArg(value, process.cwd())
+                : value;
             }
           }
 

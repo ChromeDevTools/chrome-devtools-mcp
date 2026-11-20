@@ -4,9 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
+
 import type {Argv, Options, PositionalOptions} from 'yargs';
 
 import type {ArgDef} from './cli-options.js';
+
+/**
+ * Resolves a relative file path arg, or each item of an array arg, against
+ * `cwd`. The daemon resolves relative paths against the directory it was
+ * started in, so the CLI resolves them before sending the command. Absolute
+ * paths, URLs and empty strings are returned unchanged.
+ */
+export function resolveFileArg(value: unknown, cwd: string): unknown {
+  if (Array.isArray(value)) {
+    return value.map(item => resolveFileArg(item, cwd));
+  }
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    path.isAbsolute(value) ||
+    URL.canParse(value)
+  ) {
+    return value;
+  }
+  return path.resolve(cwd, value);
+}
 
 /**
  * Builds the yargs command string and usage line for a CLI command.

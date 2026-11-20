@@ -19,6 +19,8 @@ export interface ArgDef {
   positional: boolean;
   /** Minimum number of items for array args, from JSON Schema minItems. */
   minItems?: number;
+  /** Whether the CLI resolves a relative value against its cwd. */
+  isFilePath?: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
@@ -42,6 +44,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       retainedSize: {
         name: 'retainedSize',
@@ -177,6 +180,7 @@ export const commands: Commands = {
         description: 'A path to the .heapsnapshot file to close.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
     },
   },
@@ -207,6 +211,7 @@ export const commands: Commands = {
           'A path to the base .heapsnapshot file (earlier snapshot).',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       currentFilePath: {
         name: 'currentFilePath',
@@ -215,6 +220,7 @@ export const commands: Commands = {
           'A path to the current .heapsnapshot file (later snapshot).',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       classIndex: {
         name: 'classIndex',
@@ -476,6 +482,7 @@ export const commands: Commands = {
           "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
         required: false,
         positional: false,
+        isFilePath: true,
       },
       format: {
         name: 'format',
@@ -501,6 +508,7 @@ export const commands: Commands = {
           'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
       dialogAction: {
         name: 'dialogAction',
@@ -711,6 +719,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       id: {
         name: 'id',
@@ -782,6 +791,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       filterName: {
         name: 'filterName',
@@ -846,6 +856,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -875,6 +886,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -915,6 +927,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -986,6 +999,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -1015,6 +1029,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -1062,6 +1077,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -1112,6 +1128,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -1150,6 +1167,7 @@ export const commands: Commands = {
           'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
       responseFilePath: {
         name: 'responseFilePath',
@@ -1158,6 +1176,7 @@ export const commands: Commands = {
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
       serviceWorkerId: {
         name: 'serviceWorkerId',
@@ -1252,6 +1271,7 @@ export const commands: Commands = {
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
     },
   },
@@ -1275,6 +1295,7 @@ export const commands: Commands = {
           'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       displayMode: {
         name: 'displayMode',
@@ -1347,6 +1368,7 @@ export const commands: Commands = {
         description: 'Directory for reports. If omitted, uses temporary files.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -1580,6 +1602,7 @@ export const commands: Commands = {
           'Local response body file, revalidated and reread for every request. Content-Type follows its extension. Mutually exclusive with upstream.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
       upstream: {
         name: 'upstream',
@@ -1766,6 +1789,7 @@ export const commands: Commands = {
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -1788,6 +1812,7 @@ export const commands: Commands = {
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -1832,6 +1857,7 @@ export const commands: Commands = {
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
       className: {
         name: 'className',
@@ -2025,6 +2051,7 @@ export const commands: Commands = {
           'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -2103,6 +2130,7 @@ export const commands: Commands = {
           'A path to a .heapsnapshot file to save the heapsnapshot to.',
         required: true,
         positional: true,
+        isFilePath: true,
       },
     },
   },
@@ -2166,6 +2194,7 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -2196,6 +2225,7 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
         positional: false,
+        isFilePath: true,
       },
     },
   },
@@ -2295,6 +2325,7 @@ export const commands: Commands = {
         required: true,
         positional: true,
         minItems: 1,
+        isFilePath: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',

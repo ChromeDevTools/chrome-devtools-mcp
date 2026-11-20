@@ -36,6 +36,7 @@ interface CliOption {
   required: boolean;
   positional: boolean;
   minItems?: number;
+  isFilePath?: boolean;
   default?: unknown;
   enum?: unknown[];
 }
@@ -124,9 +125,12 @@ async function generateCli() {
       io: 'input',
     }) as JsonSchema;
     const options = schemaToCLIOptions(tool.name, inputSchema);
+    const fileArgNames = new Set(Object.keys(tool.verifyFilesSchema));
     const args: Record<string, CliOption> = {};
     for (const opt of options) {
-      args[opt.name] = opt;
+      args[opt.name] = fileArgNames.has(opt.name)
+        ? {...opt, isFilePath: true}
+        : opt;
     }
 
     const categoryEnum = tool.annotations.category;
@@ -187,6 +191,8 @@ export interface ArgDef {
   positional: boolean;
   /** Minimum number of items for array args, from JSON Schema minItems. */
   minItems?: number;
+  /** Whether the CLI resolves a relative value against its cwd. */
+  isFilePath?: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
