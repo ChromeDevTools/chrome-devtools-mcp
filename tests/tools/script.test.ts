@@ -251,6 +251,24 @@ describe('script', () => {
       sinon.assert.calledOnceWithExactly(context.loadResource, sourcePath);
       sinon.assert.calledOnce(page.waitForEventsAfterAction);
     });
+    it('loads script source from http and https URLs unchanged', async () => {
+      for (const sourcePath of [
+        'https://example.com/script.js',
+        'http://localhost:8080/script.js',
+      ]) {
+        const {page, response, context, args} = createHandlerMocks();
+        context.loadResource.resolves('() => document.title;');
+
+        await evaluateScript(args).handler(
+          {params: {sourcePath}},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(context.loadResource, sourcePath);
+        sinon.assert.calledOnce(page.waitForEventsAfterAction);
+      }
+    });
     it('requires exactly one script source', async () => {
       const {response, context, args} = createHandlerMocks();
       await assert.rejects(
