@@ -45,7 +45,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [
 export const listNetworkRequests: PageToolFactory = definePageTool(
   (args: ParsedArguments) => ({
     name: 'list_network_requests',
-    description: `Lists the most recent requests for the target page since the last navigation.${args.categoryExtensions ? ' With serviceWorkerId, lists the requests of that extension service worker instead: kept across service worker restarts (up to 1000 per extension), and requests made before the server attached to the service worker are not included.' : ''}`,
+    description: `Lists the most recent requests for the target page since the last navigation.${args.categoryExtensions ? ' With serviceWorkerId, lists the requests of that extension service worker instead.' : ''}`,
     annotations: {
       category: ToolCategory.NETWORK,
       readOnlyHint: true,
@@ -176,7 +176,7 @@ export const getNetworkRequest: PageToolFactory = definePageTool(
         response.attachNetworkRequest(request.params.reqid, {
           requestFilePath: request.params.requestFilePath,
           responseFilePath: request.params.responseFilePath,
-          ...(serviceWorkerId ? {serviceWorkerId} : {}),
+          serviceWorkerId,
         });
       } else {
         const data = await request.page.getDevToolsData();
