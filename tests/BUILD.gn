@@ -46,6 +46,7 @@ ts_library("tests") {
     "e2e/chrome-devtools-disclaimers.test.ts",
     "e2e/chrome-devtools-hyphen-positionals.test.ts",
     "e2e/chrome-devtools-performance.test.ts",
+    "e2e/chrome-devtools-session-id.test.ts",
     "e2e/chrome-devtools-start-stop.test.ts",
     "e2e/chrome-devtools-status.test.ts",
     "e2e/telemetry.test.ts",

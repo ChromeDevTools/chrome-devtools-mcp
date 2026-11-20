@@ -21,6 +21,18 @@ export const DAEMON_SCRIPT_PATH: string = path.join(
 const APP_NAME = 'chrome-devtools-mcp';
 export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
 
+export const SESSION_ID_ENV_VAR = 'CHROME_DEVTOOLS_SESSION_ID';
+// Undocumented name that older agent integrations still set.
+const LEGACY_SESSION_ID_ENV_VAR = 'CD4A_INTERNAL_DAEMON_SESSION_ID';
+
+/**
+ * Returns the default for `--sessionId`: `CHROME_DEVTOOLS_SESSION_ID`, then
+ * the legacy variable, then the default session (empty string).
+ */
+export function getDefaultSessionId(env: NodeJS.ProcessEnv): string {
+  return env[SESSION_ID_ENV_VAR] || env[LEGACY_SESSION_ID_ENV_VAR] || '';
+}
+
 export function assertValidSessionId(sessionId: string): void {
   if (!sessionId) {
     return;

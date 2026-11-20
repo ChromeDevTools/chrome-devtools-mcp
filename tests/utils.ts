@@ -509,7 +509,7 @@ export const CLI_PATH: string = path.resolve(
 export async function runCli(
   args: string[],
   sessionId?: string,
-  options?: {cwd?: string},
+  options?: {cwd?: string; env?: NodeJS.ProcessEnv},
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return await new Promise((resolve, reject) => {
     const finalArgs = [...args];
@@ -518,7 +518,7 @@ export async function runCli(
       finalArgs.unshift('--sessionId', sessionId);
     }
     const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
-      env: process.env,
+      env: options?.env ?? process.env,
       cwd: options?.cwd,
     });
     let stdout = '';
