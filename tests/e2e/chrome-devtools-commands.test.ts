@@ -155,4 +155,45 @@ describe('chrome-devtools', {concurrency: true}, () => {
       await stopDaemonForCleanup(sessionId);
     }
   });
+
+  it('resolves relative file paths against the CLI cwd', async t => {
+    const sessionId = createCliSession(t);
+    using rootDirectory = createTempDir('cli-file-path-');
+    const daemonDirectory = path.join(rootDirectory.path, 'daemon');
+    const clientDirectory = path.join(rootDirectory.path, 'client');
+    await fs.mkdir(daemonDirectory);
+    await fs.mkdir(clientDirectory);
+    try {
+      const startResult = await startCli(sessionId, [], {
+        cwd: daemonDirectory,
+      });
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+
+      const result = await runCli(
+        ['take_screenshot', '1', '--filePath', 'screenshot.png'],
+        sessionId,
+        {cwd: clientDirectory},
+      );
+      assert.strictEqual(
+        result.status,
+        0,
+        `take_screenshot command failed: ${result.stderr}`,
+      );
+      assert.ok(
+        (await fs.stat(path.join(clientDirectory, 'screenshot.png'))).isFile(),
+      );
+      await assert.rejects(
+        fs.stat(path.join(daemonDirectory, 'screenshot.png')),
+        {code: 'ENOENT'},
+      );
+    } finally {
+      // Stop the daemon before the temporary directory, its working
+      // directory, is removed.
+      await stopDaemonForCleanup(sessionId);
+    }
+  });
 });
