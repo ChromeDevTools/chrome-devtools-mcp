@@ -543,6 +543,7 @@ export default defineConfig([
       'src/config/**/*.ts',
       'src/telemetry/**/*.ts',
       'src/BrowserManager.ts',
+      'src/processors/HeapSnapshotManager.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
