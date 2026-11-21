@@ -57,6 +57,52 @@ describe('ServerConfig', () => {
     });
   });
 
+  describe('cookiesFile', () => {
+    it('accepts the shared startup flag for MCP and CLI', () => {
+      for (const argv of [
+        ['--cookies-file=./cookies.json'],
+        ['--viaCli', '--cookies-file=./cookies.json'],
+      ]) {
+        assert.strictEqual(
+          parseConfig(argv).resolved.cookiesFile,
+          './cookies.json',
+        );
+      }
+    });
+
+    it('rejects blank file paths', () => {
+      assert.throws(
+        () => parseConfig(['--cookies-file=  ']),
+        /cookiesFile must be a non-empty file path/,
+      );
+    });
+
+    it('reads the configuration file option and requires a restart to change it', () => {
+      const initial = ServerConfig.create({
+        cliArgs: {},
+        fileArgs: ConfigParser.parseConfigFile(
+          'config.json',
+          '{"cookiesFile":"first.json"}',
+        ),
+        env: {},
+      });
+      const next = ServerConfig.create({
+        cliArgs: {},
+        fileArgs: {cookiesFile: 'second.json'},
+        env: {},
+      });
+
+      assert.strictEqual(initial.resolved.cookiesFile, 'first.json');
+      assert.deepStrictEqual(initial.getRestartRequiredChanges(next), [
+        'cookiesFile',
+      ]);
+      assert.strictEqual(
+        initial.mergeReloadable(next).resolved.cookiesFile,
+        'first.json',
+      );
+    });
+  });
+
   describe('validateImplications', () => {
     it('accepts when implying key is not set', () => {
       ServerConfig.validateImplications({wsEndpoint: 'ws://localhost:9222'});

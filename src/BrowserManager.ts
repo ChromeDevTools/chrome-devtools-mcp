@@ -15,8 +15,11 @@ import {
   puppeteer,
   type Browser,
   type ChromeReleaseChannel,
+  type CookieData,
   type LaunchOptions,
 } from './third_party/browser.js';
+import {readCookiesFile} from './utils/cookies.js';
+import {getErrorMessage} from './utils/errorHandling.js';
 import {
   logger,
   puppeteerLogger,
@@ -172,31 +175,78 @@ export class BrowserManager {
     // once the lock frees up, defeating the abandonment check entirely.
     const attempt = this.#browserAttempt;
     using guard = await this.#mutex.acquire();
-    if (this.#closingCount > 0) {
-      throw new Error('Browser was closed while initializing.');
-    }
-    if (this.#browserAttempt !== attempt) {
-      // Abandoned while queued for the lock — #browser was never touched by
-      // this call, so bail immediately without #closeBrowser(), which could
-      // otherwise tear down a different, still-current attempt's browser.
-      throw new Error('Connection attempt was abandoned before it completed.');
+    const queuedReason = this.#interruptionReason(attempt);
+    if (queuedReason) {
+      // Closed or abandoned while queued for the lock — #browser was never
+      // touched by this call, so bail immediately without #closeBrowser(),
+      // which could otherwise tear down a different, still-current attempt's
+      // browser.
+      throw new Error(queuedReason);
     }
     if (!this.#browser?.connected) {
-      await this.#initBrowser();
+      const {cookiesFile} = this.#config.resolved;
+      const cookies =
+        cookiesFile === undefined ? [] : await readCookiesFile(cookiesFile);
+      const readReason = this.#interruptionReason(attempt);
+      if (readReason) {
+        throw new Error(readReason);
+      }
+      const browser = await this.#initBrowser();
+      if (cookiesFile !== undefined) {
+        await this.#importCookies(browser, attempt, cookiesFile, cookies);
+      }
     }
-    if (
-      this.#closingCount > 0 ||
-      this.#browserAttempt !== attempt ||
-      !this.#browser
-    ) {
-      const reason =
-        this.#closingCount > 0
-          ? 'Browser was closed while initializing.'
-          : 'Connection attempt was abandoned before it completed.';
+    const reason = this.#interruptionReason(attempt);
+    if (reason || !this.#browser) {
       await this.#closeBrowser();
-      throw new Error(reason);
+      throw new Error(reason ?? 'Browser was closed while initializing.');
     }
     return this.#browser;
+  }
+
+  /**
+   * Why the connect/launch attempt identified by `attempt` must not go on, or
+   * `undefined` if it may continue.
+   */
+  #interruptionReason(attempt: BrowserAttempt): string | undefined {
+    if (this.#closingCount > 0) {
+      return 'Browser was closed while initializing.';
+    }
+    if (this.#browserAttempt !== attempt) {
+      return 'Connection attempt was abandoned before it completed.';
+    }
+    return undefined;
+  }
+
+  /**
+   * Imports the cookies into `browser`, unless the attempt was closed or
+   * abandoned meanwhile, or the browser is no longer the current one. A failed
+   * import closes the browser so that the next call starts over.
+   */
+  async #importCookies(
+    browser: Browser,
+    attempt: BrowserAttempt,
+    cookiesFile: string,
+    cookies: readonly CookieData[],
+  ): Promise<void> {
+    if (
+      this.#interruptionReason(attempt) !== undefined ||
+      this.#browser !== browser ||
+      cookies.length === 0
+    ) {
+      return;
+    }
+    try {
+      await browser.setCookie(...cookies);
+    } catch (error) {
+      await this.#closeBrowser();
+      // Chrome's setCookie errors name the problem, such as "Invalid cookie
+      // fields", but not the cookie values.
+      throw new Error(
+        `Unable to import cookies from "${cookiesFile}": ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
   }
 
   /**

@@ -104,6 +104,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
   - **Type:** string
 
+- **`--cookiesFile`/ `--cookies-file`**
+  Load a Puppeteer CookieData JSON array from a local file into the default browser context each time the server launches or connects to a browser, including after a reconnect or relaunch. The file is read again each time and is not watched. Relative paths use the server working directory. Newly created isolated contexts remain empty.
+  - **Type:** string
+
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string

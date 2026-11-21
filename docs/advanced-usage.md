@@ -40,6 +40,59 @@ runs with the same channel. Only one browser can use it at a time. Set the `isol
 option to `true` to use a temporary user data directory instead which will be cleared
 automatically after the browser is closed.
 
+## Loading cookies from a file
+
+Use `--cookies-file=/path/to/cookies.json` to load an exported session into
+the default browser context, including `HttpOnly` cookies. This option works
+when launching Chrome or connecting to an existing browser, and is also
+available in the CLI. For example:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--headless",
+        "--cookies-file=/path/to/cookies.json"
+      ]
+    }
+  }
+}
+```
+
+The file must contain a JSON array of
+[Puppeteer `CookieData` objects](https://pptr.dev/api/puppeteer.cookiedata):
+
+```json
+[
+  {
+    "name": "session",
+    "value": "your-session-value",
+    "domain": ".example.com",
+    "path": "/",
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Lax"
+  }
+]
+```
+
+The file is read and imported each time the server launches Chrome or
+connects to a browser. That includes the first tool call and any later
+reconnect or relaunch. It is not watched, so a replaced file takes effect at
+the next launch or connection. Relative paths resolve from the server's
+working directory. A missing or invalid file fails browser initialization,
+including on a reconnect, so keep the file in place while the server runs.
+
+The import sets cookies in the default context without clearing other
+cookies. Each import writes the file's values again, so after a reconnect or
+relaunch it can replace newer values that a site set during the session. New
+isolated browser contexts start empty. With a persistent Chrome profile,
+imported cookies can remain after the server stops. Only select a file you
+trust, keep it private, and keep it out of version control.
+
 ## Custom browser executable
 
 By default, `chrome-devtools-mcp` launches Chrome installed in the standard
