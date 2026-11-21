@@ -57,7 +57,7 @@ Example with arguments: \`(el) => el.innerText\`
           .string()
           .optional()
           .describe(
-            "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
+            "The absolute or relative path to a JavaScript file on the MCP server's local filesystem, or an http(s):// URL that the server will fetch. Provide either this or function, but not both.",
           ),
         format: zod
           .enum(['function', 'script'])
@@ -231,9 +231,10 @@ const resolveScriptSource = async (
     throw new Error('Specify exactly one of function or sourcePath.');
   }
 
-  const resourceUrl = sourcePath.startsWith('file:')
-    ? sourcePath
-    : pathToFileURL(sourcePath).href;
+  // Pass through URLs (http:, https:, file:) unchanged so loadResource can fetch them.
+  // Only plain filesystem paths go through pathToFileURL.
+  const isUrl = sourcePath.startsWith('http:') || sourcePath.startsWith('https:') || sourcePath.startsWith('file:');
+  const resourceUrl = isUrl ? sourcePath : pathToFileURL(sourcePath).href;
   try {
     return await context.loadResource(resourceUrl);
   } catch (error) {

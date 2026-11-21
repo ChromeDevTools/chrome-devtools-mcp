@@ -304,6 +304,28 @@ describe('script', () => {
         pathToFileURL(sourcePath).href,
       );
     });
+    it('passes through http(s) URLs unchanged to loadResource', async () => {
+      const {response, context, args} = createHandlerMocks();
+      const httpUrl = 'https://example.com/script.js';
+      context.loadResource.resolves('() => document.title;');
+      await evaluateScript(args).handler(
+        {params: {sourcePath: httpUrl}},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(context.loadResource, httpUrl);
+    });
+    it('passes through file: URLs unchanged to loadResource', async () => {
+      const {response, context, args} = createHandlerMocks();
+      const fileUrl = 'file:///tmp/script.js';
+      context.loadResource.resolves('() => document.title;');
+      await evaluateScript(args).handler(
+        {params: {sourcePath: fileUrl}},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(context.loadResource, fileUrl);
+    });
     it('throws without evaluating if a dialog is already open', async () => {
       const {page, response, context, args} = createHandlerMocks();
       page.throwIfDialogOpen.throws(

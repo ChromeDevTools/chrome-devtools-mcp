@@ -400,7 +400,7 @@
 
 - **pageId** (number) _(optional)_: Targets a specific page by ID. Required when not evaluating in a service worker.
 - **serviceWorkerId** (string) _(optional)_: The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.
-- **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
+- **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem, or an http(s):// URL that the server will fetch. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
 ---
