@@ -6,6 +6,7 @@
 
 import {DEFAULT_MAX_NAVIGATION_SAVED} from '../collectors/constants.js';
 import type {YargsOptions} from '../third_party/index.js';
+import {parseDurationMs} from '../utils/duration.js';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -54,6 +55,7 @@ export interface McpArguments
   clearcutIncludePidHeader: boolean;
   slim: boolean;
   viaCli: boolean;
+  idleTimeout?: string;
   redactNetworkHeaders: boolean;
   allowUnrestrictedPaths: boolean;
   filesystemRoot?: string[];
@@ -276,6 +278,20 @@ export const mcpOptions: McpOptions = {
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
   },
+  idleTimeout: {
+    type: 'string',
+    // Only the CLI daemon uses it, see `mcpOptionsForViaCli`.
+    hidden: true,
+    describe:
+      'How long the CLI daemon waits without a tool call before it exits, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). On exit, it closes the browser it launched, so all its pages are gone; with `--browserUrl`, `--wsEndpoint` or `--autoConnect`, it only disconnects and the browser stays open. The next command starts a new daemon with only the default flags and the config file, so re-run `chrome-devtools start` with your flags if you need them. `status` does not count as activity. Disabled by default. Only used by the `chrome-devtools` CLI daemon; the MCP server ignores it.',
+    coerce: (value: string | undefined): string | undefined => {
+      if (value === undefined) {
+        return;
+      }
+      parseDurationMs('idleTimeout', value);
+      return value;
+    },
+  },
   redactNetworkHeaders: {
     type: 'boolean',
     describe:
@@ -340,6 +356,10 @@ export const mcpOptionsForViaCli: McpOptions = {
   experimentalStructuredContent: {
     ...mcpOptions.experimentalStructuredContent,
     default: true,
+  },
+  idleTimeout: {
+    ...mcpOptions.idleTimeout,
+    hidden: false,
   },
   isolated: {
     ...mcpOptions.isolated,

@@ -23,10 +23,12 @@ import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {PipeTransport} from '../third_party/index.js';
 import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {parseDurationMs} from '../utils/duration.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
+import {IdleTimer} from './IdleTimer.js';
 import {
   DAEMON_CLIENT_NAME,
   getPidFilePath,
@@ -135,7 +137,7 @@ const socketPath = getSocketPath(sessionId);
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
 
-let mcpServer: McpServer | null = null;
+let running: {mcpServer: McpServer; idleTimer: IdleTimer} | null = null;
 let server: Server | null = null;
 
 async function setupMCPServer(): Promise<void> {
@@ -147,16 +149,31 @@ async function setupMCPServer(): Promise<void> {
   const browserManager = new BrowserManager(serverConfig, {
     logFile,
   });
-  mcpServer = await McpServer.from(serverConfig, {
+  const mcpServer = await McpServer.from(serverConfig, {
     browserManager,
     logFile,
   });
+  const idleTimeout = args.idleTimeout;
+  const idleTimer = new IdleTimer({
+    timeoutMs:
+      idleTimeout === undefined
+        ? undefined
+        : parseDurationMs('idleTimeout', idleTimeout),
+    onIdle: () => {
+      logger?.(`No tool call for ${idleTimeout}, exiting.`);
+      void cleanup();
+    },
+  });
+  // Set before the remaining setup so that `cleanup()` closes the server if
+  // that setup fails.
+  running = {mcpServer, idleTimer};
   if (args.watchConfig) {
     mcpServer.watchConfig();
   }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();
   void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));
+  idleTimer.schedule();
 }
 
 async function handleRequest(msg: DaemonMessage): Promise<{
@@ -168,12 +185,15 @@ async function handleRequest(msg: DaemonMessage): Promise<{
   try {
     if (msg.method === 'invoke_tool') {
       await started;
-      if (!mcpServer) {
+      const active = running;
+      if (!active) {
         throw new Error('MCP server not initialized');
       }
       const {tool, args} = msg;
 
-      const result = await mcpServer.callTool(tool, args);
+      const result = await active.idleTimer.track(() =>
+        active.mcpServer.callTool(tool, args),
+      );
 
       return {
         success: true,
@@ -277,10 +297,11 @@ async function cleanup(exitCode = 0): Promise<void> {
     return;
   }
   isCleaningUp = true;
+  running?.idleTimer.dispose();
   console.log('Cleaning up daemon...');
 
   try {
-    await mcpServer?.close();
+    await running?.mcpServer.close();
   } catch (error) {
     logger?.('Error closing MCP server:', error);
   }
