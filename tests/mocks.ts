@@ -48,6 +48,7 @@ import type {Result, RunnerResult} from '../src/third_party/index.js';
 import {
   Accessibility,
   CdpBrowser,
+  CdpBrowserContext,
   CdpExtension,
   CdpFrame,
   CdpHTTPRequest,
@@ -213,6 +214,16 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   stubEventEmitter(browser);
 
   return browser;
+}
+
+export type MockBrowserContext = sinon.SinonStubbedInstance<BrowserContext>;
+
+export function createMockBrowserContext(): MockBrowserContext {
+  const context = sinon.createStubInstance(
+    CdpBrowserContext,
+  ) as unknown as MockBrowserContext;
+  context.close.resolves();
+  return context;
 }
 
 export class MockCDPSession extends CDPSession {

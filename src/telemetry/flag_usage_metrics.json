@@ -506,5 +506,9 @@
   {
     "name": "background_new_pages",
     "flagType": "boolean"
+  },
+  {
+    "name": "downloads_dir_present",
+    "flagType": "boolean"
   }
 ]
