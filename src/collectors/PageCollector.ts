@@ -80,6 +80,9 @@ export class PageCollector<T> {
    */
   protected storage: Array<Array<WithSymbolId<T>>> = [[]];
 
+  /** Receives the items that `maxResourcesPerNavigation` removes. */
+  protected onEvicted(_items: Array<WithSymbolId<T>>): void {}
+
   constructor(
     page: Page,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
@@ -102,10 +105,11 @@ export class PageCollector<T> {
         maxResourcesPerNavigation !== undefined &&
         this.storage[0].length > maxResourcesPerNavigation
       ) {
-        this.storage[0].splice(
+        const evicted = this.storage[0].splice(
           0,
           this.storage[0].length - maxResourcesPerNavigation,
         );
+        this.onEvicted(evicted);
       }
     });
 
@@ -245,6 +249,25 @@ export class ConsoleCollector extends PageCollector<
   override dispose(): void {
     super.dispose();
     this.#subscriber?.unsubscribe();
+  }
+
+  protected override onEvicted(
+    items: Array<
+      WithSymbolId<
+        ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
+      >
+    >,
+  ): void {
+    for (const item of items) {
+      if (!('args' in item)) {
+        continue;
+      }
+      for (const arg of item.args()) {
+        void arg.dispose().catch(error => {
+          logger?.('Failed to dispose a console message argument', error);
+        });
+      }
+    }
   }
 }
 
