@@ -637,15 +637,23 @@ export const commands: Commands = {
         name: 'msgid',
         type: 'number',
         description:
-          'The msgid of a console message on the page from the listed console messages',
+          'The msgid of a console message from list_console_messages: for the page, or for the service worker when serviceWorkerId is set.',
         required: true,
         positional: true,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.',
+        required: false,
+        positional: false,
       },
     },
   },
   get_css_styles: {
     description:
-      'Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.\nRules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded].\nTreat the output as authoritative and complete.\nResults are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.',
+      'Retrieve computed styles, matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.\nComputed styles for the target element itself (not its pseudo-elements) appears as the first entry, showing display, width, height, and properties from matched or inherited rules; pass computedProperties to include additional CSS properties in Computed styles.\nMatched CSS rules follow from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved token values as inline comments (e.g. color: var(--brand); /* #ff0000 */). Computed styles shows final browser-computed longhand values.\nTreat the matched cascade and computed values as authoritative.\nResults are paginated (10 entries per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -680,6 +688,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
         default: 0,
+      },
+      computedProperties: {
+        name: 'computedProperties',
+        type: 'array',
+        description:
+          'Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.',
+        required: false,
+        positional: false,
       },
     },
   },
@@ -1804,7 +1820,8 @@ export const commands: Commands = {
       className: {
         name: 'className',
         type: 'string',
-        description: 'Optional regex or text matching object class name.',
+        description:
+          'Optional case-insensitive regex matching object class name. Escape special characters to match them literally.',
         required: false,
         positional: false,
       },
@@ -1812,7 +1829,7 @@ export const commands: Commands = {
         name: 'propertyName',
         type: 'string',
         description:
-          'Optional property name filter for outgoing reference edges.',
+          'Optional case-insensitive regex matching property names of outgoing reference edges. Escape special characters to match them literally.',
         required: false,
         positional: false,
       },
@@ -2116,6 +2133,14 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+        required: false,
+        positional: false,
+      },
+      omitBackground: {
+        name: 'omitBackground',
+        type: 'boolean',
+        description:
+          'Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.',
         required: false,
         positional: false,
       },

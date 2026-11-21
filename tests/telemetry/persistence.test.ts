@@ -30,7 +30,7 @@ describe('FilePersistence', () => {
     const logger = ClearcutLogger.initialize({
       appVersion: '1.0.0',
       persistence: mockPersistence,
-      watchdogClient: mockWatchdog,
+      createWatchdogClient: () => mockWatchdog,
     });
     logServerErrorStub = sinon.stub(logger, 'logServerError');
   });

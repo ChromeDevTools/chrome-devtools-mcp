@@ -16,7 +16,7 @@ describe('DevToolsCommentBridge', () => {
   let clock: sinon.SinonFakeTimers;
 
   beforeEach(() => {
-    clock = sinon.useFakeTimers();
+    clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
   });
 
   it('attaches to DevTools page and registers function and evaluation', async () => {

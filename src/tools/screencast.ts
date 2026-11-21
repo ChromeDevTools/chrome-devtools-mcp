@@ -9,13 +9,13 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {
-  zod,
-  type Page,
-  type ScreenRecorder,
-  type ScreenRecording,
-  type VideoFormat,
-} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {
+  Page,
+  ScreenRecorder,
+  ScreenRecording,
+  VideoFormat,
+} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';

@@ -10,8 +10,8 @@ import type {
   Protocol,
   CdpPage,
   Dialog,
-  PredefinedNetworkConditions,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
+import type {PredefinedNetworkConditions} from '../third_party/index.js';
 import {logger} from './logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;

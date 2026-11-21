@@ -23,6 +23,7 @@ import type {
 import {McpPage} from './McpPage.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
+import type {Root} from './third_party/index.js';
 import {
   Locator,
   Mutex,
@@ -39,9 +40,8 @@ import {
   type Target,
   type UninstallPWAOptions,
   type Extension,
-  type Root,
   type DevTools,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';
@@ -57,7 +57,11 @@ import {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
-import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {
+  fileUrlToPathWithPosixFallback,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from './utils/files.js';
 import {escapeForLog, redactUrlForLogging} from './utils/logger.js';
 import {
   fetchWithValidatedRedirects,
@@ -530,7 +534,9 @@ export class McpContext implements Context, BrowserlessContext {
     const resolvedRoots = await Promise.allSettled(
       roots.map(async root => {
         const rootPathUri = root.uri;
-        const rootPath = path.resolve(fileURLToPath(rootPathUri));
+        const rootPath = path.resolve(
+          fileUrlToPathWithPosixFallback(rootPathUri),
+        );
         return await fs.realpath(rootPath);
       }),
     );
@@ -841,15 +847,32 @@ export class McpContext implements Context, BrowserlessContext {
     return Array.from(this.#workers.values());
   }
 
+  #getServiceWorkerExtensionId(serviceWorkerId: string): string {
+    const worker = this.getWorkerById(serviceWorkerId);
+    if (worker?.type !== 'service_worker') {
+      throw new Error(
+        `Service worker ${serviceWorkerId} not found. Call list_pages to get the current sw-N IDs.`,
+      );
+    }
+    return new URL(worker.url).hostname;
+  }
+
   getServiceWorkerConsoleData(
     serviceWorkerId: string,
   ): Array<ConsoleMessage | UncaughtError> {
-    const worker = this.getWorkerById(serviceWorkerId);
-    if (worker?.type !== 'service_worker') {
-      throw new Error('Service worker not found.');
-    }
-    const extensionId = new URL(worker.url).hostname;
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
     return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
+  }
+
+  getServiceWorkerConsoleMessageById(
+    serviceWorkerId: string,
+    msgid: number,
+  ): ConsoleMessage | UncaughtError {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    if (!this.#serviceWorkerConsoleCollector) {
+      throw new Error('Service worker console data is not available.');
+    }
+    return this.#serviceWorkerConsoleCollector.getById(extensionId, msgid);
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {

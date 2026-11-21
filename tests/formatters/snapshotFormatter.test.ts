@@ -7,10 +7,9 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ElementHandle} from 'puppeteer-core';
-
 import {SnapshotFormatter} from '../../src/formatters/SnapshotFormatter.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import type {ElementHandle} from '../../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {

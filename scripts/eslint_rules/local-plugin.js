@@ -10,6 +10,7 @@ import enforceZodSchemaRule from './enforce-zod-schema-rule.js';
 import requireParsedArgumentsRule from './require-parsed-arguments-rule.js';
 import noDirectThirdPartyImportsRule from './no-direct-third-party-imports-rule.js';
 import noSinonRestoreInHooksRule from './no-sinon-restore-in-hooks-rule.js';
+import requireExplicitFakeTimersRule from './require-explicit-fake-timers-rule.js';
 
 export default {
   rules: {
@@ -19,5 +20,6 @@ export default {
     'enforce-zod-schema': enforceZodSchemaRule,
     'require-parsed-arguments': requireParsedArgumentsRule,
     'no-sinon-restore-in-hooks': noSinonRestoreInHooksRule,
+    'require-explicit-fake-timers': requireExplicitFakeTimersRule,
   },
 };

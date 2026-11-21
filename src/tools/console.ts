@@ -5,7 +5,8 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod, type ConsoleMessageType} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {ConsoleMessageType} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
@@ -87,12 +88,16 @@ export const listConsoleMessages: PageToolFactory = definePageTool(
           .describe(
             'Set to true to include the stack trace for each message when available. Increases the response size.',
           ),
-        serviceWorkerId: zod
-          .string()
-          .optional()
-          .describe(
-            'Filter messages by the service worker ID shown by list_pages (sw-N).',
-          ),
+        ...(cliArgs.categoryExtensions
+          ? {
+              serviceWorkerId: zod
+                .string()
+                .optional()
+                .describe(
+                  'Filter messages by the service worker ID shown by list_pages (sw-N).',
+                ),
+            }
+          : {}),
       },
       blockedByDialog: false,
       concurrency: 'page',
@@ -111,24 +116,40 @@ export const listConsoleMessages: PageToolFactory = definePageTool(
   },
 );
 
-export const getConsoleMessage: PageToolFactory = definePageTool(() => ({
-  name: GET_CONSOLE_MESSAGE_TOOL_NAME,
-  description: `Gets a console message by its ID. You can get all messages by calling ${LIST_CONSOLE_MESSAGES_TOOL_NAME}.`,
-  annotations: {
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
-  },
-  schema: {
-    msgid: zod
-      .number()
-      .describe(
-        'The msgid of a console message on the page from the listed console messages',
-      ),
-  },
-  blockedByDialog: false,
-  concurrency: 'page',
-  verifyFilesSchema: {},
-  handler: async (request, response) => {
-    response.attachConsoleMessage(request.params.msgid);
-  },
-}));
+export const getConsoleMessage: PageToolFactory = definePageTool(
+  (cliArgs: ParsedArguments) => ({
+    name: GET_CONSOLE_MESSAGE_TOOL_NAME,
+    description: `Gets a console message by its ID. You can get all messages by calling ${LIST_CONSOLE_MESSAGES_TOOL_NAME}.`,
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: true,
+    },
+    schema: {
+      msgid: zod
+        .number()
+        .describe(
+          cliArgs.categoryExtensions
+            ? 'The msgid of a console message from list_console_messages: for the page, or for the service worker when serviceWorkerId is set.'
+            : 'The msgid of a console message on the page from the listed console messages',
+        ),
+      ...(cliArgs.categoryExtensions
+        ? {
+            serviceWorkerId: zod
+              .string()
+              .optional()
+              .describe(
+                'Get the message from the service worker with this ID shown by list_pages (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.',
+              ),
+          }
+        : {}),
+    },
+    blockedByDialog: false,
+    concurrency: 'page',
+    verifyFilesSchema: {},
+    handler: async (request, response) => {
+      response.attachConsoleMessage(request.params.msgid, {
+        serviceWorkerId: request.params.serviceWorkerId,
+      });
+    },
+  }),
+);

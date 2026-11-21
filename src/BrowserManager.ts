@@ -16,7 +16,7 @@ import {
   type Browser,
   type ChromeReleaseChannel,
   type LaunchOptions,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import {
   logger,
   puppeteerLogger,

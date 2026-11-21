@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {parseTraceEventsFromBuffer} from '../../src/processors/ChunkedTraceParser.js';
-import type {DevTools} from '../../src/third_party/index.js';
+import type {DevTools} from '../../src/third_party/browser.js';
 
 import {loadTraceAsBuffer} from './fixtures/load.js';
 

@@ -12,10 +12,12 @@ import {after, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
+import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
+import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/index.js';
+import {DevTools, type Extension} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {
@@ -37,6 +39,7 @@ import {
   createHandlerMocks,
   createMockConsoleMessage,
   createMockHeapSnapshotAggregate,
+  createMockCDPSession,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
@@ -676,6 +679,248 @@ describe('McpResponse', () => {
     });
   });
 
+  describe('console errors of a handed over page', () => {
+    const heading = '## Console errors during this call';
+
+    function createHandedOverPage(
+      messages: Array<ReturnType<typeof createMockConsoleMessage>>,
+      universe?: TargetUniverse,
+    ) {
+      const page = createMockMcpPage();
+      page.getConsoleDataAfter.returns(messages);
+      sinon.stub(page, 'devtoolsUniverse').get(() => universe);
+      return {
+        page,
+        context: createMockMcpContext({selectedPage: page}),
+        response: new McpResponse(createMockServerConfig()),
+      };
+    }
+
+    function createErrors(...texts: string[]) {
+      return texts.map(text => createMockConsoleMessage({type: 'error', text}));
+    }
+
+    it('lists the errors after the message id read at the hand-over', async () => {
+      const {page, context, response} = createHandedOverPage([
+        createMockConsoleMessage({type: 'warn', text: 'warned after'}),
+        ...createErrors('logged after'),
+      ]);
+      page.getLatestConsoleMessageId.returns(7);
+      response.includeConsoleErrorsFrom(page);
+      page.getLatestConsoleMessageId.returns(9);
+
+      const {content} = await response.handle(context);
+
+      sinon.assert.calledOnceWithExactly(page.getConsoleDataAfter, 7);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes(heading));
+      assert.ok(text.includes('logged after'));
+      assert.ok(!text.includes('warned after'));
+    });
+
+    it('lists the first errors and points to the rest', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors(
+          ...Array.from(
+            {length: 12},
+            (_, i) => `error ${String(i).padStart(2, '0')}`,
+          ),
+        ),
+      );
+      response.includeConsoleErrorsFrom(page);
+
+      const {content} = await response.handle(context);
+
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('error 09'));
+      assert.ok(!text.includes('error 10'));
+      assert.ok(text.includes('2 more not shown.'));
+    });
+
+    it('lists ten errors without a pointer to the rest', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors(...Array.from({length: 10}, (_, i) => `error ${i}`)),
+      );
+      response.includeConsoleErrorsFrom(page);
+
+      const {content} = await response.handle(context);
+
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('error 9'));
+      assert.ok(!text.includes('more not shown'));
+    });
+
+    it('counts a repeated error once toward the cap', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors(...Array.from({length: 12}, () => 'thrown in a loop')),
+      );
+      response.includeConsoleErrorsFrom(page);
+
+      const {content, structuredContent} = await response.handle(context);
+
+      assert.ok('consoleErrors' in structuredContent);
+      assert.ok(Array.isArray(structuredContent.consoleErrors));
+      assert.strictEqual(structuredContent.consoleErrors.length, 1);
+      assert.ok(!getTextContent(content[0]).includes('more not shown'));
+    });
+
+    it('leaves the section out when there are none', async () => {
+      const {page, context, response} = createHandedOverPage([]);
+      response.includeConsoleErrorsFrom(page);
+
+      const {content} = await response.handle(context);
+
+      assert.ok(!getTextContent(content[0]).includes(heading));
+    });
+
+    it('lists the errors next to the error of a tool that threw', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors('thrown in a timer'),
+      );
+      response.includeConsoleErrorsFrom(page);
+      response.setError(new Error('thrown by the function'));
+
+      const {content} = await response.handle(context);
+
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('thrown by the function'));
+      assert.ok(text.includes(heading));
+      assert.ok(text.includes('thrown in a timer'));
+    });
+
+    it('formats the errors with the DevTools universe of the handed over page', async () => {
+      const universe: TargetUniverse = {
+        universe: sinon.createStubInstance(
+          DevTools.Foundation.Universe.Universe,
+        ),
+        target: sinon.createStubInstance(DevTools.Target),
+        session: createMockCDPSession(),
+      };
+      const [message] = createErrors('logged after');
+      const {page, context, response} = createHandedOverPage(
+        [message],
+        universe,
+      );
+      const formatter = await ConsoleFormatter.from(message, {
+        id: -1,
+        fetchDetailedData: false,
+      });
+      const from = sinon.stub(ConsoleFormatter, 'from').resolves(formatter);
+      response.includeConsoleErrorsFrom(page);
+
+      await response.handle(context);
+
+      sinon.assert.calledOnceWithExactly(from, message, {
+        id: -1,
+        fetchDetailedData: false,
+        fetchStackTrace: undefined,
+        devTools: universe,
+      });
+    });
+
+    it('keeps the listing of a tool that lists console messages', async () => {
+      const messages = createErrors('logged after');
+      const {page, context, response} = createHandedOverPage(messages);
+      page.getConsoleData.returns(messages);
+      response.setPage(page);
+      response.setIncludeConsoleData(true);
+      response.includeConsoleErrorsFrom(page);
+
+      const {content} = await response.handle(context);
+
+      sinon.assert.notCalled(page.getConsoleDataAfter);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('## Console messages'));
+      assert.ok(!text.includes(heading));
+    });
+
+    it('leaves the errors out next to a single attached message', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors('logged after'),
+      );
+      const [attached] = createErrors('logged before');
+      page.getConsoleMessageById.returns(attached);
+      response.setPage(page);
+      response.attachConsoleMessage(1);
+      response.includeConsoleErrorsFrom(page);
+
+      const {content} = await response.handle(context);
+
+      sinon.assert.notCalled(page.getConsoleDataAfter);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('logged before'));
+      assert.ok(!text.includes(heading));
+    });
+
+    it('keeps the pagination of the list the tool asked for', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors('logged after'),
+      );
+      page.getNetworkRequests.returns([
+        getMockRequest({stableId: 1}),
+        getMockRequest({stableId: 2}),
+      ]);
+      response.setPage(page);
+      response.setIncludeNetworkRequests(true, {pageSize: 1});
+      response.includeConsoleErrorsFrom(page);
+
+      const {content, structuredContent} = await response.handle(context);
+
+      assert.ok(getTextContent(content[0]).includes('logged after'));
+      assert.ok('consoleErrors' in structuredContent);
+      assert.ok(Array.isArray(structuredContent.consoleErrors));
+      assert.strictEqual(structuredContent.consoleErrors.length, 1);
+      assert.ok('pagination' in structuredContent);
+      assert.deepStrictEqual(structuredContent.pagination, {
+        currentPage: 0,
+        totalPages: 2,
+        hasNextPage: true,
+        hasPreviousPage: false,
+        startIndex: 0,
+        endIndex: 1,
+        invalidPage: false,
+      });
+    });
+
+    it('leaves out the errors of a page closed meanwhile', async () => {
+      const {page, context, response} = createHandedOverPage(
+        createErrors('logged before closing'),
+      );
+      response.includeConsoleErrorsFrom(page);
+      page.isClosed.callsFake(() => true);
+
+      const {content} = await response.handle(context);
+
+      sinon.assert.notCalled(page.getConsoleDataAfter);
+      assert.ok(!getTextContent(content[0]).includes(heading));
+    });
+  });
+
+  it('reads an attached message from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const message = createMockConsoleMessage({
+      type: 'log',
+      text: 'logged by the service worker',
+    });
+    context.getServiceWorkerConsoleMessageById.returns(message);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachConsoleMessage(2, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleMessageById,
+      'sw-1',
+      2,
+    );
+    sinon.assert.notCalled(page.getConsoleMessageById);
+    assert.ok(
+      getTextContent(content[0]).includes('logged by the service worker'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
@@ -1056,7 +1301,7 @@ describe('extensions', () => {
       const emptyText = getTextContent(emptyResult.content[0]);
       assert.ok(
         emptyText.includes('No unpacked extensions found.'),
-        'Should show message for ampty extensions',
+        'Should show message for empty extensions',
       );
 
       response.resetResponseLineForTesting();
@@ -1520,15 +1765,75 @@ describe('webmcp', () => {
           ),
         ),
       });
-      response.setIncludeCssStyles(mockStyles, {
-        uid: '1_1',
-        pageSize: 2,
-        pageIdx: 0,
-      });
+      response.setIncludeCssStyles(
+        {matchedStyles: mockStyles},
+        {
+          uid: '1_1',
+          pageSize: 2,
+          pageIdx: 0,
+        },
+      );
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-2 of 5'));
     });
+  });
+
+  it('includes computed styles only on the first page of css styles', async () => {
+    const context = createMockMcpContext();
+    const mockStyles = createMockCSSMatchedStyles({
+      node: 'button#btn',
+      nodeStyles: Array.from({length: 4}, (_, idx) =>
+        createMockCSSStyleDeclaration(
+          [createMockCSSProperty('color', `color-${idx}`)],
+          {rule: createMockCSSStyleRule(`.rule-${idx}`)},
+        ),
+      ),
+    });
+    const computedStyles = new Map([
+      ['color', 'rgb(0, 0, 0)'],
+      ['display', 'inline-block'],
+      ['height', '32px'],
+      ['width', '80px'],
+    ]);
+    const styles = {matchedStyles: mockStyles, computedStyles};
+
+    const pageZeroResponse = new McpResponse(createMockServerConfig());
+    pageZeroResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 0,
+    });
+    const pageZeroResult = await pageZeroResponse.handle(context);
+    const pageZeroText = getTextContent(pageZeroResult.content[0]);
+    assert.ok(pageZeroText.includes('Showing 1-2 of 5 (Page 1 of 3).'));
+    assert.ok(pageZeroText.includes('Computed styles:'));
+    assert.ok(pageZeroText.includes('.rule-0'));
+    assert.ok(!pageZeroText.includes('.rule-1'));
+
+    const pageOneResponse = new McpResponse(createMockServerConfig());
+    pageOneResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 1,
+    });
+    const pageOneResult = await pageOneResponse.handle(context);
+    const pageOneText = getTextContent(pageOneResult.content[0]);
+    assert.ok(pageOneText.includes('Showing 3-4 of 5 (Page 2 of 3).'));
+    assert.ok(!pageOneText.includes('Computed styles:'));
+    assert.ok(pageOneText.includes('.rule-1'));
+    assert.ok(pageOneText.includes('.rule-2'));
+
+    const fallbackResponse = new McpResponse(createMockServerConfig());
+    fallbackResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 99,
+    });
+    const fallbackResult = await fallbackResponse.handle(context);
+    assert.ok(
+      getTextContent(fallbackResult.content[0]).includes('Computed styles:'),
+    );
   });
 });
 

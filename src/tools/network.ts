@@ -9,7 +9,8 @@ import fs from 'node:fs/promises';
 import type {ParsedArguments} from '../config/mcp-options.js';
 import type {NetworkMockInput} from '../NetworkOverrideManager.js';
 import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
-import {zod, type ResourceType} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {ResourceType} from '../third_party/browser.js';
 import {validateUrlPatterns} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
