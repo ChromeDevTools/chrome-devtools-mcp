@@ -40,8 +40,10 @@ export const puppeteerOptions: PuppeteerOptions = {
       if (arg === undefined) {
         return;
       }
-      const [width, height] = arg.split('x').map(Number);
+      const parts = arg.split('x');
+      const [width, height] = parts.map(Number);
       if (
+        parts.length !== 2 ||
         !Number.isInteger(width) ||
         !Number.isInteger(height) ||
         width <= 0 ||
