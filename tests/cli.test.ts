@@ -204,6 +204,15 @@ describe('cli args parsing', () => {
     }
   });
 
+  it('rejects viewports with more than two parts', async () => {
+    for (const value of ['1280x720x2', '1280x720xfoo', '1280x720x']) {
+      assert.throws(
+        () => parseConfig(['--viewport', value]),
+        /Invalid viewport\. Expected format is `1280x720` with positive integer width and height\./,
+      );
+    }
+  });
+
   it('parses chrome args', async () => {
     const args = parseConfig([
       `--chrome-arg='--no-sandbox'`,
