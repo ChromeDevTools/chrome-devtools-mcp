@@ -30,7 +30,6 @@ import {
   type Root,
   type Transport,
 } from './third_party/index.js';
-import {puppeteer} from './third_party/browser.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -39,8 +38,6 @@ import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import {TaskRunner} from './utils/TaskRunner.js';
 import {VERSION} from './version.js';
-
-puppeteer.setFollowSymlinks(false);
 
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
