@@ -25,8 +25,12 @@ This repository contains an MCP server and CLI for Chrome DevTools.
 - Classes checked with `instanceof` (for example `TimeoutError`) come only from
   `browser.js`; never re-export them from `index.ts`. Small pure modules may be
   re-exported from `index.ts` by their direct file path.
-- `tests/browser-imports.test.ts` lists the modules that must not reach
-  `browser.js`. Add new tool, config and telemetry modules to it.
+- ESLint (`@typescript-eslint/no-restricted-imports` in `eslint.config.js`)
+  rejects value imports from `browser.js` in `src/tools/`, `src/config/` and
+  `src/telemetry/`. It only sees direct imports, so
+  `tests/browser-imports.test.ts` also checks that the listed modules do not
+  reach `browser.js` through other modules. Add new tool, config and telemetry
+  modules to it.
 
 ## Rules for TypeScript
 
