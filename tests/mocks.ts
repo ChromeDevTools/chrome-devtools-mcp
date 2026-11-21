@@ -505,7 +505,11 @@ class MockWebWorker extends WebWorker {
 }
 
 export function createMockWebWorker(): sinon.SinonStubbedInstance<MockWebWorker> {
-  return sinon.createStubInstance(MockWebWorker);
+  const worker = sinon.createStubInstance(MockWebWorker);
+  const client = createMockCDPSession();
+  sinon.stub(worker, 'client').get(() => client);
+  stubEventEmitter(worker);
+  return worker;
 }
 
 export function createMockMcpWorker(

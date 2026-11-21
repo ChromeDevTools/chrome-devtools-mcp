@@ -9,9 +9,8 @@ import type {
   ConsoleMessage,
   WebWorker,
   Target,
-  CDPSession,
-  Protocol,
   Browser,
+  RemoteException,
 } from '../third_party/browser.js';
 import type {McpWorker} from '../McpWorker.js';
 import {
@@ -19,13 +18,13 @@ import {
   stableIdSymbol,
   type WithSymbolId,
 } from '../utils/id.js';
+import {logger} from '../utils/logger.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 
 export class ServiceWorkerSubscriber {
   #target: Target;
   #callback: (item: ConsoleMessage | UncaughtError) => void;
-  #session?: CDPSession;
   #worker?: WebWorker;
 
   constructor(
@@ -37,36 +36,36 @@ export class ServiceWorkerSubscriber {
   }
 
   async subscribe(): Promise<void> {
-    this.#session = await this.#target.createCDPSession();
-    await this.#session.send('Runtime.enable');
-    this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
-
     this.#worker = (await this.#target.worker()) ?? undefined;
     if (this.#worker) {
       this.#worker.on('console', this.#onConsole);
+      this.#worker.on('exception', this.#onException);
     }
   }
 
-  async unsubscribe(): Promise<void> {
+  unsubscribe(): void {
     if (this.#worker) {
       this.#worker.off('console', this.#onConsole);
+      this.#worker.off('exception', this.#onException);
     }
-    await this.#session?.detach();
   }
 
   #onConsole = (message: ConsoleMessage): void => {
     this.#callback(message);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
-    const url = this.#target.url();
-
-    const extensionId = extractExtensionId(url);
-
-    if (extensionId) {
-      this.#callback(
-        new UncaughtError(event.exceptionDetails, extensionId, this.#session),
-      );
+  #onException = (exception: RemoteException): void => {
+    const extensionId = extractExtensionId(this.#target.url());
+    if (!extensionId || !this.#worker) {
+      return;
+    }
+    const error = UncaughtError.fromException(
+      exception,
+      extensionId,
+      this.#worker.client,
+    );
+    if (error) {
+      this.#callback(error);
     }
   };
 }
@@ -105,11 +104,7 @@ export class ServiceWorkerConsoleCollector {
     this.#browser.off('targetcreated', this.#onTargetCreated);
     this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
     for (const subscriber of this.#serviceWorkerSubscribers.values()) {
-      subscriber.unsubscribe().catch(err => {
-        if (!isIgnoredTargetError(err)) {
-          // Swallow error as we are tearing down the system
-        }
-      });
+      subscriber.unsubscribe();
     }
     this.#serviceWorkerSubscribers.clear();
   }
@@ -133,30 +128,27 @@ export class ServiceWorkerConsoleCollector {
       try {
         await subscriber.subscribe();
         if (this.#serviceWorkerSubscribers.get(target) !== subscriber) {
-          await subscriber.unsubscribe();
+          subscriber.unsubscribe();
         }
       } catch (err) {
         if (this.#serviceWorkerSubscribers.get(target) === subscriber) {
           this.#serviceWorkerSubscribers.delete(target);
         }
         if (!isIgnoredTargetError(err)) {
-          throw err;
+          logger?.(
+            `Failed to subscribe to service worker of extension ${extensionId} (${origin})`,
+            err,
+          );
         }
       }
     }
   };
 
-  #onTargetDestroyed = async (target: Target): Promise<void> => {
+  #onTargetDestroyed = (target: Target): void => {
     const subscriber = this.#serviceWorkerSubscribers.get(target);
     if (subscriber) {
       this.#serviceWorkerSubscribers.delete(target);
-      try {
-        await subscriber.unsubscribe();
-      } catch (err) {
-        if (!isIgnoredTargetError(err)) {
-          throw err;
-        }
-      }
+      subscriber.unsubscribe();
     }
   };
 

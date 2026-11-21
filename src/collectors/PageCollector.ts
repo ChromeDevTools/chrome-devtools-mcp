@@ -42,6 +42,26 @@ export class UncaughtError {
     this.targetId = targetId;
     this.session = session;
   }
+
+  /**
+   * Builds an `UncaughtError` from a Puppeteer `exception` event, or returns
+   * `undefined` when the raw exception details are not available.
+   */
+  static fromException(
+    exception: RemoteException,
+    targetId: string,
+    session: CDPSession,
+  ): UncaughtError | undefined {
+    const details: Protocol.Runtime.ExceptionDetails | undefined =
+      // @ts-expect-error use internal Puppeteer API to get raw exception details.
+      exception._rawExceptionDetails();
+    if (!details) {
+      return undefined;
+    }
+    // Keep the exception object alive so its stack and cause resolve later.
+    exception.handle()?.move();
+    return new UncaughtError(details, targetId, session);
+  }
 }
 
 interface PageEvents extends PuppeteerPageEvents {
@@ -316,18 +336,14 @@ class PageEventSubscriber {
   };
 
   #onException = (exception: RemoteException): void => {
-    const details: Protocol.Runtime.ExceptionDetails | undefined =
-      // @ts-expect-error use internal Puppeteer API to get raw exception details.
-      exception._rawExceptionDetails();
-    if (!details) {
-      return;
-    }
-    // Keep the exception object alive so its stack and cause resolve later.
-    exception.handle()?.move();
-    this.#page.emit(
-      'uncaughtError',
-      new UncaughtError(details, this.#targetId, this.#session),
+    const error = UncaughtError.fromException(
+      exception,
+      this.#targetId,
+      this.#session,
     );
+    if (error) {
+      this.#page.emit('uncaughtError', error);
+    }
   };
 
   // On navigation, we reset issue aggregation.
