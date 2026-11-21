@@ -28,6 +28,55 @@ describe('mcp-options steps', () => {
         headless: true,
       });
     });
+
+    it('rejects viewport with more than two parts', () => {
+      const parser = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--viewport',
+        '1280x720x2',
+      ]);
+      assert.throws(
+        () => parser.parseCliArgs(),
+        /Invalid viewport. Expected format is `1280x720` with exactly two parts/,
+      );
+    });
+
+    it('rejects viewport with non-numeric third part', () => {
+      const parser = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--viewport',
+        '1280x720xfoo',
+      ]);
+      assert.throws(
+        () => parser.parseCliArgs(),
+        /Invalid viewport. Expected format is `1280x720` with exactly two parts/,
+      );
+    });
+
+    it('rejects viewport with trailing x', () => {
+      const parser = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--viewport',
+        '1280x720x',
+      ]);
+      assert.throws(
+        () => parser.parseCliArgs(),
+        /Invalid viewport. Expected format is `1280x720` with exactly two parts/,
+      );
+    });
+
+    it('accepts valid viewport', () => {
+      const args = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--viewport',
+        '1280x720',
+      ]).parseCliArgs();
+      assert.deepStrictEqual(args.viewport, {width: 1280, height: 720});
+    });
   });
 
   describe('parseConfigFile', () => {

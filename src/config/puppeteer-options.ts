@@ -40,7 +40,13 @@ export const puppeteerOptions: PuppeteerOptions = {
       if (arg === undefined) {
         return;
       }
-      const [width, height] = arg.split('x').map(Number);
+      const parts = arg.split('x');
+      if (parts.length !== 2) {
+        throw new Error(
+          'Invalid viewport. Expected format is `1280x720` with exactly two parts (width x height).',
+        );
+      }
+      const [width, height] = parts.map(Number);
       if (
         !Number.isInteger(width) ||
         !Number.isInteger(height) ||
