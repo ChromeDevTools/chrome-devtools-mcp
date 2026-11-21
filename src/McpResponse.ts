@@ -107,6 +107,7 @@ export class McpResponse implements Response {
   #attachedNetworkRequestOptions?: {
     requestFilePath?: string;
     responseFilePath?: string;
+    serviceWorkerId?: string;
   };
   #attachedConsoleMessageId?: number;
   #attachedConsoleMessageServiceWorkerId?: string;
@@ -140,6 +141,7 @@ export class McpResponse implements Response {
     resourceTypes?: ResourceType[];
     includePreservedRequests?: boolean;
     networkRequestIdInDevToolsUI?: number;
+    serviceWorkerId?: string;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -232,6 +234,7 @@ export class McpResponse implements Response {
       resourceTypes?: ResourceType[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      serviceWorkerId?: string;
     },
   ): void {
     if (!value) {
@@ -251,6 +254,7 @@ export class McpResponse implements Response {
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
       networkRequestIdInDevToolsUI: options?.networkRequestIdInDevToolsUI,
+      serviceWorkerId: options?.serviceWorkerId,
     };
   }
 
@@ -307,7 +311,11 @@ export class McpResponse implements Response {
 
   attachNetworkRequest(
     reqId: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: {
+      requestFilePath?: string;
+      responseFilePath?: string;
+      serviceWorkerId?: string;
+    },
   ): void {
     this.#attachedNetworkRequestId = reqId;
     this.#attachedNetworkRequestOptions = options;
@@ -586,12 +594,22 @@ export class McpResponse implements Response {
     if (!this.#attachedNetworkRequestId) {
       return undefined;
     }
-    if (!this.#page) {
-      throw new Error(`Response must have an McpPage`);
+    const serviceWorkerId =
+      this.#attachedNetworkRequestOptions?.serviceWorkerId;
+    let request: HTTPRequest;
+    if (serviceWorkerId) {
+      request = context.getServiceWorkerNetworkRequestById(
+        serviceWorkerId,
+        this.#attachedNetworkRequestId,
+      );
+    } else {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      request = this.#page.getNetworkRequestById(
+        this.#attachedNetworkRequestId,
+      );
     }
-    const request = this.#page.getNetworkRequestById(
-      this.#attachedNetworkRequestId,
-    );
     return await NetworkFormatter.from(request, {
       requestId: this.#attachedNetworkRequestId,
       requestIdResolver: req => this.getNetworkRequestStableId(req),
@@ -780,12 +798,19 @@ export class McpResponse implements Response {
     if (!this.#networkRequestsOptions?.include) {
       return undefined;
     }
-    if (!this.#page) {
-      throw new Error(`Response must have an McpPage`);
+    let requests: HTTPRequest[];
+    if (this.#networkRequestsOptions.serviceWorkerId) {
+      requests = context.getServiceWorkerNetworkData(
+        this.#networkRequestsOptions.serviceWorkerId,
+      );
+    } else {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      requests = this.#page.getNetworkRequests(
+        this.#networkRequestsOptions.includePreservedRequests,
+      );
     }
-    let requests = this.#page.getNetworkRequests(
-      this.#networkRequestsOptions?.includePreservedRequests,
-    );
 
     // Apply resource type filtering if specified
     if (this.#networkRequestsOptions.resourceTypes?.length) {
