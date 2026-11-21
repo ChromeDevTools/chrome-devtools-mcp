@@ -132,6 +132,11 @@ const categoryOverrides: Record<
       'Set to true to include a tool that manages virtual WebAuthn authenticators, for testing passkey and security key flows.',
     offByDefault: true,
   },
+  [ToolCategory.COVERAGE]: {
+    describe:
+      'Set to true to include tools that collect JavaScript and CSS coverage. Coverage collection is heavy and cannot run during a performance trace.',
+    offByDefault: true,
+  },
 };
 
 function createOption(category: ToolCategory): CategoryOption {

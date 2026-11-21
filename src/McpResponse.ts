@@ -11,6 +11,10 @@ import {
 } from './formatters/CommentFormatter.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
+  CoverageFormatter,
+  type CoverageReportJson,
+} from './formatters/CoverageFormatter.js';
+import {
   type CascadeRule,
   CssFormatter,
   type CssFormatterOptions,
@@ -60,6 +64,7 @@ import {
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
+  CoverageReport,
   DevToolsData,
   ElementCssStyles,
   ImageContentData,
@@ -166,6 +171,7 @@ export class McpResponse implements Response {
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
   #webAuthnFormatter?: WebAuthnFormatter;
+  #coverageFormatter?: CoverageFormatter;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -325,6 +331,10 @@ export class McpResponse implements Response {
     authenticator: WebAuthnAuthenticatorState | undefined,
   ): void {
     this.#webAuthnFormatter = new WebAuthnFormatter(authenticator);
+  }
+
+  attachCoverageReport(report: CoverageReport): void {
+    this.#coverageFormatter = new CoverageFormatter(report);
   }
 
   attachTraceSummary(result: TraceResult): void {
@@ -1015,6 +1025,7 @@ export class McpResponse implements Response {
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
       webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
+      coverage?: CoverageReportJson;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1839,6 +1850,15 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         compactEncode
           ? compactEncode(structuredContent.webauthnAuthenticator)
           : this.#webAuthnFormatter.toString(),
+      );
+    }
+
+    if (this.#coverageFormatter) {
+      structuredContent.coverage = this.#coverageFormatter.toJSON();
+      response.push(
+        compactEncode
+          ? compactEncode(structuredContent.coverage)
+          : this.#coverageFormatter.toString(),
       );
     }
 

@@ -8,3 +8,4 @@
 // modules because `createTools()` instantiates every export of those.
 export const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 export const GET_CONSOLE_MESSAGE_TOOL_NAME = 'get_console_message';
+export const STOP_COVERAGE_TOOL_NAME = 'stop_coverage';

@@ -1,0 +1,66 @@
+exports[`CoverageFormatter > formats JS and CSS resources toJSON 1`] = `
+{
+  "resources": [
+    {
+      "url": "https://example.com/app.js",
+      "type": "JS",
+      "totalBytes": 1000,
+      "usedBytes": 250,
+      "unusedBytes": 750,
+      "unusedPercent": 75
+    },
+    {
+      "url": "https://example.com/app.css",
+      "type": "CSS",
+      "totalBytes": 400,
+      "usedBytes": 100,
+      "unusedBytes": 300,
+      "unusedPercent": 75
+    },
+    {
+      "url": "(inline/anonymous)",
+      "type": "JS",
+      "totalBytes": 80,
+      "usedBytes": 80,
+      "unusedBytes": 0,
+      "unusedPercent": 0
+    }
+  ],
+  "omitted": 0,
+  "totals": {
+    "resources": 3,
+    "totalBytes": 1480,
+    "usedBytes": 430,
+    "unusedBytes": 1050,
+    "unusedPercent": 70.9
+  }
+}
+`;
+
+exports[`CoverageFormatter > formats JS and CSS resources toString 1`] = `
+## Coverage report
+https://example.com/app.js JS total=1000 used=250 unused=750 unused%=75.0
+https://example.com/app.css CSS total=400 used=100 unused=300 unused%=75.0
+(inline/anonymous) JS total=80 used=80 unused=0 unused%=0.0
+Totals: 3 resources, 1480 total bytes, 430 used, 1050 unused (70.9% unused)
+`;
+
+exports[`CoverageFormatter > formats an empty report toJSON 1`] = `
+{
+  "resources": [],
+  "omitted": 0,
+  "totals": {
+    "resources": 0,
+    "totalBytes": 0,
+    "usedBytes": 0,
+    "unusedBytes": 0,
+    "unusedPercent": 0
+  }
+}
+`;
+
+exports[`CoverageFormatter > formats an empty report toString 1`] = `
+## Coverage report
+No coverage data. The page may have no script or stylesheet, or coverage was reset on navigation.
+Totals: 0 resources, 0 total bytes, 0 used, 0 unused (0.0% unused)
+`;

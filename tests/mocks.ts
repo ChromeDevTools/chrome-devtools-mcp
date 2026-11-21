@@ -65,6 +65,7 @@ import {
   Target,
   TargetType,
   Tracing,
+  Coverage,
   WebWorker,
   WebMCP,
   WebMCPTool,
@@ -86,6 +87,7 @@ import {
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;
   tracing: sinon.SinonStubbedInstance<Tracing>;
+  coverage: sinon.SinonStubbedInstance<Coverage>;
   mouse: sinon.SinonStubbedInstance<Mouse>;
   accessibility: sinon.SinonStubbedInstance<Accessibility>;
   cdpSession: {
@@ -312,6 +314,19 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
     configurable: true,
   });
 
+  // The real `coverage` getter reads a private field, which throws on a stub
+  // instance, so it is replaced with a stubbed Coverage instance.
+  const coverage = sinon.createStubInstance(Coverage);
+  coverage.startJSCoverage.resolves();
+  coverage.startCSSCoverage.resolves();
+  coverage.stopJSCoverage.resolves([]);
+  coverage.stopCSSCoverage.resolves([]);
+  Object.defineProperty(page, 'coverage', {
+    value: coverage,
+    writable: true,
+    configurable: true,
+  });
+
   const mouse = sinon.createStubInstance(
     CdpMouse,
   ) as unknown as sinon.SinonStubbedInstance<Mouse>;
@@ -334,6 +349,7 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   return Object.assign(page, {
     webmcp,
     tracing,
+    coverage,
     mouse,
     accessibility,
     cdpSession,

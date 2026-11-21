@@ -325,6 +325,7 @@ export interface Response {
   attachWebAuthnAuthenticator(
     authenticator: WebAuthnAuthenticatorState | undefined,
   ): void;
+  attachCoverageReport(report: CoverageReport): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
@@ -515,6 +516,37 @@ export interface WebAuthnAuthenticatorState {
   }>;
 }
 
+export const ANONYMOUS_COVERAGE_URL = '(inline/anonymous)';
+
+export type CoverageResourceType = 'JS' | 'CSS';
+
+export interface CoverageResource {
+  url: string;
+  type: CoverageResourceType;
+  totalBytes: number;
+  usedBytes: number;
+  unusedBytes: number;
+  unusedPercent: number;
+}
+
+export interface CoverageTotals {
+  resources: number;
+  totalBytes: number;
+  usedBytes: number;
+  unusedBytes: number;
+  unusedPercent: number;
+}
+
+export interface CoverageReport {
+  resources: CoverageResource[];
+  totals: CoverageTotals;
+}
+
+export interface StartCoverageOptions {
+  js: boolean;
+  css: boolean;
+}
+
 /**
  * Only add methods used by tools/*.
  */
@@ -530,6 +562,9 @@ export type ContextPage = Readonly<{
   configureWebAuthn(
     config: WebAuthnAuthenticatorConfig,
   ): Promise<WebAuthnAuthenticatorState | undefined>;
+  isRunningCoverage(): boolean;
+  startCoverage(options: StartCoverageOptions): Promise<void>;
+  stopCoverage(): Promise<CoverageReport>;
 
   /**
    * Returns a reqid for a cdpRequestId.
