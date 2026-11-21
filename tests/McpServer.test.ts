@@ -98,13 +98,18 @@ describe('McpServer', () => {
     return tools.map(tool => tool.name);
   }
 
-  it('passes the navigation limit to the lazily connected context', async () => {
+  it('creates the context on the first tool call with the navigation limit', async () => {
     const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
     const createContext = sinon.stub(McpContext, 'create').returns(context);
     const {server, browserManager, config} = await createTestServer(
       ['--maxNavigationSaved=5'],
       {mockContext: false},
     );
+
+    sinon.assert.notCalled(createContext);
+    await server.callTool('list_pages', {});
 
     sinon.assert.calledOnceWithExactly(
       createContext,
@@ -113,6 +118,125 @@ describe('McpServer', () => {
     );
     assert.strictEqual(config.resolved.maxNavigationSaved, 5);
     sinon.assert.notCalled(browserManager.ensureBrowser);
+    await server.close();
+  });
+
+  it('applies roots updates and config reloads received while idle when the first tool call creates the context', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, config} = await createTestServer([], {mockContext: false});
+
+    const initialClientRoot = 'file:///tmp/initial-client-root';
+    const updatedClientRoot = 'file:///tmp/updated-client-root';
+    let currentClientRoot = initialClientRoot;
+    const rootsListed = Promise.withResolvers<void>();
+    let listCount = 0;
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client(
+      {name: 'test', version: '1.0.0'},
+      {capabilities: {roots: {listChanged: true}}},
+    );
+    client.setRequestHandler('roots/list', () => {
+      listCount++;
+      if (listCount === 2) {
+        rootsListed.resolve();
+      }
+      return {roots: [{uri: currentClientRoot, name: 'client-root'}]};
+    });
+    await client.connect(clientTransport);
+
+    try {
+      currentClientRoot = updatedClientRoot;
+      await client.notification({method: 'notifications/roots/list_changed'});
+      await rootsListed.promise;
+
+      const reloadedRootPath = path.resolve('/tmp/reloaded-workspace');
+      await server.applyConfig(
+        parseConfig([
+          '--no-performance-crux',
+          `--workspace=${reloadedRootPath}`,
+        ]),
+      );
+
+      sinon.assert.notCalled(createContext);
+      sinon.assert.notCalled(context.setRoots);
+      sinon.assert.notCalled(context.onConfigChanged);
+
+      const result = await server.callTool('list_pages', {});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledOnceWithExactly(
+        createContext,
+        sinon.match.any,
+        sinon.match({config: sinon.match.same(config)}),
+      );
+      assert.strictEqual(config.resolved.performanceCrux, false);
+      sinon.assert.calledOnceWithExactly(context.setRoots, [
+        {
+          uri: pathToFileURL(reloadedRootPath).href,
+          name: 'reloaded-workspace',
+        },
+        {
+          uri: updatedClientRoot,
+          name: 'client-root',
+        },
+      ]);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('closes without creating or disposing a context when no tool ran', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server} = await createTestServer([], {mockContext: false});
+
+    await server.close();
+
+    sinon.assert.notCalled(createContext);
+    sinon.assert.notCalled(context.dispose);
+  });
+
+  it('disposes a context created after the server is already closed', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server} = await createTestServer([], {mockContext: false});
+
+    await server.close();
+    await server.callTool('list_pages', {});
+
+    sinon.assert.calledOnce(createContext);
+    sinon.assert.calledOnceWithExactly(context.dispose);
+  });
+
+  it('retries creating the context when a previous creation threw', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon
+      .stub(McpContext, 'create')
+      .onFirstCall()
+      .throws(new Error('context init failed'))
+      .onSecondCall()
+      .returns(context);
+    const {server} = await createTestServer([], {mockContext: false});
+
+    await assert.rejects(
+      server.callTool('list_pages', {}),
+      /context init failed/,
+    );
+    const result = await server.callTool('list_pages', {});
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.calledTwice(createContext);
     await server.close();
   });
 
@@ -578,6 +702,7 @@ describe('McpServer', () => {
       const {server, context, config} = await createTestServer([
         '--chromeArg=--foo',
       ]);
+      await server.callTool('list_pages');
       const previousArgs = config.resolved;
       let cruxWhenNotified: boolean | undefined;
       context.onConfigChanged.callsFake(async () => {
@@ -935,6 +1060,8 @@ describe('McpServer', () => {
         'cd4a.watch.apply-error.json',
       );
       await using watched = await watchTestServer(configFile.path);
+      await watched.server.callTool('list_pages');
+      watched.logStream.write.resetHistory();
       const applyError = new Error('failed to update pages');
       watched.context.onConfigChanged.rejects(applyError);
       const consoleError = sinon.stub(console, 'error');

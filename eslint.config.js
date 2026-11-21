@@ -539,10 +539,13 @@ export default defineConfig([
   {
     name: 'Modules that must not load the browser bundle',
     files: [
-      'src/tools/**/*.ts',
+      'src/bin/**/*.ts',
       'src/config/**/*.ts',
+      'src/daemon/**/*.ts',
       'src/telemetry/**/*.ts',
+      'src/tools/**/*.ts',
       'src/BrowserManager.ts',
+      'src/index.ts',
       'src/processors/HeapSnapshotManager.ts',
       'src/ToolHandler.ts',
     ],
