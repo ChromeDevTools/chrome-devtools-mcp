@@ -97,6 +97,38 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), '');
       });
     });
+    it(
+      'rejects a pending evaluation when the request is cancelled',
+      {
+        timeout: 10_000,
+      },
+      async () => {
+        await withMcpContext(async (response, context, args) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          const controller = new AbortController();
+          const evaluation = evaluateScript(args).handler(
+            {
+              params: {
+                function: String(() => {
+                  document.title = 'pending';
+                  return new Promise(() => {});
+                }),
+              },
+              signal: controller.signal,
+            },
+            response,
+            context,
+          );
+          await page.waitForFunction(() => document.title === 'pending', {
+            timeout: 5_000,
+          });
+          controller.abort();
+          await assert.rejects(evaluation, {
+            message: /evaluate_script was cancelled/,
+          });
+        });
+      },
+    );
     it('does not execute multi-statement source in function mode', async () => {
       await withMcpContext(async (response, context, args) => {
         await assert.rejects(
