@@ -87,24 +87,24 @@ interface FootprintOptions {
 
 const MiB = 1024 * 1024;
 
-// Budgets are strict: about 3% above the median measured on Linux x64
-// (no-usage-statistics: 106.6 MiB). The idle default tree has no watchdog and
-// measured 1.5 MiB above no-usage-statistics locally. Raise a budget only
-// together with a change that needs the memory.
+// Budgets sit ~20-25% above the Linux x64 CI medians on Node 22 (default:
+// 35.9 MiB, no-usage-statistics: 34.2 MiB; ~42.3 / 38.8 MiB on Node 25) and
+// well below the ~93 MiB footprint when third_party/browser.js loads eagerly.
+// Raise a budget only together with a change that needs the memory.
 const CONFIGURATIONS: FootprintConfiguration[] = [
   {
     name: 'default',
     description: 'usage statistics on (server only until the first tool call)',
     serverArgs: ['--usage-statistics'],
     usageStatistics: true,
-    maxPrivateBytes: 112 * MiB,
+    maxPrivateBytes: 45 * MiB,
   },
   {
     name: 'no-usage-statistics',
     description: 'usage statistics off (server only)',
     serverArgs: ['--no-usage-statistics'],
     usageStatistics: false,
-    maxPrivateBytes: 110 * MiB,
+    maxPrivateBytes: 42 * MiB,
   },
 ];
 
