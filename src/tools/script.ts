@@ -9,6 +9,7 @@ import {pathToFileURL} from 'node:url';
 import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/browser.js';
+import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -150,6 +151,7 @@ Example with arguments: \`(el) => el.innerText\`
                 await performEvaluation(worker, source, format, [], response, {
                   filePath,
                   context,
+                  signal: request.signal,
                 });
               },
               // Service workers cannot interact with the DOM, so never wait for it.
@@ -205,6 +207,7 @@ Example with arguments: \`(el) => el.innerText\`
               {
                 filePath,
                 context,
+                signal: request.signal,
               },
             );
           },
@@ -251,7 +254,7 @@ const performEvaluation = async (
   format: 'function' | 'script',
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options: {context: Context; filePath?: string},
+  options: {context: Context; filePath?: string; signal?: AbortSignal},
 ): Promise<void> => {
   let result: string | undefined;
   if (format === 'function') {
@@ -260,11 +263,17 @@ const performEvaluation = async (
       [],
       () => (...args: unknown[]) => unknown
     >(`(\n${functionSource}\n)`);
+    using stack = new DisposableStack();
+    const cancellation = await rejectOnAbort(
+      evaluatable,
+      options.signal,
+      stack,
+    );
     // Normalize non-Error values inside the page callback (serialized by Puppeteer) so CDP preserves the message.
     result = await evaluatable.evaluate(
-      async (fn, ...args) => {
+      async (fn, {aborted}, ...args) => {
         try {
-          return JSON.stringify(await fn(...args));
+          return JSON.stringify(await Promise.race([fn(...args), aborted]));
         } catch (err) {
           if (
             err instanceof Error ||
@@ -288,6 +297,7 @@ const performEvaluation = async (
         }
       },
       fn,
+      cancellation,
       ...args,
     );
   } else {
@@ -311,6 +321,45 @@ const performEvaluation = async (
     response.appendResponseLine(`${result}`);
     response.appendResponseLine('```');
   }
+};
+
+/**
+ * Creates a page-side promise that rejects when `signal` aborts. An evaluation
+ * that races against it settles on cancellation, so the protocol call returns
+ * and the tool call releases its task queue.
+ */
+const rejectOnAbort = async (
+  evaluatable: Evaluatable,
+  signal: AbortSignal | undefined,
+  stack: DisposableStack,
+): Promise<
+  JSHandle<{aborted: Promise<never>; abort: (reason: Error) => void}>
+> => {
+  const cancellation = stack.use(
+    await evaluatable.evaluateHandle(() => {
+      let abort: (reason: Error) => void = () => {};
+      const aborted = new Promise<never>((_, reject) => {
+        abort = reject;
+      });
+      return {aborted, abort};
+    }),
+  );
+  if (!signal) {
+    return cancellation;
+  }
+  const onAbort = (): void => {
+    void cancellation
+      .evaluate(({abort}) => {
+        abort(new Error('evaluate_script was cancelled.'));
+      })
+      .catch(error => {
+        logger?.('Failed to cancel evaluate_script', error);
+      });
+  };
+  signal.addEventListener('abort', onAbort, {once: true});
+  stack.defer(() => signal.removeEventListener('abort', onAbort));
+  signal.throwIfAborted();
+  return cancellation;
 };
 
 const getPageOrFrame = async (

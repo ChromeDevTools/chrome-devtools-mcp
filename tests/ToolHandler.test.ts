@@ -35,6 +35,7 @@ import {pressKey, typeText} from '../src/tools/input.js';
 import {
   defineBrowserlessTool,
   definePageTool,
+  defineTool,
   type AnyToolDefinition,
   type BrowserlessToolDefinition,
   type DefinedPageTool,
@@ -248,7 +249,13 @@ describe('ToolHandler', () => {
           );
           sinon.assert.calledOnceWithExactly(
             nextRun,
-            mode === 'browserless' ? {params: args} : {params: args, page},
+            mode === 'browserless'
+              ? {params: args, signal: sinon.match.instanceOf(AbortSignal)}
+              : {
+                  params: args,
+                  page,
+                  signal: sinon.match.instanceOf(AbortSignal),
+                },
             responseHandle.firstCall.thisValue,
             context,
           );
@@ -527,6 +534,62 @@ describe('ToolHandler', () => {
       (await pause)[Symbol.dispose]();
       sinon.assert.calledOnceWithExactly(paused);
     });
+
+    const handlerModes: Array<'page' | 'browser' | 'browserless'> = [
+      'page',
+      'browser',
+      'browserless',
+    ];
+    for (const mode of handlerModes) {
+      it(`passes the request signal to the ${mode} tool handler`, async () => {
+        const config = parseConfig(['--no-page-id-routing']);
+        const run = sinon.stub().resolves();
+        const definition = {
+          name: 'signal_tool',
+          description: 'A tool that observes cancellation',
+          annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
+          schema: {},
+          blockedByDialog: false,
+          verifyFilesSchema: {},
+          handler: run,
+        } satisfies Omit<
+          BrowserlessToolDefinition,
+          'browserless' | 'concurrency'
+        >;
+        const tool =
+          mode === 'page'
+            ? definePageTool(() => ({...definition, concurrency: 'page'}))(
+                config.resolved,
+              )
+            : mode === 'browser'
+              ? defineTool(() => ({...definition, concurrency: 'exclusive'}))(
+                  config.resolved,
+                )
+              : defineBrowserlessTool(() => definition)(config.resolved);
+        const page = createMockMcpPage();
+        const context = createMockMcpContext({selectedPage: page});
+        context.ensureBrowser.resolves(getMockBrowser());
+        sinon
+          .stub(McpResponse.prototype, 'handle')
+          .resolves({content: [], structuredContent: {}});
+        const controller = new AbortController();
+        const handler = new ToolHandler(
+          tool,
+          config,
+          async () => context,
+          sinon.spy(),
+        );
+        await handler.handle({}, {signal: controller.signal});
+        sinon.assert.calledOnceWithExactly(
+          run,
+          mode === 'page'
+            ? {params: {}, page, signal: controller.signal}
+            : {params: {}, signal: controller.signal},
+          sinon.match.instanceOf(McpResponse),
+          context,
+        );
+      });
+    }
 
     it('skips context for an already cancelled request', async () => {
       const getContext = sinon.stub().resolves(createMockMcpContext());
@@ -2855,7 +2918,10 @@ describe('ToolHandler', () => {
       );
       sinon.assert.calledOnceWithExactly(
         handler,
-        {params: {filePath: '/canonical/file.heapsnapshot'}},
+        {
+          params: {filePath: '/canonical/file.heapsnapshot'},
+          signal: sinon.match.instanceOf(AbortSignal),
+        },
         sinon.match.instanceOf(McpResponse),
         mockContext,
       );
@@ -3024,7 +3090,10 @@ describe('ToolHandler', () => {
       sinon.assert.notCalled(initialHandler);
       sinon.assert.calledOnceWithExactly(
         updatedHandler,
-        {params: {a: 'value', b: 'extra'}},
+        {
+          params: {a: 'value', b: 'extra'},
+          signal: sinon.match.instanceOf(AbortSignal),
+        },
         sinon.match.instanceOf(McpResponse),
         mockContext,
       );
@@ -3085,7 +3154,7 @@ describe('ToolHandler', () => {
       sinon.assert.notCalled(initialHandler);
       sinon.assert.calledOnceWithExactly(
         updatedHandler,
-        {params: {a: 'value'}},
+        {params: {a: 'value'}, signal: sinon.match.instanceOf(AbortSignal)},
         sinon.match.instanceOf(McpResponse),
         mockContext,
       );
