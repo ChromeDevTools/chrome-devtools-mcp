@@ -257,7 +257,8 @@ export interface Response {
   ): void;
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions & HeapSnapshotFormatOptions,
+    options?: PaginationOptions &
+      HeapSnapshotFormatOptions & {maxNodeIds?: number},
   ): void;
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,

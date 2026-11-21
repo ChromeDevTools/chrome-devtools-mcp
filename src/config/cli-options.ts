@@ -875,6 +875,14 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
+      maxNodeIds: {
+        name: 'maxNodeIds',
+        type: 'integer',
+        description:
+          'Maximum node IDs per group. Defaults to 10. Set to the group count to include all IDs.',
+        required: false,
+        positional: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',

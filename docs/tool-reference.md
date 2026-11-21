@@ -630,6 +630,7 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
+- **maxNodeIds** (integer) _(optional)_: Maximum node IDs per group. Defaults to 10. Set to the group count to include all IDs.
 - **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
 - **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
