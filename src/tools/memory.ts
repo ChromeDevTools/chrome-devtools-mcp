@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {MAX_NAME_LENGTH} from '../formatters/HeapSnapshotFormatter.js';
+import {MAX_NAME_LENGTH} from '../formatters/constants.js';
 import {zod} from '../third_party/index.js';
 import {byteSizeRangeSchema} from '../utils/bytes.js';
 

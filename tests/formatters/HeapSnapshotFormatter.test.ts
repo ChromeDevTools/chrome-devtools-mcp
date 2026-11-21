@@ -13,8 +13,8 @@ import {
   type ContextAnalysisReport,
   formatName,
   HeapSnapshotFormatter,
-  MAX_NAME_LENGTH,
 } from '../../src/formatters/HeapSnapshotFormatter.js';
+import {MAX_NAME_LENGTH} from '../../src/formatters/constants.js';
 import {
   HeapSnapshotManager,
   type HeapSnapshotAggregate,

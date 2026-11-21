@@ -15,9 +15,9 @@ import {DevTools} from '../third_party/browser.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
 import {truncateText} from '../utils/text.js';
 
-const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+import {MAX_NAME_LENGTH} from './constants.js';
 
-export const MAX_NAME_LENGTH = 100;
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
 export interface HeapSnapshotFormatOptions {
   /**
