@@ -35,6 +35,35 @@ export interface BrowserManagerOptions {
  */
 class BrowserAttempt {}
 
+/**
+ * Retries connecting to Puppeteer via `puppeteer.connect` up to a specified
+ * maximum number of attempts when transient connection or WebSocket failures occur.
+ *
+ * @param options Parameters passed to `puppeteer.connect`.
+ * @param retries Maximum number of connection attempts before throwing (default: 3).
+ * @param delayMs Base delay in milliseconds between retry attempts (default: 500).
+ * @returns Resolves with the connected `Browser` instance on success.
+ * @throws Re-throws the final error if all retry attempts fail.
+ */
+async function connectWithRetry(
+  options: Parameters<typeof puppeteer.connect>[0],
+  retries = 3,
+  delayMs = 500,
+): Promise<Browser> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await puppeteer.connect(options);
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export class BrowserManager {
   #browser?: Browser;
   #browserMode?: 'launched' | 'connected';
@@ -461,7 +490,7 @@ export class BrowserManager {
       JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
     );
     try {
-      const connected = await puppeteer.connect(connectOptions);
+      const connected = await connectWithRetry(connectOptions);
       logger?.('Connected Puppeteer');
       this.#browserMode = 'connected';
       this.#browser = connected;
