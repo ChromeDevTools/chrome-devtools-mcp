@@ -1,0 +1,49 @@
+{
+  "name": "chrome-devtools-mcp",
+  "version": "1.13.0",
+  "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer",
+  "author": {
+    "name": "Google Chrome",
+    "url": "https://developer.chrome.com/"
+  },
+  "homepage": "https://developer.chrome.com/docs/devtools/agents",
+  "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "browser",
+    "chrome",
+    "debugging",
+    "mcp",
+    "performance"
+  ],
+  "skills": "./skills/",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@1.13.0"
+      ]
+    }
+  },
+  "interface": {
+    "displayName": "Chrome DevTools",
+    "shortDescription": "Automate, debug, and analyze Chrome with DevTools",
+    "longDescription": "Give your coding agent reliable Chrome automation, in-depth debugging, and performance analysis through Chrome DevTools and Puppeteer. Inspect pages, capture traces, debug console and network issues, and verify UI changes before you ship.",
+    "developerName": "Chrome DevTools",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://developer.chrome.com/docs/devtools/agents",
+    "defaultPrompt": [
+      "Check the performance of https://developers.chrome.com",
+      "Debug the failing network request on the selected page",
+      "Take a screenshot and list console errors"
+    ],
+    "brandColor": "#1A73E8",
+    "composerIcon": "https://github.com/ChromeDevTools/devtools-logo/blob/master/logos/svg/chrome-devtools-square-responsive.svg",
+    "logo": "https://github.com/ChromeDevTools/devtools-logo/blob/master/logos/svg/chrome-devtools-square-responsive.svg"
+  }
+}

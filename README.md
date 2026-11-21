@@ -132,6 +132,7 @@ The package includes [skills](./skills) that teach your agent how to use Chrome 
 A plugin installs the MCP server and all skills, including the CLI skill:
 
 - **Claude Code:** Run `/plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `/plugin install chrome-devtools-mcp@chrome-devtools-plugins`.
+- **Codex:** Run `codex plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `codex plugin add chrome-devtools-mcp@chrome-devtools-plugins`.
 - **Copilot / VS Code:** Run **Chat: Install Plugin From Source** and enter `ChromeDevTools/chrome-devtools-mcp`.
 - **Gemini CLI:** Run `gemini extensions install --auto-update https://github.com/ChromeDevTools/chrome-devtools-mcp`.
 

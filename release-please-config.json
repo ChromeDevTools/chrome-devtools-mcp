@@ -94,6 +94,21 @@
           "type": "json",
           "path": "mcp.json",
           "jsonpath": "mcpServers['chrome-devtools'].args[2]"
+        },
+        {
+          "type": "json",
+          "path": ".codex-plugin/plugin.json",
+          "jsonpath": "version"
+        },
+        {
+          "type": "json",
+          "path": ".codex-plugin/plugin.json",
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
+        },
+        {
+          "type": "json",
+          "path": ".mcp.json",
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         }
       ]
     }
