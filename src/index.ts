@@ -423,7 +423,7 @@ export class McpServer {
         inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      args => handler.handle(args),
+      (args, ctx) => handler.handle(args, {signal: ctx.mcpReq.signal}),
     );
 
     if (handler.disabled) {

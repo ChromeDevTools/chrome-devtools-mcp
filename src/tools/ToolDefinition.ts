@@ -171,6 +171,10 @@ export interface ToolDefinition<
 
 export interface Request<Schema extends ToolSchema> {
   params: zod.output<zod.ZodObject<MergeSchema<Schema>>>;
+  /**
+   * Aborted when the MCP client cancels the tool call.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ImageContentData {
@@ -566,6 +570,7 @@ export type ContextPage = Readonly<{
     toolName: string,
     params: Record<string, unknown>,
     response: Response,
+    signal?: AbortSignal,
   ): Promise<void>;
   getDevToolsData(): Promise<DevToolsData>;
   restoreEmulation(): Promise<void>;

@@ -371,7 +371,7 @@ export class ToolHandler {
     try {
       await validateToolFiles(tool, params, context, true);
       signal.throwIfAborted();
-      await tool.handler({params}, response, context);
+      await tool.handler({params, signal}, response, context);
     } catch (err) {
       signal.throwIfAborted();
       response.setError(toError(err));
@@ -433,6 +433,7 @@ export class ToolHandler {
           {
             params,
             page,
+            signal,
           },
           response,
           context,
@@ -441,6 +442,7 @@ export class ToolHandler {
         await tool.handler(
           {
             params,
+            signal,
           },
           response,
           context,
