@@ -152,6 +152,11 @@ log.txt
 
 mcp-heap-profiles/
 
+# Playwright framework artifacts and authentication state
+playwright-report/
+test-results/
+.auth/
+
 # gclient and depot_tools
 /build
 /build_overrides

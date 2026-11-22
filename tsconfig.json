@@ -32,6 +32,9 @@
   "include": [
     "src/**/*.ts",
     "tests/**/*.ts",
+    "playwright/**/*.ts",
+    "e2e/playwright/**/*.ts",
+    "playwright.config.ts",
     "third_party/devtools-frontend/front_end/legacy/legacy-defs.d.ts"
   ],
   "references": [
