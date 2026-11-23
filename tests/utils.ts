@@ -722,17 +722,18 @@ export async function spawnReadyProcess(extraArgs: string[] = []): Promise<{
     const pid = child.pid;
     assert.ok(pid, 'Child process should have a PID');
     child.stdout.destroy();
-    child.unref();
     return {
       pid,
       child,
       [Symbol.dispose](): void {
         child.kill();
+        child.unref();
       },
     };
   } catch (error) {
     child.stdout.destroy();
     child.kill();
+    child.unref();
     throw error;
   }
 }
