@@ -379,25 +379,49 @@ describe('McpServer', () => {
       assert.deepStrictEqual(exposedNames, definedNames.sort());
     });
 
-    for (const mode of ['MCP', 'CLI']) {
-      it(`rejects network mocks by default in ${mode} mode`, async () => {
-        const {server, browserManager} = await createTestServer(
-          mode === 'CLI' ? ['--viaCli'] : [],
-        );
-        const names = await listServerToolNames(server);
-        assert.ok(names.includes('list_network_requests'));
-        for (const name of ['mock_network', 'remove_network_mock']) {
-          assert.strictEqual(names.includes(name), mode === 'CLI');
-          const result = await server.callTool(name, {pageId: 1});
-          assert.strictEqual(result.isError, true);
-          const content = result.content[0];
-          assert.strictEqual(content.type, 'text');
-          assert.match(content.text, /--categoryNetworkMocks=true/);
-        }
-        sinon.assert.notCalled(browserManager.ensureBrowser);
-        await server.close();
-      });
-    }
+    it('rejects network mocks by default in MCP mode', async () => {
+      const {server, browserManager} = await createTestServer();
+      const names = await listServerToolNames(server);
+      assert.ok(names.includes('list_network_requests'));
+      for (const name of ['mock_network', 'remove_network_mock']) {
+        assert.strictEqual(names.includes(name), false);
+        const result = await server.callTool(name, {pageId: 1});
+        assert.strictEqual(result.isError, true);
+        const content = result.content[0];
+        assert.strictEqual(content.type, 'text');
+        assert.match(content.text, /--categoryNetworkMocks=true/);
+      }
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
+
+    it('enables network mocks by default in CLI mode', async () => {
+      const {server, context} = await createTestServer(['--viaCli']);
+      const names = await listServerToolNames(server);
+      assert.ok(names.includes('mock_network'));
+      assert.ok(names.includes('remove_network_mock'));
+      await server.callTool('mock_network', {pageId: 1});
+      sinon.assert.calledOnce(context.ensureBrowser);
+      await server.close();
+    });
+
+    it('rejects network mocks in CLI mode when explicitly disabled', async () => {
+      const {server, browserManager} = await createTestServer([
+        '--viaCli',
+        '--no-category-network-mocks',
+      ]);
+      const names = await listServerToolNames(server);
+      for (const name of ['mock_network', 'remove_network_mock']) {
+        assert.strictEqual(names.includes(name), true);
+        const result = await server.callTool(name, {pageId: 1});
+        assert.strictEqual(result.isError, true);
+        const content = result.content[0];
+        assert.strictEqual(content.type, 'text');
+        assert.match(content.text, /--categoryNetworkMocks=true/);
+      }
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
 
     it('enables network mocks independently of network inspection', async () => {
       const names = await listToolNames([

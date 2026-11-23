@@ -97,6 +97,11 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.isolated, true);
     assert.strictEqual(args.memoryDebugging, true);
     assert.strictEqual(args.categoryExtensions, true);
+    assert.strictEqual(args.categoryNetworkMocks, true);
+    assert.strictEqual(args.categoryPwa, true);
+    assert.strictEqual(args.categoryWebauthn, true);
+    assert.strictEqual(args.categoryExperimentalWebmcp, true);
+    assert.strictEqual(args.categoryExperimentalThirdParty, true);
     assert.strictEqual(args.experimentalStructuredContent, true);
     assert.strictEqual(args.viaCli, true);
   });
@@ -1051,7 +1056,21 @@ describe('cli args parsing', () => {
     );
     assert.strictEqual(
       cliOptions.categoryExtensions?.defaultDescription,
-      'true unless autoConnect, browserUrl or wsEndpoint is set',
+      'true',
+    );
+    assert.strictEqual(
+      cliOptions.categoryNetworkMocks?.defaultDescription,
+      'true',
+    );
+    assert.strictEqual(cliOptions.categoryPwa?.defaultDescription, 'true');
+    assert.strictEqual(cliOptions.categoryWebauthn?.defaultDescription, 'true');
+    assert.strictEqual(
+      cliOptions.categoryExperimentalWebmcp?.defaultDescription,
+      'true',
+    );
+    assert.strictEqual(
+      cliOptions.categoryExperimentalThirdParty?.defaultDescription,
+      'true',
     );
   });
 
@@ -1336,12 +1355,27 @@ describe('cli args parsing', () => {
       ['--wsEndpoint', 'ws://localhost:9222'],
       ['--auto-connect'],
     ]) {
-      it(`allows viaCli with ${connectArgs[0]} without enabling extensions`, async () => {
+      it(`allows viaCli with ${connectArgs[0]} and enables all categories`, async () => {
         const args = parseConfig(['--viaCli', ...connectArgs]);
-        assert.strictEqual(args.categoryExtensions, undefined);
+        assert.strictEqual(args.categoryExtensions, true);
+        assert.strictEqual(args.categoryPwa, true);
+        assert.strictEqual(args.categoryNetworkMocks, true);
+        assert.strictEqual(args.categoryWebauthn, true);
+        assert.strictEqual(args.categoryExperimentalWebmcp, true);
+        assert.strictEqual(args.categoryExperimentalThirdParty, true);
         assert.strictEqual(args.isolated, false);
       });
     }
+
+    it('lets explicit category flags disable categories in viaCli', async () => {
+      const args = parseConfig([
+        '--viaCli',
+        '--no-category-network-mocks',
+        '--categoryPwa=false',
+      ]);
+      assert.strictEqual(args.categoryNetworkMocks, false);
+      assert.strictEqual(args.categoryPwa, false);
+    });
 
     it('allows explicit categoryExtensions with browserUrl in viaCli', async () => {
       const args = parseConfig([

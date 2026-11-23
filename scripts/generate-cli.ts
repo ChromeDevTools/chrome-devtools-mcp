@@ -7,11 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {
-  isCategoryOffByDefault,
-  categoryToFlagName,
-} from '../out/Default/gen/src/config/category-options.js';
-import {mcpOptions} from '../out/Default/gen/src/config/mcp-options.js';
+import {categoryToFlagName} from '../out/Default/gen/src/config/category-options.js';
 import {ServerConfig} from '../out/Default/gen/src/config/ServerConfig.js';
 import {zod} from '../out/Default/gen/src/third_party/index.js';
 import {labels, ToolCategory} from '../out/Default/gen/src/tools/categories.js';
@@ -80,12 +76,11 @@ function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
 }
 
 async function generateCli() {
-  const tools = createTools(
-    ServerConfig.applyDefaults(
-      {viaCli: true},
-      {suppressUsageStatisticsNotice: true},
-    ),
+  const cliDefaults = ServerConfig.applyDefaults(
+    {viaCli: true},
+    {suppressUsageStatisticsNotice: true},
   );
+  const tools = createTools(cliDefaults);
 
   // Sort tools by name
   const sortedTools = tools
@@ -143,16 +138,14 @@ async function generateCli() {
     let description = tool.description;
     const requiredFlags: string[] = [];
 
-    const isOffByDefault = isCategoryOffByDefault(categoryEnum);
-    if (isOffByDefault) {
-      const categoryFlag = categoryToFlagName(categoryEnum);
+    const categoryFlag = categoryToFlagName(categoryEnum);
+    if (!cliDefaults[categoryFlag]) {
       requiredFlags.push(`--${categoryFlag}=true`);
     }
 
     const conditions = tool.annotations.conditions || [];
     for (const condition of conditions) {
-      const option = mcpOptions[condition as keyof typeof mcpOptions];
-      if (!option || !('default' in option) || option.default !== true) {
+      if (!cliDefaults[condition]) {
         requiredFlags.push(`--${condition}=true`);
       }
     }

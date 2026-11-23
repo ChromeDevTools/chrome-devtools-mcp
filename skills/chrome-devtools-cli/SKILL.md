@@ -177,7 +177,7 @@ chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome ext
 chrome-devtools trigger_extension_action "extension_id" # Triggers the default action of an extension by its ID
 ```
 
-## Progressive Web Apps (requires `--categoryPwa=true`)
+## Progressive Web Apps
 
 ```bash
 chrome-devtools install_pwa "https://example.com/" "https://example.com/" # Install PWA by manifest ID and install URL
@@ -188,14 +188,12 @@ chrome-devtools uninstall_pwa "https://example.com/" # Uninstall PWA and close w
 
 ## Experimental Features
 
-Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
-
 ```bash
 chrome-devtools click_at 1 100 200 # Clicks at the provided coordinates on page 1 (requires --experimentalVision=true)
-chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1 (requires --categoryExperimentalWebmcp=true)
-chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1 (requires --categoryExperimentalWebmcp=true)
-chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1 (requires --categoryExperimentalThirdParty=true)
-chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}' # Execute third-party developer tool on page 1 (requires --categoryExperimentalThirdParty=true)
+chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1
+chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1
+chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1
+chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}' # Execute third-party developer tool on page 1
 ```
 
 ## Service Management
