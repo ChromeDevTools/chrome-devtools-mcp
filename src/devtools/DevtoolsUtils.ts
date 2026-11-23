@@ -234,6 +234,64 @@ export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
+ * The parts of a DevTools stack trace that are formatted. A stack trace built
+ * from raw CDP call frames (without a DevTools universe) also fits.
+ */
+export interface FormattableFrame {
+  readonly url?: string;
+  readonly uiSourceCode?: DevTools.StackTrace.StackTrace.Frame['uiSourceCode'];
+  readonly name?: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+export interface FormattableFragment {
+  readonly frames: readonly FormattableFrame[];
+}
+
+export interface FormattableAsyncFragment extends FormattableFragment {
+  readonly description: string;
+}
+
+export interface FormattableStackTrace {
+  readonly syncFragment: FormattableFragment;
+  readonly asyncFragments: readonly FormattableAsyncFragment[];
+}
+
+/**
+ * Builds a stack trace from raw CDP call frames, without source maps. Used for
+ * targets that have no DevTools universe, such as extension service workers.
+ */
+export function createRawStackTrace(
+  rawStackTrace: StackTraceLike,
+): FormattableStackTrace {
+  const toFrames = (
+    callFrames: StackTraceLike['callFrames'],
+  ): FormattableFrame[] =>
+    callFrames.map(frame => ({
+      url: frame.url,
+      name: frame.functionName || undefined,
+      line: frame.lineNumber,
+      column: frame.columnNumber,
+    }));
+  const asyncFragments = [];
+  for (
+    let asyncStack = rawStackTrace.parent;
+    asyncStack;
+    asyncStack = asyncStack.parent
+  ) {
+    asyncFragments.push({
+      description: asyncStack.description ?? '',
+      frames: toFrames(asyncStack.callFrames),
+    });
+  }
+  return {
+    syncFragment: {frames: toFrames(rawStackTrace.callFrames)},
+    asyncFragments,
+  };
+}
+
+/**
  * Maximum number of `cause` links resolved for one error. A page can create a
  * cyclic chain (`error.cause = error`), and CDP returns a new object id on
  * every lookup of the same object, so a cycle cannot be detected by id.
@@ -249,12 +307,12 @@ const MAX_CAUSE_DEPTH = 10;
  */
 export class SymbolizedError {
   readonly message: string;
-  readonly stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
+  readonly stackTrace?: FormattableStackTrace;
   readonly cause?: SymbolizedError;
 
   private constructor(
     message: string,
-    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    stackTrace?: FormattableStackTrace,
     cause?: SymbolizedError,
   ) {
     this.message = message;
@@ -270,7 +328,7 @@ export class SymbolizedError {
     // the session that issued them, so the cause has to be resolved there.
     session?: SessionLike;
     includeStackAndCause?: boolean;
-    resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
+    resolvedStackTraceForTesting?: FormattableStackTrace;
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
     return await SymbolizedError.#fromDetails(opts, 0);
@@ -289,7 +347,7 @@ export class SymbolizedError {
       );
     }
 
-    let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    let stackTrace: FormattableStackTrace | undefined;
     if (opts.resolvedStackTraceForTesting) {
       stackTrace = opts.resolvedStackTraceForTesting;
     } else if (opts.devTools && opts.details.stackTrace) {
@@ -302,6 +360,8 @@ export class SymbolizedError {
       } catch {
         // ignore
       }
+    } else if (opts.details.stackTrace) {
+      stackTrace = createRawStackTrace(opts.details.stackTrace);
     }
 
     // TODO: Turn opts.details.exception into a JSHandle and retrieve the 'cause' property.

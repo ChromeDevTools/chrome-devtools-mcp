@@ -25,7 +25,12 @@ import {
   type Protocol,
 } from '../../src/third_party/browser.js';
 
-import {createMockPuppeteerPage} from '../mocks.js';
+import {
+  createMockCDPSession,
+  createMockCdpJSHandle,
+  createMockPuppeteerPage,
+  type MockPuppeteerPage,
+} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
 function createMockConsoleMessage(text: string): ConsoleMessage {
@@ -715,6 +720,139 @@ describe('ConsoleCollector', () => {
         );
       }),
     );
+  });
+
+  describe('exception routing', () => {
+    function emitException(
+      pptrPage: MockPuppeteerPage,
+      handle?: ReturnType<typeof createMockCdpJSHandle>,
+    ): void {
+      pptrPage.emit(
+        'exception',
+        createRemoteException(
+          {
+            exceptionId: 1,
+            exception: {type: 'object', subtype: 'error', objectId: '1'},
+            text: 'Uncaught',
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          handle,
+        ),
+      );
+    }
+
+    function collectUncaughtErrors(
+      pptrPage: MockPuppeteerPage,
+    ): sinon.SinonSpy {
+      const onUncaughtError = sinon.spy();
+      new ConsoleCollector(pptrPage, () => {
+        return {uncaughtError: onUncaughtError} as ListenerMap;
+      });
+      return onUncaughtError;
+    }
+
+    it('uses the worker session and target for an exception from a worker', () => {
+      const pptrPage = createMockPuppeteerPage();
+      const onUncaughtError = collectUncaughtErrors(pptrPage);
+      const workerSession = createMockCDPSession({targetId: 'worker-1'});
+
+      emitException(
+        pptrPage,
+        createMockCdpJSHandle({type: 'object'}, workerSession),
+      );
+
+      sinon.assert.calledOnceWithMatch(
+        onUncaughtError,
+        sinon.match({
+          targetId: 'worker-1',
+          session: sinon.match.same(workerSession),
+          fromOtherTarget: true,
+        }),
+      );
+    });
+
+    it('uses the page session and target for an exception from the page', () => {
+      const pptrPage = createMockPuppeteerPage();
+      const onUncaughtError = collectUncaughtErrors(pptrPage);
+      // @ts-expect-error internal API
+      const pageSession = pptrPage._client();
+
+      emitException(
+        pptrPage,
+        createMockCdpJSHandle({type: 'object'}, pageSession),
+      );
+
+      sinon.assert.calledOnceWithMatch(
+        onUncaughtError,
+        sinon.match({
+          targetId: '<mock>',
+          session: sinon.match.same(pageSession),
+          fromOtherTarget: false,
+        }),
+      );
+    });
+
+    it('uses the page session for an exception without a handle', () => {
+      const pptrPage = createMockPuppeteerPage();
+      const onUncaughtError = collectUncaughtErrors(pptrPage);
+      // @ts-expect-error internal API
+      const pageSession = pptrPage._client();
+
+      emitException(pptrPage);
+
+      sinon.assert.calledOnceWithMatch(
+        onUncaughtError,
+        sinon.match({
+          targetId: '<mock>',
+          session: sinon.match.same(pageSession),
+          fromOtherTarget: false,
+        }),
+      );
+    });
+
+    it('falls back to the page target when the session has no target', () => {
+      const pptrPage = createMockPuppeteerPage();
+      const onUncaughtError = collectUncaughtErrors(pptrPage);
+      const workerSession = createMockCDPSession();
+      workerSession.target.throws(new Error('Target must exist'));
+
+      emitException(
+        pptrPage,
+        createMockCdpJSHandle({type: 'object'}, workerSession),
+      );
+
+      sinon.assert.calledOnceWithMatch(
+        onUncaughtError,
+        sinon.match({
+          targetId: '<mock>',
+          session: sinon.match.same(workerSession),
+          fromOtherTarget: true,
+        }),
+      );
+    });
+
+    it('compares with the current page session after the session changes', () => {
+      const pptrPage = createMockPuppeteerPage();
+      const onUncaughtError = collectUncaughtErrors(pptrPage);
+      const activatedSession = createMockCDPSession({targetId: 'activated'});
+      // @ts-expect-error internal API
+      pptrPage._client.returns(activatedSession);
+
+      emitException(
+        pptrPage,
+        createMockCdpJSHandle({type: 'object'}, activatedSession),
+      );
+
+      sinon.assert.calledOnceWithMatch(
+        onUncaughtError,
+        sinon.match({
+          targetId: 'activated',
+          session: sinon.match.same(activatedSession),
+          fromOtherTarget: false,
+        }),
+      );
+    });
   });
 
   it('retains only the newest messages per navigation', async () => {
