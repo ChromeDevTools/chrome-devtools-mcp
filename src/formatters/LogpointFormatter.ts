@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {GeneratedLocation, Logpoint} from '../LogpointManager.js';
+import type {GeneratedLocation, Logpoint} from '../utils/logpoint.js';
 
 export interface StructuredLogpoint {
   url: string;
