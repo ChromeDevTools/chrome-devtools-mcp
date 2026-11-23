@@ -22,9 +22,11 @@ import {
 import {
   buildCommand,
   getCommandArgSpec,
+  registerCommandArgs,
   shieldLiteralArgs,
 } from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
+import {yargs} from '../src/third_party/cli.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
@@ -1367,6 +1369,11 @@ describe('cli command strings', () => {
   const required = {description: '', required: true, positional: true};
   const dummyArgsVariadic = {
     arg1: {name: 'arg1', type: 'string', ...required},
+    arrArg: {name: 'arrArg', type: 'array', minItems: 1, ...required},
+  };
+
+  const dummyArgsVariadicAllowEmpty = {
+    arg1: {name: 'arg1', type: 'string', ...required},
     arrArg: {name: 'arrArg', type: 'array', ...required},
   };
 
@@ -1386,9 +1393,14 @@ describe('cli command strings', () => {
     },
   };
 
-  it('renders a required array arg as a variadic positional', () => {
+  it('renders a required array arg with minItems > 0 as a required variadic positional', () => {
     const {command} = buildCommand('dummy_cmd', dummyArgsVariadic);
     assert.strictEqual(command, 'dummy_cmd <arg1> <arrArg..>');
+  });
+
+  it('renders a required array arg without minItems as an optional variadic positional', () => {
+    const {command} = buildCommand('dummy_cmd', dummyArgsVariadicAllowEmpty);
+    assert.strictEqual(command, 'dummy_cmd <arg1> [arrArg..]');
   });
 
   it('renders required non-array args as plain positionals', () => {
@@ -1424,7 +1436,7 @@ describe('cli command strings', () => {
       );
 
       // yargs only allows a variadic positional as the last one.
-      const variadic = command.indexOf('..>');
+      const variadic = command.search(/\.\.[>\]]/);
       assert.ok(
         variadic === -1 || variadic === command.length - 3,
         `${name}: a variadic positional must be last`,
@@ -1433,13 +1445,141 @@ describe('cli command strings', () => {
       // A required array arg the daemon receives as a string fails validation.
       for (const [argName, arg] of Object.entries(args)) {
         if (arg.required && arg.type === 'array') {
+          const expected =
+            (arg.minItems ?? 0) > 0 ? `<${argName}..>` : `[${argName}..]`;
           assert.ok(
-            command.includes(`<${argName}..>`),
-            `${name}: required array arg ${argName} must be variadic`,
+            command.includes(expected),
+            `${name}: required array arg ${argName} must be variadic (${expected})`,
           );
         }
       }
     }
+  });
+});
+
+describe('cli command parsing', () => {
+  const mockCommands: typeof commands = {
+    allow_empty_array: {
+      description: 'Command whose required array arg allows empty arrays',
+      category: 'Test',
+      args: {
+        id: {
+          name: 'id',
+          type: 'number',
+          description: '',
+          required: true,
+          positional: true,
+        },
+        items: {
+          name: 'items',
+          type: 'array',
+          description: '',
+          required: true,
+          positional: true,
+        },
+      },
+    },
+    require_non_empty_array: {
+      description:
+        'Command whose required array arg requires at least one item',
+      category: 'Test',
+      args: {
+        id: {
+          name: 'id',
+          type: 'number',
+          description: '',
+          required: true,
+          positional: true,
+        },
+        items: {
+          name: 'items',
+          type: 'array',
+          description: '',
+          required: true,
+          positional: true,
+          minItems: 1,
+        },
+      },
+    },
+  };
+
+  function parseToolCommand(rawArgs: string[]): Record<string, unknown> {
+    const {argv: cliArgs, restore} = shieldLiteralArgs(rawArgs, commandName => {
+      const commandDef = mockCommands[commandName];
+      return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
+    });
+
+    let parsedArgs: Record<string, unknown> | undefined;
+    const parser = yargs(cliArgs)
+      .locale('en')
+      .exitProcess(false)
+      .strict()
+      .fail((msg, err) => {
+        throw err ?? new Error(msg);
+      });
+
+    for (const [commandName, commandDef] of Object.entries(mockCommands)) {
+      const {command, usage} = buildCommand(commandName, commandDef.args);
+      parser.command(
+        command,
+        commandDef.description,
+        y => {
+          y.usage(usage);
+          y.option('output-format', {
+            choices: ['md', 'json'],
+            default: 'md',
+          });
+          registerCommandArgs(y, commandDef.args);
+        },
+        argv => {
+          const commandArgs: Record<string, unknown> = {};
+          for (const argName of Object.keys(commandDef.args)) {
+            if (argName in argv) {
+              commandArgs[argName] = restore(argv[argName]);
+            }
+          }
+          parsedArgs = commandArgs;
+        },
+      );
+    }
+
+    parser.parse();
+    assert.ok(parsedArgs, `Command did not match: ${rawArgs.join(' ')}`);
+    return parsedArgs;
+  }
+
+  it('parses an omitted variadic array arg without minItems as an empty array', () => {
+    assert.deepStrictEqual(parseToolCommand(['allow_empty_array', '2']), {
+      id: 2,
+      items: [],
+    });
+  });
+
+  it('parses an omitted variadic array arg as empty when followed by flags', () => {
+    assert.deepStrictEqual(
+      parseToolCommand(['allow_empty_array', '2', '--output-format', 'json']),
+      {
+        id: 2,
+        items: [],
+      },
+    );
+  });
+
+  it('parses multiple items for an optional variadic array arg', () => {
+    assert.deepStrictEqual(
+      parseToolCommand(['allow_empty_array', '2', 'first', 'second']),
+      {
+        id: 2,
+        items: ['first', 'second'],
+      },
+    );
+  });
+
+  it('rejects an omitted variadic array arg when minItems > 0', () => {
+    assert.throws(
+      () => parseToolCommand(['require_non_empty_array', '2']),
+      /Not enough non-option arguments/,
+    );
   });
 });
 
