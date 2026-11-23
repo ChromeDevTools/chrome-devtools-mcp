@@ -94,6 +94,11 @@
           "type": "json",
           "path": "mcp.json",
           "jsonpath": "mcpServers['chrome-devtools'].args[2]"
+        },
+        {
+          "type": "json",
+          "path": ".mcp.json",
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         }
       ]
     }
