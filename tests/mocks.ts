@@ -231,10 +231,19 @@ export class MockCDPSession extends CDPSession {
   override id(): string {
     return '';
   }
+  // Internal Puppeteer API that collectors read the target ID from.
+  target(): {_targetId: string} {
+    throw new Error('Not implemented');
+  }
 }
 
-export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSession> {
+export function createMockCDPSession(
+  options: {targetId?: string} = {},
+): sinon.SinonStubbedInstance<MockCDPSession> {
   const session = sinon.createStubInstance(MockCDPSession);
+  if (options.targetId !== undefined) {
+    session.target.returns({_targetId: options.targetId});
+  }
   const connection = sinon.createStubInstance(Connection);
   connection.session.returns(session);
   session.connection.returns(connection);

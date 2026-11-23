@@ -742,15 +742,6 @@ describe('ConsoleCollector', () => {
       );
     }
 
-    function createMockSession(
-      targetId: string,
-    ): ReturnType<typeof createMockCDPSession> {
-      const session = createMockCDPSession();
-      // @ts-expect-error internal API
-      session.target = sinon.stub().returns({_targetId: targetId});
-      return session;
-    }
-
     function collectUncaughtErrors(
       pptrPage: MockPuppeteerPage,
     ): sinon.SinonSpy {
@@ -764,7 +755,7 @@ describe('ConsoleCollector', () => {
     it('uses the worker session and target for an exception from a worker', () => {
       const pptrPage = createMockPuppeteerPage();
       const onUncaughtError = collectUncaughtErrors(pptrPage);
-      const workerSession = createMockSession('worker-1');
+      const workerSession = createMockCDPSession({targetId: 'worker-1'});
 
       emitException(
         pptrPage,
@@ -824,10 +815,7 @@ describe('ConsoleCollector', () => {
       const pptrPage = createMockPuppeteerPage();
       const onUncaughtError = collectUncaughtErrors(pptrPage);
       const workerSession = createMockCDPSession();
-      // @ts-expect-error internal API
-      workerSession.target = sinon
-        .stub()
-        .throws(new Error('Target must exist'));
+      workerSession.target.throws(new Error('Target must exist'));
 
       emitException(
         pptrPage,
@@ -847,7 +835,7 @@ describe('ConsoleCollector', () => {
     it('compares with the current page session after the session changes', () => {
       const pptrPage = createMockPuppeteerPage();
       const onUncaughtError = collectUncaughtErrors(pptrPage);
-      const activatedSession = createMockSession('activated');
+      const activatedSession = createMockCDPSession({targetId: 'activated'});
       // @ts-expect-error internal API
       pptrPage._client.returns(activatedSession);
 
