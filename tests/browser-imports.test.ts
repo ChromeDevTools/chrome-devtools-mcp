@@ -21,8 +21,10 @@ const LIGHT_ENTRIES = [
   'tools/input.js',
   'tools/lighthouse.js',
   'tools/logpoints.js',
+  'tools/memory.js',
   'tools/performance.js',
   'tools/snapshot.js',
+  'tools/tools.js',
   'utils/text.js',
 ];
 
