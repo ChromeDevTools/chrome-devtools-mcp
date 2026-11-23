@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {MAX_NAME_LENGTH} from '../formatters/constants.js';
+import {HEAP_SNAPSHOT_MAX_NAME_LENGTH} from '../formatters/constants.js';
 import {zod} from '../third_party/index.js';
 import {byteSizeRangeSchema} from '../utils/bytes.js';
 
@@ -32,7 +32,7 @@ const maxNameLengthSchema = zod
   .min(1)
   .optional()
   .describe(
-    `Maximum length of names before truncation. Defaults to ${MAX_NAME_LENGTH}.`,
+    `Maximum length of names before truncation. Defaults to ${HEAP_SNAPSHOT_MAX_NAME_LENGTH}.`,
   );
 
 const DEFAULT_HEAP_SNAPSHOT_PAGE_SIZE = 50;
