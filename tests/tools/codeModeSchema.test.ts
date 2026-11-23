@@ -11,10 +11,10 @@ import {McpResponse} from '../../src/McpResponse.js';
 import {zod} from '../../src/third_party/index.js';
 import {ToolCategory} from '../../src/tools/categories.js';
 import {
-  buildReplApiDeclaration,
-  formatReplToolMethodSignature,
+  buildCodeModeApiDeclaration,
+  formatCodeModeToolMethodSignature,
   zodShapeToTs,
-} from '../../src/tools/repl/replSchema.js';
+} from '../../src/tools/codeMode/codeModeSchema.js';
 import {
   definePageTool,
   type AnyToolDefinition,
@@ -27,7 +27,7 @@ import {
   createMockServerConfig,
 } from '../mocks.js';
 
-const DEFAULT_INNER_REPL_TOOLS: readonly string[] = [
+const DEFAULT_INNER_CODE_MODE_TOOLS: readonly string[] = [
   'click',
   'drag',
   'fill',
@@ -45,8 +45,8 @@ const DEFAULT_INNER_REPL_TOOLS: readonly string[] = [
   'wait_for',
 ];
 
-const INNER_REPL_TOOLS: readonly string[] = [
-  ...DEFAULT_INNER_REPL_TOOLS,
+const INNER_CODE_MODE_TOOLS: readonly string[] = [
+  ...DEFAULT_INNER_CODE_MODE_TOOLS,
   'click_at',
   'execute_3p_developer_tool',
   'execute_webmcp_tool',
@@ -58,13 +58,13 @@ function toFieldMap(structuredContent: object): Map<string, unknown> {
   return new Map<string, unknown>(Object.entries(structuredContent));
 }
 
-describe('replSchema', () => {
-  describe('inner REPL tool outputSchema declarations', () => {
-    it('defines a non-empty outputSchema on every inner REPL ToolDefinition', () => {
-      assert.strictEqual(INNER_REPL_TOOLS.length, 20);
+describe('codeModeSchema', () => {
+  describe('inner Code Mode tool outputSchema declarations', () => {
+    it('defines a non-empty outputSchema on every inner Code Mode ToolDefinition', () => {
+      assert.strictEqual(INNER_CODE_MODE_TOOLS.length, 20);
       const tools = createTools(
         createMockParsedArguments({
-          repl: false,
+          codeMode: false,
           experimentalVision: true,
           categoryExperimentalWebmcp: true,
           categoryExperimentalThirdParty: true,
@@ -75,9 +75,9 @@ describe('replSchema', () => {
         byName.set(tool.name, tool);
       }
 
-      for (const toolName of INNER_REPL_TOOLS) {
+      for (const toolName of INNER_CODE_MODE_TOOLS) {
         const tool = byName.get(toolName);
-        assert.ok(tool, `Expected inner REPL tool "${toolName}" to exist`);
+        assert.ok(tool, `Expected inner Code Mode tool "${toolName}" to exist`);
         assert.ok(
           tool.outputSchema && Object.keys(tool.outputSchema).length > 0,
           `Expected "${toolName}" to declare a non-empty outputSchema`,
@@ -126,7 +126,7 @@ describe('replSchema', () => {
     });
   });
 
-  describe('formatReplToolMethodSignature', () => {
+  describe('formatCodeModeToolMethodSignature', () => {
     it('strips pageId, filePath, requestFilePath, responseFilePath, and serviceWorkerId and renders concrete Promise<{ ... }> return types', () => {
       const args = createMockParsedArguments({pageIdRouting: true});
       const syntheticSnapshotTool = definePageTool(() => ({
@@ -152,7 +152,9 @@ describe('replSchema', () => {
         handler: async () => {},
       }))(args);
 
-      const snapshotSig = formatReplToolMethodSignature(syntheticSnapshotTool);
+      const snapshotSig = formatCodeModeToolMethodSignature(
+        syntheticSnapshotTool,
+      );
       assert.match(snapshotSig, /^take_snapshot\(/);
       assert.match(snapshotSig, /\bverbose\?:\s*boolean\b/);
       assert.doesNotMatch(snapshotSig, /\bpageId\b/);
@@ -192,7 +194,8 @@ describe('replSchema', () => {
         handler: async () => {},
       }))(args);
 
-      const networkSig = formatReplToolMethodSignature(syntheticNetworkTool);
+      const networkSig =
+        formatCodeModeToolMethodSignature(syntheticNetworkTool);
       assert.match(networkSig, /^get_network_request\(/);
       assert.match(networkSig, /\breqid\?:\s*number\b/);
       assert.doesNotMatch(networkSig, /\bpageId\b/);
@@ -205,10 +208,10 @@ describe('replSchema', () => {
       assert.doesNotMatch(networkSig, /Promise<unknown>|ToolResult/);
     });
 
-    it('renders concrete typed Promise<{ ... }> signatures for all 20 real inner REPL tools without untyped fallback', () => {
+    it('renders concrete typed Promise<{ ... }> signatures for all 20 real inner Code Mode tools without untyped fallback', () => {
       const tools = createTools(
         createMockParsedArguments({
-          repl: false,
+          codeMode: false,
           pageIdRouting: true,
           experimentalVision: true,
           categoryExperimentalWebmcp: true,
@@ -220,11 +223,11 @@ describe('replSchema', () => {
         byName.set(tool.name, tool);
       }
 
-      for (const toolName of INNER_REPL_TOOLS) {
+      for (const toolName of INNER_CODE_MODE_TOOLS) {
         const tool = byName.get(toolName);
-        assert.ok(tool, `Expected inner REPL tool "${toolName}" to exist`);
+        assert.ok(tool, `Expected inner Code Mode tool "${toolName}" to exist`);
 
-        const sig = formatReplToolMethodSignature(tool);
+        const sig = formatCodeModeToolMethodSignature(tool);
         assert.ok(
           sig.startsWith(`${toolName}(`),
           `Expected signature for "${toolName}" to start with "${toolName}(", got: "${sig}"`,
@@ -248,28 +251,28 @@ describe('replSchema', () => {
     });
   });
 
-  describe('buildReplApiDeclaration', () => {
+  describe('buildCodeModeApiDeclaration', () => {
     it('builds a compact McpTools TypeScript declaration <= 4500 bytes including getElement and getEventListeners', () => {
-      const defaultNameSet = new Set<string>(DEFAULT_INNER_REPL_TOOLS);
+      const defaultNameSet = new Set<string>(DEFAULT_INNER_CODE_MODE_TOOLS);
       const defaultInnerTools = createTools(
         createMockParsedArguments({
-          repl: false,
+          codeMode: false,
           slim: false,
           experimentalVision: false,
         }),
       ).filter(tool => defaultNameSet.has(tool.name));
       assert.strictEqual(defaultInnerTools.length, 15);
 
-      const declaration = buildReplApiDeclaration(defaultInnerTools);
+      const declaration = buildCodeModeApiDeclaration(defaultInnerTools);
       assert.ok(
         declaration.length > 0,
-        'Expected buildReplApiDeclaration to return a non-empty declaration',
+        'Expected buildCodeModeApiDeclaration to return a non-empty declaration',
       );
       assert.match(declaration, /\binterface\s+McpTools\b/);
       assert.match(declaration, /\bgetElement\s*\(/);
       assert.match(declaration, /\bgetEventListeners\s*\(/);
 
-      for (const toolName of DEFAULT_INNER_REPL_TOOLS) {
+      for (const toolName of DEFAULT_INNER_CODE_MODE_TOOLS) {
         assert.ok(
           declaration.includes(`${toolName}(`),
           `Expected McpTools declaration to include "${toolName}("`,
@@ -376,7 +379,7 @@ describe('replSchema', () => {
     function buildInnerToolMap(): Map<string, AnyToolDefinition> {
       const tools = createTools(
         createMockParsedArguments({
-          repl: false,
+          codeMode: false,
           experimentalVision: true,
           categoryExperimentalWebmcp: true,
           categoryExperimentalThirdParty: true,
@@ -395,7 +398,7 @@ describe('replSchema', () => {
       payload: unknown,
     ): {success: boolean; errorSummary: string} {
       const tool = byName.get(toolName);
-      assert.ok(tool, `Expected inner REPL tool "${toolName}" to exist`);
+      assert.ok(tool, `Expected inner Code Mode tool "${toolName}" to exist`);
       assert.ok(
         tool.outputSchema,
         `Expected "${toolName}" to declare outputSchema`,

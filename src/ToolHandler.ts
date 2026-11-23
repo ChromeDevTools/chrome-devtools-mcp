@@ -24,7 +24,7 @@ import {categoryToFlagName} from './config/category-options.js';
 import {
   buildStrictRuntimeOutputSchema,
   formatZodOutputValidationError,
-} from './tools/repl/replSchema.js';
+} from './tools/codeMode/codeModeSchema.js';
 import {
   isAvailableInMode,
   isBrowserlessTool,

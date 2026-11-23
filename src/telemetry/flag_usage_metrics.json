@@ -500,19 +500,19 @@
     "flagType": "boolean"
   },
   {
-    "name": "repl_present",
+    "name": "code_mode_present",
     "flagType": "boolean"
   },
   {
-    "name": "repl",
+    "name": "code_mode",
     "flagType": "boolean"
   },
   {
-    "name": "repl_main_world_present",
+    "name": "code_mode_main_world_present",
     "flagType": "boolean"
   },
   {
-    "name": "repl_main_world",
+    "name": "code_mode_main_world",
     "flagType": "boolean"
   }
 ]

@@ -40,7 +40,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getReplEvaluateTool(args: ParsedArguments): AnyToolDefinition {
+function getCodeModeEvaluateTool(args: ParsedArguments): AnyToolDefinition {
   const tool = createTools(args).find(
     entry => entry.name === 'evaluate_script',
   );
@@ -48,13 +48,13 @@ function getReplEvaluateTool(args: ParsedArguments): AnyToolDefinition {
   return tool;
 }
 
-async function runReplEvaluate(
+async function runCodeModeEvaluate(
   args: ParsedArguments,
   params: Record<string, unknown>,
   response: McpResponse,
   context: McpContext,
 ): Promise<void> {
-  const tool = getReplEvaluateTool(args);
+  const tool = getCodeModeEvaluateTool(args);
   const parsedParams = zod.object(tool.schema).parse(params);
   if (isPageScopedTool(tool)) {
     const pageId =
@@ -114,26 +114,26 @@ function getClientResultText(
   return parts.join('\n');
 }
 
-describe('repl mode (evaluate_script with --repl)', () => {
+describe('code mode (evaluate_script with --code-mode)', () => {
   const httpServer = serverHooks();
 
-  it('exposes the compact McpTools declaration, file-only sourcePath verification, and pageId routing on evaluate_script when repl is true', () => {
-    const standardTool = getReplEvaluateTool(
-      createMockParsedArguments({repl: false, pageIdRouting: true}),
+  it('exposes the compact McpTools declaration, file-only sourcePath verification, and pageId routing on evaluate_script when codeMode is true', () => {
+    const standardTool = getCodeModeEvaluateTool(
+      createMockParsedArguments({codeMode: false, pageIdRouting: true}),
     );
     assert.doesNotMatch(standardTool.description, /\binterface\s+McpTools\b/);
 
-    const replTool = getReplEvaluateTool(
-      createMockParsedArguments({repl: true, pageIdRouting: true}),
+    const codeModeTool = getCodeModeEvaluateTool(
+      createMockParsedArguments({codeMode: true, pageIdRouting: true}),
     );
-    assert.match(replTool.description, /\binterface\s+McpTools\b/);
-    assert.match(replTool.description, /\bgetElement\s*\(/);
-    assert.match(replTool.description, /\bgetEventListeners\s*\(/);
+    assert.match(codeModeTool.description, /\binterface\s+McpTools\b/);
+    assert.match(codeModeTool.description, /\bgetElement\s*\(/);
+    assert.match(codeModeTool.description, /\bgetEventListeners\s*\(/);
 
-    assert.ok('function' in replTool.schema);
-    assert.ok('sourcePath' in replTool.schema);
+    assert.ok('function' in codeModeTool.schema);
+    assert.ok('sourcePath' in codeModeTool.schema);
 
-    const sourcePathVerify = replTool.verifyFilesSchema.sourcePath;
+    const sourcePathVerify = codeModeTool.verifyFilesSchema.sourcePath;
     assert.ok(
       sourcePathVerify !== undefined,
       'Expected verifyFilesSchema.sourcePath to be configured',
@@ -145,10 +145,10 @@ describe('repl mode (evaluate_script with --repl)', () => {
     assert.strictEqual(
       allowsRemoteUrl,
       false,
-      'Expected verifyFilesSchema.sourcePath not to set allowUrl: true in REPL mode',
+      'Expected verifyFilesSchema.sourcePath not to set allowUrl: true in Code Mode',
     );
 
-    const strictSchema = zod.object(replTool.schema).strict();
+    const strictSchema = zod.object(codeModeTool.schema).strict();
     assert.strictEqual(
       strictSchema.safeParse({function: 'async (mcp) => 1'}).success,
       false,
@@ -159,13 +159,15 @@ describe('repl mode (evaluate_script with --repl)', () => {
       true,
     );
     assert.strictEqual(
-      strictSchema.safeParse({pageId: 1, sourcePath: '/tmp/repl-script.js'})
-        .success,
+      strictSchema.safeParse({
+        pageId: 1,
+        sourcePath: '/tmp/code-mode-script.js',
+      }).success,
       true,
     );
   });
 
-  it('executes in the cd4a_repl isolated world by default without main-world pollution or JSON intrinsic poisoning across sequential calls', async () => {
+  it('executes in the cd4a_code_mode isolated world by default without main-world pollution or JSON intrinsic poisoning across sequential calls', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
@@ -178,16 +180,16 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </script>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
             function: `async (mcp) => {
               const logs = await mcp.list_console_messages();
               return {
-                replGlobalBindingType: typeof globalThis.__mcpCallTool,
-                replWindowBindingType: typeof window.__mcpCallTool,
-                replSecretGlobalType: typeof window.secretMainGlobal,
+                codeModeGlobalBindingType: typeof globalThis.__mcpCallTool,
+                codeModeWindowBindingType: typeof window.__mcpCallTool,
+                codeModeSecretGlobalType: typeof window.secretMainGlobal,
                 isLogsArray: Array.isArray(logs.consoleMessages),
                 hasLoggedMain: logs.consoleMessages.some(
                   entry => typeof entry.text === 'string' && entry.text.includes('logged-from-main'),
@@ -200,9 +202,9 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
 
         const first = parseEvaluatedJson(response);
-        assert.strictEqual(first.replGlobalBindingType, 'undefined');
-        assert.strictEqual(first.replWindowBindingType, 'undefined');
-        assert.strictEqual(first.replSecretGlobalType, 'undefined');
+        assert.strictEqual(first.codeModeGlobalBindingType, 'undefined');
+        assert.strictEqual(first.codeModeWindowBindingType, 'undefined');
+        assert.strictEqual(first.codeModeSecretGlobalType, 'undefined');
         assert.strictEqual(first.isLogsArray, true);
         assert.strictEqual(first.hasLoggedMain, true);
 
@@ -214,7 +216,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(mainWorldCheck.mainSecretValue, 42);
 
         response.resetResponseLineForTesting();
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -222,7 +224,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
               const snap = await mcp.take_snapshot();
               return {
                 hasSnapshot: Boolean(snap.snapshot),
-                replSecretGlobalType: typeof window.secretMainGlobal,
+                codeModeSecretGlobalType: typeof window.secretMainGlobal,
               };
             }`,
           },
@@ -232,14 +234,14 @@ describe('repl mode (evaluate_script with --repl)', () => {
 
         const second = parseEvaluatedJson(response);
         assert.strictEqual(second.hasSnapshot, true);
-        assert.strictEqual(second.replSecretGlobalType, 'undefined');
+        assert.strictEqual(second.codeModeSecretGlobalType, 'undefined');
       },
       {},
-      {repl: true, replMainWorld: false},
+      {codeMode: true, codeModeMainWorld: false},
     );
   });
 
-  it('executes in the page main world when replMainWorld is true', async () => {
+  it('executes in the page main world when codeModeMainWorld is true', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
@@ -250,7 +252,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </script>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -268,22 +270,22 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.snap, true);
       },
       {},
-      {repl: true, replMainWorld: true},
+      {codeMode: true, codeModeMainWorld: true},
     );
   });
 
   it('executes outer navigate_page then evaluate_script with inner mcp.* calls via McpServer without TaskRunner deadlock and returns structuredContent', async () => {
     httpServer.addHtmlRoute(
-      '/server-repl',
+      '/server-code-mode',
       `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:," />
-    <title>REPL Server Page</title>
+    <title>Code Mode Server Page</title>
   </head>
   <body>
-    <main><h1>REPL Server Page</h1><button>Go</button></main>
+    <main><h1>Code Mode Server Page</h1><button>Go</button></main>
   </body>
 </html>`,
     );
@@ -298,14 +300,17 @@ describe('repl mode (evaluate_script with --repl)', () => {
       browserManager.close.resolves();
 
       const config = createMockServerConfig({
-        repl: true,
+        codeMode: true,
         experimentalStructuredContent: false,
       });
       const mcpServer = await McpServer.from(config, {browserManager});
       const [clientTransport, serverTransport] =
         InMemoryTransport.createLinkedPair();
       await mcpServer.connect(serverTransport);
-      const client = new Client({name: 'repl-e2e-client', version: '1.0.0'});
+      const client = new Client({
+        name: 'code-mode-e2e-client',
+        version: '1.0.0',
+      });
       await client.connect(clientTransport);
 
       try {
@@ -321,7 +326,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         const navRes = await client.callTool(
           {
             name: 'navigate_page',
-            arguments: {pageId, url: httpServer.getRoute('/server-repl')},
+            arguments: {pageId, url: httpServer.getRoute('/server-code-mode')},
           },
           {timeout: 10_000},
         );
@@ -392,7 +397,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </script>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -429,7 +434,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.hasClickListener, true);
       },
       {},
-      {repl: true, replMainWorld: false},
+      {codeMode: true, codeModeMainWorld: false},
     );
   });
 
@@ -441,7 +446,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Outer Guardrails</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -477,7 +482,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.doesNotMatch(result.dialogError, /is not a function/i);
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -489,7 +494,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Disabled Tool Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -513,7 +518,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.doesNotMatch(result.disabledError, /is not a function/i);
       },
       {},
-      {repl: true, experimentalVision: false},
+      {codeMode: true, experimentalVision: false},
     );
   });
 
@@ -525,7 +530,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Stripped Param Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -548,7 +553,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.match(result.filePathError, /filePath/);
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -560,7 +565,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Screenshot Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -579,7 +584,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.ok((response.images[0]?.data.length ?? 0) > 0);
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -591,7 +596,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Drain In-Flight Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -612,7 +617,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(response.images[0]?.mimeType, 'image/png');
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -626,7 +631,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
 
         const waitSpy = sinon.spy(mcpPage, 'createWaitForHelper');
         try {
-          await runReplEvaluate(
+          await runCodeModeEvaluate(
             args,
             {
               pageId: mcpPage.id,
@@ -640,7 +645,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           waitSpy.resetHistory();
           response.resetResponseLineForTesting();
 
-          await runReplEvaluate(
+          await runCodeModeEvaluate(
             args,
             {
               pageId: mcpPage.id,
@@ -656,7 +661,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         }
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -675,7 +680,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           />
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -701,7 +706,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.valueB, 'beta');
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -733,7 +738,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         await mcpPage.pptrPage.goto(httpServer.getRoute('/bridge'));
         assert.strictEqual(mcpPage.textSnapshot, null);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -786,7 +791,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.sameIdentity, true);
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -847,7 +852,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </script>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -891,7 +896,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         });
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -899,11 +904,11 @@ describe('repl mode (evaluate_script with --repl)', () => {
     const {page, context, response, args} = createHandlerMocks();
     const {handle, locator} = createMockElementHandle();
     locator.click.resolves();
-    page.getElementByUid.withArgs('__repl_el_1').resolves(handle);
-    page.getAXNodeByUid.withArgs('__repl_el_1').returns(undefined);
+    page.getElementByUid.withArgs('__code_mode_el_1').resolves(handle);
+    page.getAXNodeByUid.withArgs('__code_mode_el_1').returns(undefined);
 
     await click(args).handler(
-      {params: {uid: '__repl_el_1'}, page},
+      {params: {uid: '__code_mode_el_1'}, page},
       response,
       context,
     );
@@ -923,7 +928,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </select>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -941,7 +946,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.selected, 'pro');
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -958,7 +963,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           </button>
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -975,7 +980,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(accepted.confirmed, 'true');
 
         response.resetResponseLineForTesting();
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -993,7 +998,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(dismissed.confirmed, 'false');
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1015,7 +1020,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
 
         try {
           await assert.rejects(
-            runReplEvaluate(
+            runCodeModeEvaluate(
               args,
               {
                 pageId: mcpPage.id,
@@ -1032,7 +1037,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         }
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1042,7 +1047,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         const snap = await mcp.take_snapshot();
         return { loadedFromFile: true, snapOk: snap.ok };
       }`,
-      'repl-local-check.js',
+      'code-mode-local-check.js',
     );
 
     await withMcpContext(
@@ -1052,7 +1057,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Local Script Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1067,7 +1072,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(fileJson.snapOk, true);
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1077,7 +1082,10 @@ describe('repl mode (evaluate_script with --repl)', () => {
     const browserManager = sinon.createStubInstance(BrowserManager);
     browserManager.ensureBrowser.resolves(mockBrowser);
     browserManager.close.resolves();
-    const config = createMockServerConfig({repl: true, pageIdRouting: false});
+    const config = createMockServerConfig({
+      codeMode: true,
+      pageIdRouting: false,
+    });
     const mcpServer = await McpServer.from(config, {browserManager});
 
     try {
@@ -1113,7 +1121,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         const mcpPage = context.getSelectedMcpPage();
         await mcpPage.pptrPage.goto(httpServer.getRoute('/spa-app'));
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1136,7 +1144,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(spaJson.rendered, '/step2');
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1159,7 +1167,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         const mcpPage = context.getSelectedMcpPage();
         await mcpPage.pptrPage.goto(httpServer.getRoute('/mpa-page1'));
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1195,13 +1203,13 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
   it('accepts inner tool structuredContent when page emulation metadata is active', async () => {
     httpServer.addHtmlRoute(
-      '/emul-repl',
+      '/emul-code-mode',
       `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -1228,13 +1236,13 @@ describe('repl mode (evaluate_script with --repl)', () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
-        await mcpPage.pptrPage.goto(httpServer.getRoute('/emul-repl'));
+        await mcpPage.pptrPage.goto(httpServer.getRoute('/emul-code-mode'));
         await mcpPage.emulate({
           colorScheme: 'dark',
           cpuThrottlingRate: 2,
         });
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1299,11 +1307,11 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
-  it('rejects drifted inner tool structuredContent in ReplToolDispatcher', async () => {
+  it('rejects drifted inner tool structuredContent in CodeModeToolDispatcher', async () => {
     await withMcpContext(
       async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
@@ -1337,7 +1345,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
 
         try {
           await assert.rejects(
-            runReplEvaluate(
+            runCodeModeEvaluate(
               args,
               {
                 pageId: mcpPage.id,
@@ -1355,7 +1363,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         }
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1370,7 +1378,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
       browserManager.close.resolves();
 
       const config = createMockServerConfig({
-        repl: false,
+        codeMode: false,
         experimentalStructuredContent: true,
       });
       const mcpServer = await McpServer.from(config, {browserManager});
@@ -1521,7 +1529,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
             Boolean(Reflect.get(window, '__oopifReady')),
           );
 
-          await runReplEvaluate(
+          await runCodeModeEvaluate(
             args,
             {
               pageId: mcpPage.id,
@@ -1575,7 +1583,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           assert.deepStrictEqual(result.listenerTypes, ['oopif-only-listener']);
         },
         {},
-        {repl: true},
+        {codeMode: true},
       );
     } finally {
       await new Promise<void>(resolve => {
@@ -1624,7 +1632,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           Number(Reflect.get(window, '__getterHits')),
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1721,8 +1729,8 @@ describe('repl mode (evaluate_script with --repl)', () => {
       },
       {},
       {
-        repl: true,
-        replMainWorld: false,
+        codeMode: true,
+        codeModeMainWorld: false,
         categoryExperimentalThirdParty: true,
       },
     );
@@ -1737,7 +1745,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
 
         await assert.rejects(
-          runReplEvaluate(
+          runCodeModeEvaluate(
             args,
             {
               pageId: mcpPage.id,
@@ -1756,7 +1764,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.deepStrictEqual(residualBindings, []);
       },
       {},
-      {repl: true, replMainWorld: true},
+      {codeMode: true, codeModeMainWorld: true},
     );
 
     await withMcpContext(
@@ -1766,7 +1774,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           html`<main><h1>Lexical Scope & Trailing Comment Check</h1></main>`,
         );
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1791,7 +1799,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.strictEqual(result.ok, true);
       },
       {},
-      {repl: true, replMainWorld: false},
+      {codeMode: true, codeModeMainWorld: false},
     );
   });
 
@@ -1807,7 +1815,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
           />
         `);
 
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1876,7 +1884,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         assert.doesNotMatch(result.circularError, /Maximum call stack/i);
       },
       {},
-      {repl: true, categoryExperimentalThirdParty: true},
+      {codeMode: true, categoryExperimentalThirdParty: true},
     );
   });
 
@@ -1890,7 +1898,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
 
         const startedAt = performance.now();
         await assert.rejects(
-          runReplEvaluate(
+          runCodeModeEvaluate(
             args,
             {
               pageId: mcpPage.id,
@@ -1916,7 +1924,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
 
         response.resetResponseLineForTesting();
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1952,7 +1960,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
 
         response.resetResponseLineForTesting();
-        await runReplEvaluate(
+        await runCodeModeEvaluate(
           args,
           {
             pageId: mcpPage.id,
@@ -1980,7 +1988,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         );
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 
@@ -1999,7 +2007,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         ]) {
           let caughtMessage = '';
           try {
-            await runReplEvaluate(
+            await runCodeModeEvaluate(
               args,
               {
                 pageId: mcpPage.id,
@@ -2026,7 +2034,7 @@ describe('repl mode (evaluate_script with --repl)', () => {
         }
       },
       {},
-      {repl: true},
+      {codeMode: true},
     );
   });
 });

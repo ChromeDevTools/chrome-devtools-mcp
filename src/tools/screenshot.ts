@@ -14,7 +14,7 @@ import {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {messageOutputSchema} from './repl/replSchema.js';
+import {messageOutputSchema} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
@@ -321,7 +321,7 @@ export const screenshot: PageToolFactory = definePageTool(
             `Saved screenshot to ${result.filename}.`,
           );
         } else if (screenshot.length >= 2_000_000) {
-          if (args.repl) {
+          if (args.codeMode) {
             const webpFallback = await captureScreenshotBytes({
               page,
               element,
@@ -332,7 +332,7 @@ export const screenshot: PageToolFactory = definePageTool(
             });
             if (webpFallback.length >= 2_000_000) {
               throw new Error(
-                'Screenshot exceeds 2 MB inline limit in REPL mode. Pass format: "webp" with a lower quality, target a specific element, or configure --screenshot-max-width.',
+                'Screenshot exceeds 2 MB inline limit in Code Mode. Pass format: "webp" with a lower quality, target a specific element, or configure --screenshot-max-width.',
               );
             }
             response.attachImage({

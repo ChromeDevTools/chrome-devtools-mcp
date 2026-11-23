@@ -351,14 +351,14 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
-  #replDialogAction?: DialogAction;
+  #codeModeDialogAction?: DialogAction;
   #activeWaitForHelperCount = 0;
 
-  // REPL isolated world & ephemeral DOM bridge
-  #replSession?: CDPSession;
-  #replSessionPromise?: Promise<CDPSession>;
-  #replMainWorldContexts = new Map<string, number>();
-  #replIsolatedWorld?: {
+  // Code Mode isolated world & ephemeral DOM bridge
+  #codeModeSession?: CDPSession;
+  #codeModeSessionPromise?: Promise<CDPSession>;
+  #codeModeMainWorldContexts = new Map<string, number>();
+  #codeModeIsolatedWorld?: {
     frameId: string;
     loaderId: string;
     contextId: number;
@@ -402,13 +402,13 @@ export class McpPage implements ContextPage {
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       if (
-        this.#replDialogAction !== undefined &&
+        this.#codeModeDialogAction !== undefined &&
         this.#activeWaitForHelperCount === 0
       ) {
-        const action = this.#replDialogAction;
+        const action = this.#codeModeDialogAction;
         this.#dialog = undefined;
         const onDialogError = (err: unknown): void => {
-          logger?.('Failed to handle REPL dialog', err);
+          logger?.('Failed to handle Code Mode dialog', err);
         };
         if (action === 'dismiss') {
           void dialog.dismiss().catch(onDialogError);
@@ -1085,9 +1085,9 @@ export class McpPage implements ContextPage {
       getNetworkMultiplierFromString(this.networkConditions),
     );
     const effectiveOptions =
-      this.#replDialogAction !== undefined &&
+      this.#codeModeDialogAction !== undefined &&
       options?.handleDialog === undefined
-        ? {...options, handleDialog: this.#replDialogAction}
+        ? {...options, handleDialog: this.#codeModeDialogAction}
         : options;
     this.#activeWaitForHelperCount++;
     try {
@@ -1121,15 +1121,15 @@ export class McpPage implements ContextPage {
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
     this.#logpointManager = undefined;
-    const replSession = this.#replSession;
-    this.#replSession = undefined;
-    this.#replSessionPromise = undefined;
-    this.#replMainWorldContexts.clear();
-    this.#replIsolatedWorld = undefined;
+    const codeModeSession = this.#codeModeSession;
+    this.#codeModeSession = undefined;
+    this.#codeModeSessionPromise = undefined;
+    this.#codeModeMainWorldContexts.clear();
+    this.#codeModeIsolatedWorld = undefined;
     this.#ephemeralNodes.clear();
-    this.#replDialogAction = undefined;
-    void replSession?.detach().catch(e => {
-      logger?.('Failed to detach REPL session', e);
+    this.#codeModeDialogAction = undefined;
+    void codeModeSession?.detach().catch(e => {
+      logger?.('Failed to detach Code Mode session', e);
     });
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
@@ -1409,8 +1409,8 @@ export class McpPage implements ContextPage {
     }
   }
 
-  setReplDialogAction(action: DialogAction | undefined): void {
-    this.#replDialogAction = action;
+  setCodeModeDialogAction(action: DialogAction | undefined): void {
+    this.#codeModeDialogAction = action;
   }
 
   registerEphemeralBackendNode(entry: {
@@ -1418,7 +1418,7 @@ export class McpPage implements ContextPage {
     frameId?: string;
     role?: string;
   }): {uid: string} & Disposable {
-    const uid = `__repl_el_${this.#nextEphemeralNodeId++}`;
+    const uid = `__code_mode_el_${this.#nextEphemeralNodeId++}`;
     this.#ephemeralNodes.set(uid, entry);
     return {
       uid,
@@ -1435,16 +1435,16 @@ export class McpPage implements ContextPage {
     );
   }
 
-  async #getReplCdpSession(): Promise<CDPSession> {
-    if (this.#replSession && !this.#replSession.detached) {
-      return this.#replSession;
+  async #getCodeModeCdpSession(): Promise<CDPSession> {
+    if (this.#codeModeSession && !this.#codeModeSession.detached) {
+      return this.#codeModeSession;
     }
-    this.#replSession = undefined;
-    if (!this.#replSessionPromise) {
-      this.#replSessionPromise = (async () => {
+    this.#codeModeSession = undefined;
+    if (!this.#codeModeSessionPromise) {
+      this.#codeModeSessionPromise = (async () => {
         const session = await this.pptrPage.createCDPSession();
-        this.#replMainWorldContexts.clear();
-        this.#replIsolatedWorld = undefined;
+        this.#codeModeMainWorldContexts.clear();
+        this.#codeModeIsolatedWorld = undefined;
         session.on('Runtime.executionContextCreated', event => {
           const auxData: unknown = event.context.auxData;
           if (
@@ -1452,26 +1452,31 @@ export class McpPage implements ContextPage {
             auxData.isDefault === true &&
             typeof auxData.frameId === 'string'
           ) {
-            this.#replMainWorldContexts.set(auxData.frameId, event.context.id);
+            this.#codeModeMainWorldContexts.set(
+              auxData.frameId,
+              event.context.id,
+            );
           }
         });
         session.on('Runtime.executionContextDestroyed', event => {
-          for (const [frameId, ctxId] of this.#replMainWorldContexts) {
+          for (const [frameId, ctxId] of this.#codeModeMainWorldContexts) {
             if (ctxId === event.executionContextId) {
-              this.#replMainWorldContexts.delete(frameId);
+              this.#codeModeMainWorldContexts.delete(frameId);
             }
           }
-          if (this.#replIsolatedWorld?.contextId === event.executionContextId) {
-            this.#replIsolatedWorld = undefined;
+          if (
+            this.#codeModeIsolatedWorld?.contextId === event.executionContextId
+          ) {
+            this.#codeModeIsolatedWorld = undefined;
           }
         });
         session.on('Runtime.executionContextsCleared', () => {
-          this.#replMainWorldContexts.clear();
-          this.#replIsolatedWorld = undefined;
+          this.#codeModeMainWorldContexts.clear();
+          this.#codeModeIsolatedWorld = undefined;
         });
         session.on('Page.frameNavigated', event => {
           if (!event.frame.parentId) {
-            this.#replIsolatedWorld = undefined;
+            this.#codeModeIsolatedWorld = undefined;
           }
         });
         await Promise.all([
@@ -1479,31 +1484,31 @@ export class McpPage implements ContextPage {
           session.send('Runtime.enable'),
           session.send('DOM.enable'),
         ]);
-        this.#replSession = session;
+        this.#codeModeSession = session;
         return session;
       })().finally(() => {
-        this.#replSessionPromise = undefined;
+        this.#codeModeSessionPromise = undefined;
       });
     }
-    return await this.#replSessionPromise;
+    return await this.#codeModeSessionPromise;
   }
 
-  async getReplExecutionContext(options: {mainWorld: boolean}): Promise<{
+  async getCodeModeExecutionContext(options: {mainWorld: boolean}): Promise<{
     session: CDPSession;
     contextId: number;
     frameId: string;
     loaderId: string;
   }> {
-    const session = await this.#getReplCdpSession();
+    const session = await this.#getCodeModeCdpSession();
     const {frameTree} = await session.send('Page.getFrameTree');
     const frameId = frameTree.frame.id;
     const loaderId = frameTree.frame.loaderId;
 
     if (options.mainWorld) {
-      let contextId = this.#replMainWorldContexts.get(frameId);
+      let contextId = this.#codeModeMainWorldContexts.get(frameId);
       if (contextId === undefined) {
         await this.pptrPage.mainFrame().evaluate(() => undefined);
-        contextId = this.#replMainWorldContexts.get(frameId);
+        contextId = this.#codeModeMainWorldContexts.get(frameId);
       }
       if (contextId === undefined) {
         throw new Error(
@@ -1514,13 +1519,13 @@ export class McpPage implements ContextPage {
     }
 
     if (
-      this.#replIsolatedWorld &&
-      this.#replIsolatedWorld.frameId === frameId &&
-      this.#replIsolatedWorld.loaderId === loaderId
+      this.#codeModeIsolatedWorld &&
+      this.#codeModeIsolatedWorld.frameId === frameId &&
+      this.#codeModeIsolatedWorld.loaderId === loaderId
     ) {
       return {
         session,
-        contextId: this.#replIsolatedWorld.contextId,
+        contextId: this.#codeModeIsolatedWorld.contextId,
         frameId,
         loaderId,
       };
@@ -1530,11 +1535,11 @@ export class McpPage implements ContextPage {
       'Page.createIsolatedWorld',
       {
         frameId,
-        worldName: 'cd4a_repl',
+        worldName: 'cd4a_code_mode',
         grantUniveralAccess: false,
       },
     );
-    this.#replIsolatedWorld = {
+    this.#codeModeIsolatedWorld = {
       frameId,
       loaderId,
       contextId: executionContextId,
@@ -1651,7 +1656,7 @@ export class McpPage implements ContextPage {
     throw new Error('Target node is not a DOM Element or is detached.');
   }
 
-  async resolveUidInReplContext(
+  async resolveUidInCodeModeContext(
     uid: string,
     contextId: number,
   ): Promise<string | null> {
@@ -1671,7 +1676,7 @@ export class McpPage implements ContextPage {
       if (!backendNodeId) {
         return null;
       }
-      const session = await this.#getReplCdpSession();
+      const session = await this.#getCodeModeCdpSession();
       const {object} = await session.send('DOM.resolveNode', {
         backendNodeId,
         executionContextId: contextId,
@@ -1705,7 +1710,7 @@ export class McpPage implements ContextPage {
       return [];
     }
     const targetSession: Pick<CDPSession, 'send'> =
-      getFrameCdpClient(handleFrame) ?? (await this.#getReplCdpSession());
+      getFrameCdpClient(handleFrame) ?? (await this.#getCodeModeCdpSession());
     const {object} = await targetSession.send('DOM.resolveNode', {
       backendNodeId,
     });

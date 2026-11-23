@@ -7,6 +7,8 @@
 import {mcpOptions, type ParsedArguments} from '../config/mcp-options.js';
 import type {YargsOptions} from '../third_party/index.js';
 
+import {createCodeModeEvaluateTool} from './codeMode/codeMode.js';
+import {partitionToolsForCodeMode} from './codeMode/codeModePartition.js';
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
 import * as cssTools from './css.js';
@@ -20,8 +22,6 @@ import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
 import * as pwaTools from './pwa.js';
-import {createReplEvaluateTool} from './repl/repl.js';
-import {partitionToolsForRepl} from './repl/replPartition.js';
 import * as screencastTools from './screencast.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
@@ -64,11 +64,11 @@ export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
 
   tools.sort((a, b) => a.name.localeCompare(b.name));
 
-  if (args.repl && !args.slim) {
-    const {outerTools, innerTools} = partitionToolsForRepl(tools, args);
-    const replTool = createReplEvaluateTool(args, innerTools, tools);
+  if (args.codeMode && !args.slim) {
+    const {outerTools, innerTools} = partitionToolsForCodeMode(tools, args);
+    const codeModeTool = createCodeModeEvaluateTool(args, innerTools, tools);
     return outerTools.map(tool =>
-      tool.name === 'evaluate_script' ? replTool : tool,
+      tool.name === 'evaluate_script' ? codeModeTool : tool,
     );
   }
 

@@ -10,7 +10,7 @@ import {ToolCategory} from './categories.js';
 import {
   executeThirdPartyToolOutputSchema,
   listThirdPartyToolsOutputSchema,
-} from './repl/replSchema.js';
+} from './codeMode/codeModeSchema.js';
 import {
   definePageTool,
   jsonObjectTransform,

@@ -357,9 +357,9 @@ describe('ServerConfig', () => {
       assert.strictEqual(mergedWithoutCi.usageStatistics, true);
     });
 
-    it('allows mergeReloadable to disable javascriptEvaluation and ignore slim when started with repl=true', () => {
+    it('allows mergeReloadable to disable javascriptEvaluation and ignore slim when started with codeMode=true', () => {
       const initial = ServerConfig.create({
-        cliArgs: {repl: true},
+        cliArgs: {codeMode: true},
         fileArgs: {},
         env: {CI: '1'},
         suppressUsageStatisticsNotice: true,
@@ -367,7 +367,7 @@ describe('ServerConfig', () => {
       const reloaded = ServerConfig.create({
         cliArgs: {},
         fileArgs: {
-          repl: false,
+          codeMode: false,
           javascriptEvaluation: false,
           slim: true,
           blockedUrlPattern: ['*://blocked.example/*'],
@@ -378,7 +378,7 @@ describe('ServerConfig', () => {
 
       const merged = initial.mergeReloadable(reloaded, {env: {CI: '1'}});
 
-      assert.strictEqual(merged.resolved.repl, true);
+      assert.strictEqual(merged.resolved.codeMode, true);
       assert.strictEqual(merged.resolved.slim, false);
       assert.strictEqual(merged.resolved.javascriptEvaluation, false);
       assert.deepStrictEqual(merged.resolved.blockedUrlPattern, [

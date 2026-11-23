@@ -68,7 +68,7 @@ import type {
   PaginationOutput,
   SnapshotJsonNode,
   WebMcpToolSummary,
-} from './tools/repl/replSchema.js';
+} from './tools/codeMode/codeModeSchema.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,

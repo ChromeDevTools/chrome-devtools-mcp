@@ -31,18 +31,18 @@ import {
   type ToolSchema,
 } from '../ToolDefinition.js';
 import {
-  INNER_REPL_TOOL_NAMES,
+  INNER_CODE_MODE_TOOL_NAMES,
   STRIPPED_INNER_PARAMS,
-  stripReplToolParams,
-} from './replPartition.js';
+  stripCodeModeToolParams,
+} from './codeModePartition.js';
 import {
-  buildReplApiDeclaration,
+  buildCodeModeApiDeclaration,
   buildStrictRuntimeOutputSchema,
   formatZodOutputValidationError,
-} from './replSchema.js';
+} from './codeModeSchema.js';
 
-const MAX_REPL_IMAGES = 4;
-const MAX_REPL_WAIT_TIMEOUT_MS = 30_000;
+const MAX_CODE_MODE_IMAGES = 4;
+const MAX_CODE_MODE_WAIT_TIMEOUT_MS = 30_000;
 const MAX_PENDING_BINDING_CALLS = 32;
 const MAX_BINDING_PAYLOAD_BYTES = 1_048_576;
 const MAX_ARG_NESTING_DEPTH = 64;
@@ -52,13 +52,13 @@ const FORBIDDEN_PARAM_KEYS: ReadonlySet<string> = new Set([
   'prototype',
 ]);
 
-interface CompletedReplStep {
+interface CompletedCodeModeStep {
   tool: string;
   ok: boolean;
   navigatedToUrl?: string;
 }
 
-interface ReplBindingMessage {
+interface CodeModeBindingMessage {
   seq: number;
   kind: 'tool' | 'getElement' | 'getEventListeners';
   name?: string;
@@ -76,7 +76,9 @@ function isElementHandleToken(
   );
 }
 
-function isReplBindingMessage(value: unknown): value is ReplBindingMessage {
+function isCodeModeBindingMessage(
+  value: unknown,
+): value is CodeModeBindingMessage {
   return (
     isPlainRecord(value) &&
     typeof value.seq === 'number' &&
@@ -227,7 +229,7 @@ function extractExceptionMessage(
       }
     }
   }
-  return details.text || 'REPL evaluation failed.';
+  return details.text || 'Code Mode evaluation failed.';
 }
 
 function isContextDestructionError(error: unknown): boolean {
@@ -242,7 +244,7 @@ function isContextDestructionError(error: unknown): boolean {
   );
 }
 
-async function resolveReplScriptSource(
+async function resolveCodeModeScriptSource(
   inlineSource: string | undefined,
   sourcePath: string | undefined,
   context: Context,
@@ -305,7 +307,7 @@ async function resolveReplScriptSource(
   }
 }
 
-async function writeReplOutput(
+async function writeCodeModeOutput(
   jsonText: string,
   response: Response,
   options: {context: Context; filePath?: string},
@@ -468,7 +470,7 @@ function buildBootstrapExpression(options: {
 
   async function invokeHost(kind, name, rawParams) {
     if (typeof rawBinding !== 'function') {
-      throw new ErrorCtor('REPL host binding is unavailable.');
+      throw new ErrorCtor('Code Mode host binding is unavailable.');
     }
     const allocatedIds = [];
     let seq = 0;
@@ -589,11 +591,13 @@ function buildBootstrapExpression(options: {
 })()`;
 }
 
-/* eslint-disable @local/enforce-zod-schema -- strict runtime input validation for inner REPL tools. */
+/* eslint-disable @local/enforce-zod-schema -- strict runtime input validation for inner Code Mode tools. */
 function buildStrictInnerSchema(
   schema: ToolSchema,
 ): zod.ZodObject<zod.ZodRawShape, zod.core.$strict> {
-  return zod.object(stripReplToolParams(schema, {stripPageId: true})).strict();
+  return zod
+    .object(stripCodeModeToolParams(schema, {stripPageId: true}))
+    .strict();
 }
 /* eslint-enable @local/enforce-zod-schema */
 
@@ -610,8 +614,8 @@ function setOwnProperty(
   });
 }
 
-class ReplToolDispatcher {
-  readonly completedSteps: CompletedReplStep[] = [];
+class CodeModeToolDispatcher {
+  readonly completedSteps: CompletedCodeModeStep[] = [];
 
   #innerMutex = new Mutex();
   #inFlight?: Promise<void>;
@@ -676,11 +680,11 @@ class ReplToolDispatcher {
     void mutexGuard;
     if (this.#navigated) {
       throw new Error(
-        'REPL script execution ended due to full-page navigation.',
+        'Code Mode script execution ended due to full-page navigation.',
       );
     }
     if (this.#aborted) {
-      throw new Error('REPL script execution has already ended.');
+      throw new Error('Code Mode script execution has already ended.');
     }
     const resolvers = Promise.withResolvers<void>();
     this.#inFlight = resolvers.promise;
@@ -940,7 +944,7 @@ class ReplToolDispatcher {
     return await this.#runExclusively(async () => {
       const innerTool = this.#innerToolsByName.get(toolName);
       if (!innerTool) {
-        throw new Error(`Unknown inner REPL tool: ${toolName}`);
+        throw new Error(`Unknown inner Code Mode tool: ${toolName}`);
       }
 
       using ephemeralStack = new DisposableStack();
@@ -966,23 +970,24 @@ class ReplToolDispatcher {
       if (
         toolName === 'wait_for' &&
         typeof parsedParams.timeout === 'number' &&
-        parsedParams.timeout > MAX_REPL_WAIT_TIMEOUT_MS
+        parsedParams.timeout > MAX_CODE_MODE_WAIT_TIMEOUT_MS
       ) {
         throw new Error(
-          `Invalid arguments for mcp.wait_for: timeout must not exceed ${MAX_REPL_WAIT_TIMEOUT_MS}ms inside evaluate_script.`,
+          `Invalid arguments for mcp.wait_for: timeout must not exceed ${MAX_CODE_MODE_WAIT_TIMEOUT_MS}ms inside evaluate_script.`,
         );
       }
 
-      const {structuredContent, images} = await this.#context.runReplInnerTool(
-        innerTool,
-        parsedParams,
-        this.#page,
-      );
+      const {structuredContent, images} =
+        await this.#context.runCodeModeInnerTool(
+          innerTool,
+          parsedParams,
+          this.#page,
+        );
 
       for (const image of images) {
-        if (this.#imagesAttached >= MAX_REPL_IMAGES) {
+        if (this.#imagesAttached >= MAX_CODE_MODE_IMAGES) {
           throw new Error(
-            `Exceeded maximum of ${MAX_REPL_IMAGES} inline screenshots in a single evaluate_script call.`,
+            `Exceeded maximum of ${MAX_CODE_MODE_IMAGES} inline screenshots in a single evaluate_script call.`,
           );
         }
         this.#imagesAttached++;
@@ -1029,7 +1034,7 @@ class ReplToolDispatcher {
       if (typeof uid !== 'string' || uid.length === 0) {
         throw new Error('mcp.getElement(uid) requires a non-empty uid string.');
       }
-      return await this.#page.resolveUidInReplContext(uid, this.#contextId);
+      return await this.#page.resolveUidInCodeModeContext(uid, this.#contextId);
     });
   }
 
@@ -1105,7 +1110,7 @@ class ReplToolDispatcher {
   }
 }
 
-export function createReplEvaluateTool(
+export function createCodeModeEvaluateTool(
   cliArgs: ParsedArguments,
   innerTools: readonly AnyToolDefinition[],
   allTools: readonly AnyToolDefinition[],
@@ -1117,7 +1122,7 @@ export function createReplEvaluateTool(
 
   const enabledToolNames = [...innerToolsByName.keys()];
   const disabledInnerToolNames: string[] = [];
-  for (const name of INNER_REPL_TOOL_NAMES) {
+  for (const name of INNER_CODE_MODE_TOOL_NAMES) {
     if (!innerToolsByName.has(name)) {
       disabledInnerToolNames.push(name);
     }
@@ -1129,29 +1134,29 @@ export function createReplEvaluateTool(
       tool.name === 'evaluate_script' ||
       tool.name === 'wait_for' ||
       isSlimTool(tool) ||
-      INNER_REPL_TOOL_NAMES.has(tool.name)
+      INNER_CODE_MODE_TOOL_NAMES.has(tool.name)
     ) {
       continue;
     }
     outerOnlyToolNames.push(tool.name);
   }
 
-  const apiDeclaration = buildReplApiDeclaration(innerTools);
+  const apiDeclaration = buildCodeModeApiDeclaration(innerTools);
 
   const factory = definePageTool(() => ({
     name: 'evaluate_script',
-    description: `Evaluate an async JavaScript function \`async (mcp: McpTools) => { ... }\` inside the page REPL context. Returns JSON.\n\`\`\`ts\n${apiDeclaration}\n\`\`\``,
+    description: `Evaluate an async JavaScript function \`async (mcp: McpTools) => { ... }\` in Code Mode inside the page context. Returns JSON.\n\`\`\`ts\n${apiDeclaration}\n\`\`\``,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
-      conditions: ['javascriptEvaluation', 'repl'],
+      conditions: ['javascriptEvaluation', 'codeMode'],
     },
     schema: {
       function: zod
         .string()
         .optional()
         .describe(
-          'Async function `(mcp) => ...` to execute in the REPL context. Provide either function or sourcePath, not both.',
+          'Async function `(mcp) => ...` to execute in Code Mode. Provide either function or sourcePath, not both.',
         ),
       sourcePath: zod
         .string()
@@ -1188,7 +1193,7 @@ export function createReplEvaluateTool(
       const page = request.page;
       page.throwIfDialogOpen();
 
-      const rawSource = await resolveReplScriptSource(
+      const rawSource = await resolveCodeModeScriptSource(
         request.params.function,
         request.params.sourcePath,
         context,
@@ -1199,22 +1204,22 @@ export function createReplEvaluateTool(
         session,
         contextId,
         loaderId: initialLoaderId,
-      } = await page.getReplExecutionContext({
-        mainWorld: cliArgs.replMainWorld,
+      } = await page.getCodeModeExecutionContext({
+        mainWorld: cliArgs.codeModeMainWorld,
       });
 
       const turnId = crypto.randomUUID().replaceAll('-', '');
       const bindingName = `__mcpCallTool_${turnId}`;
-      const objectGroup = `cd4a_repl_turn_${turnId}`;
+      const objectGroup = `cd4a_code_mode_turn_${turnId}`;
 
-      const dispatcher = new ReplToolDispatcher({
+      const dispatcher = new CodeModeToolDispatcher({
         page,
         context,
         outerResponse: response,
         session,
         contextId,
         objectGroup,
-        mainWorld: cliArgs.replMainWorld,
+        mainWorld: cliArgs.codeModeMainWorld,
         innerToolsByName,
       });
 
@@ -1268,7 +1273,7 @@ export function createReplEvaluateTool(
           completedSteps: dispatcher.completedSteps,
           note: 'Script ended early due to full-page navigation; call evaluate_script again on the new page.',
         });
-        await writeReplOutput(earlyExitJson, response, {
+        await writeCodeModeOutput(earlyExitJson, response, {
           context,
           filePath: request.params.filePath,
         });
@@ -1305,10 +1310,10 @@ export function createReplEvaluateTool(
         ) {
           try {
             const parsed: unknown = JSON.parse(event.payload);
-            if (isReplBindingMessage(parsed)) {
+            if (isCodeModeBindingMessage(parsed)) {
               rejectBindingCall(
                 parsed.seq,
-                'REPL binding payload exceeded maximum size (1 MiB).',
+                'Code Mode binding payload exceeded maximum size (1 MiB).',
               );
             }
           } catch {
@@ -1323,7 +1328,7 @@ export function createReplEvaluateTool(
         } catch {
           return;
         }
-        if (!isReplBindingMessage(parsedPayload)) {
+        if (!isCodeModeBindingMessage(parsedPayload)) {
           return;
         }
 
@@ -1422,7 +1427,7 @@ export function createReplEvaluateTool(
 
       session.on('Page.frameNavigated', onFrameNavigated);
       session.on('Runtime.bindingCalled', onBindingCalled);
-      page.setReplDialogAction(request.params.dialogAction ?? 'accept');
+      page.setCodeModeDialogAction(request.params.dialogAction ?? 'accept');
 
       try {
         const userFnRes = await session.send('Runtime.evaluate', {
@@ -1442,7 +1447,7 @@ export function createReplEvaluateTool(
           !userFnRes.result.objectId
         ) {
           throw new Error(
-            'REPL evaluate_script expects a function (e.g. async (mcp) => { ... }).',
+            'Code Mode evaluate_script expects a function (e.g. async (mcp) => { ... }).',
           );
         }
         const userFnObjectId = userFnRes.result.objectId;
@@ -1475,7 +1480,7 @@ export function createReplEvaluateTool(
           );
         }
         if (!bootstrapRes.result.objectId) {
-          throw new Error('Failed to initialize REPL execution harness.');
+          throw new Error('Failed to initialize Code Mode execution harness.');
         }
         holderObjectId = bootstrapRes.result.objectId;
 
@@ -1524,13 +1529,13 @@ export function createReplEvaluateTool(
           await waitForPageStableDom();
         }
 
-        await writeReplOutput(serializedOutput, response, {
+        await writeCodeModeOutput(serializedOutput, response, {
           context,
           filePath: request.params.filePath,
         });
       } finally {
         dispatcher.abort();
-        page.setReplDialogAction(undefined);
+        page.setCodeModeDialogAction(undefined);
         session.off('Runtime.bindingCalled', onBindingCalled);
         session.off('Page.frameNavigated', onFrameNavigated);
         if (bindingRegistered) {

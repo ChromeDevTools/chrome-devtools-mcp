@@ -15,7 +15,7 @@ import type {ConsoleMessage, Protocol} from '../third_party/index.js';
 import type {
   ConsoleMessageConcise,
   ConsoleMessageDetailed,
-} from '../tools/repl/replSchema.js';
+} from '../tools/codeMode/codeModeSchema.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';

@@ -10,7 +10,7 @@ import {ToolCategory} from './categories.js';
 import {
   takeSnapshotOutputSchema,
   waitForOutputSchema,
-} from './repl/replSchema.js';
+} from './codeMode/codeModeSchema.js';
 import {
   definePageTool,
   type PageToolFactory,

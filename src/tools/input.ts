@@ -17,7 +17,10 @@ import {raceWithSignal} from '../utils/raceWithSignal.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
-import {actionOutputSchema, typeTextOutputSchema} from './repl/replSchema.js';
+import {
+  actionOutputSchema,
+  typeTextOutputSchema,
+} from './codeMode/codeModeSchema.js';
 import {
   definePageTool,
   zodTransform,

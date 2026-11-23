@@ -12,7 +12,7 @@ import {
   type ToolSchema,
 } from '../ToolDefinition.js';
 
-export const INNER_REPL_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const INNER_CODE_MODE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'click',
   'click_at',
   'drag',
@@ -46,12 +46,12 @@ export const STRIPPED_INNER_PARAMS: ReadonlySet<string> = new Set([
   'serviceWorkerId',
 ]);
 
-export interface ReplToolPartition {
+export interface CodeModeToolPartition {
   outerTools: AnyToolDefinition[];
   innerTools: AnyToolDefinition[];
 }
 
-export function stripReplToolParams(
+export function stripCodeModeToolParams(
   schema: ToolSchema,
   options?: {stripPageId?: boolean},
 ): ToolSchema {
@@ -85,28 +85,28 @@ function cloneInnerToolWithStrippedParams<T extends AnyToolDefinition>(
 ): T {
   return {
     ...tool,
-    schema: stripReplToolParams(tool.schema),
+    schema: stripCodeModeToolParams(tool.schema),
     verifyFilesSchema: stripInnerVerifyFilesParams(tool.verifyFilesSchema),
   };
 }
 
-export function partitionToolsForRepl(
+export function partitionToolsForCodeMode(
   tools: readonly AnyToolDefinition[],
   args: ParsedArguments,
-): ReplToolPartition {
+): CodeModeToolPartition {
   const outerTools: AnyToolDefinition[] = [];
   const innerTools: AnyToolDefinition[] = [];
 
   for (const tool of tools) {
     if (
-      !INNER_REPL_TOOL_NAMES.has(tool.name) ||
+      !INNER_CODE_MODE_TOOL_NAMES.has(tool.name) ||
       SHARED_OUTER_AND_INNER_TOOL_NAMES.has(tool.name)
     ) {
       outerTools.push(tool);
     }
 
     if (
-      INNER_REPL_TOOL_NAMES.has(tool.name) &&
+      INNER_CODE_MODE_TOOL_NAMES.has(tool.name) &&
       isCapabilityEnabled(tool.annotations, args)
     ) {
       innerTools.push(cloneInnerToolWithStrippedParams(tool));

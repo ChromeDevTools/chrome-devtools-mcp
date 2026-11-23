@@ -400,7 +400,7 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
-  runReplInnerTool(
+  runCodeModeInnerTool(
     tool: AnyToolDefinition,
     params: Record<string, unknown>,
     page: ContextPage,
@@ -536,13 +536,13 @@ export type ContextPage = Readonly<{
   isOptionUid(uid: string): boolean;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
-  getReplExecutionContext(options: {mainWorld: boolean}): Promise<{
+  getCodeModeExecutionContext(options: {mainWorld: boolean}): Promise<{
     session: CDPSession;
     contextId: number;
     frameId: string;
     loaderId: string;
   }>;
-  resolveUidInReplContext(
+  resolveUidInCodeModeContext(
     uid: string,
     contextId: number,
   ): Promise<string | null>;
@@ -550,7 +550,7 @@ export type ContextPage = Readonly<{
     uid: string,
     options: {mainWorld: boolean},
   ): Promise<DomEventListenerSummary[]>;
-  setReplDialogAction(action: DialogAction | undefined): void;
+  setCodeModeDialogAction(action: DialogAction | undefined): void;
   registerEphemeralBackendNode(entry: {
     backendNodeId: number;
     frameId?: string;

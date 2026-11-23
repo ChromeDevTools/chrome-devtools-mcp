@@ -9,7 +9,7 @@ import {zod} from '../../third_party/index.js';
 import {isPlainRecord} from '../../utils/objects.js';
 
 import type {AnyToolDefinition, ToolSchema} from '../ToolDefinition.js';
-import {stripReplToolParams} from './replPartition.js';
+import {stripCodeModeToolParams} from './codeModePartition.js';
 
 export type SnapshotPrimitiveAttribute = string | number | boolean;
 
@@ -664,7 +664,7 @@ export function formatZodOutputValidationError(
 }
 
 const VALID_IDENTIFIER_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const REPL_TS_TYPE_KEY = 'x-repl-ts-type';
+const CODE_MODE_TS_TYPE_KEY = 'x-code-mode-ts-type';
 
 function formatPropertyKey(key: string): string {
   return VALID_IDENTIFIER_REGEX.test(key) ? key : JSON.stringify(key);
@@ -718,7 +718,7 @@ function jsonSchemaNodeToTs(
     return 'unknown';
   }
 
-  const customTs = node[REPL_TS_TYPE_KEY];
+  const customTs = node[CODE_MODE_TS_TYPE_KEY];
   if (typeof customTs === 'string') {
     return customTs;
   }
@@ -850,7 +850,7 @@ export function zodShapeToTs(shape: ToolSchema): string {
   return jsonSchemaNodeToTs(root, extractJsonSchemaDefs(root), new Set());
 }
 
-function augmentObjectSchemaWithReplElements(
+function augmentObjectSchemaWithCodeModeElements(
   objNode: Record<string, unknown>,
   options: {
     includeElementsArrayItem: boolean;
@@ -891,7 +891,7 @@ function augmentObjectSchemaWithReplElements(
     ) {
       effectiveProp = {
         ...effectiveProp,
-        items: augmentObjectSchemaWithReplElements(effectiveProp.items, {
+        items: augmentObjectSchemaWithCodeModeElements(effectiveProp.items, {
           includeElementsArrayItem: false,
           collapseLargeStringEnums: options.collapseLargeStringEnums,
         }),
@@ -903,17 +903,17 @@ function augmentObjectSchemaWithReplElements(
     if (key === 'uid') {
       reqSet.delete('uid');
       if (!('element' in props)) {
-        nextProps.element = {[REPL_TS_TYPE_KEY]: 'Element'};
+        nextProps.element = {[CODE_MODE_TS_TYPE_KEY]: 'Element'};
       }
     } else if (key === 'from_uid') {
       reqSet.delete('from_uid');
       if (!('fromElement' in props)) {
-        nextProps.fromElement = {[REPL_TS_TYPE_KEY]: 'Element'};
+        nextProps.fromElement = {[CODE_MODE_TS_TYPE_KEY]: 'Element'};
       }
     } else if (key === 'to_uid') {
       reqSet.delete('to_uid');
       if (!('toElement' in props)) {
-        nextProps.toElement = {[REPL_TS_TYPE_KEY]: 'Element'};
+        nextProps.toElement = {[CODE_MODE_TS_TYPE_KEY]: 'Element'};
       }
     }
   }
@@ -925,11 +925,11 @@ function augmentObjectSchemaWithReplElements(
   };
 }
 
-function formatReplToolMethodSignatureInternal(
+function formatCodeModeToolMethodSignatureInternal(
   tool: AnyToolDefinition,
   options?: {collapseLargeStringEnums?: boolean},
 ): string {
-  const inputSchema = stripReplToolParams(tool.schema, {stripPageId: true});
+  const inputSchema = stripCodeModeToolParams(tool.schema, {stripPageId: true});
   let paramsPart = '';
   if (Object.keys(inputSchema).length > 0) {
     const rawRoot = toInputJsonSchema(inputSchema);
@@ -937,7 +937,7 @@ function formatReplToolMethodSignatureInternal(
       ? rawRoot.required.filter((r): r is string => typeof r === 'string')
       : [];
     const allOptional = initialRequired.length === 0;
-    const augmentedRoot = augmentObjectSchemaWithReplElements(rawRoot, {
+    const augmentedRoot = augmentObjectSchemaWithCodeModeElements(rawRoot, {
       includeElementsArrayItem: tool.name === 'fill_form',
       collapseLargeStringEnums: options?.collapseLargeStringEnums ?? false,
     });
@@ -953,8 +953,10 @@ function formatReplToolMethodSignatureInternal(
   return `${tool.name}(${paramsPart}): Promise<${outputTs}>;`;
 }
 
-export function formatReplToolMethodSignature(tool: AnyToolDefinition): string {
-  return formatReplToolMethodSignatureInternal(tool);
+export function formatCodeModeToolMethodSignature(
+  tool: AnyToolDefinition,
+): string {
+  return formatCodeModeToolMethodSignatureInternal(tool);
 }
 
 function compactTsWhitespace(ts: string): string {
@@ -1016,7 +1018,7 @@ const CSS_PROP_TS = zodSchemaToTs(structuredCssPropertySchema);
 const CSS_STYLES_RAW_TS = zodSchemaToTs(structuredCssStylesSchema);
 const CSS_RULE_TYPES_TS = collectCascadeRuleTypeLiterals();
 
-export function buildReplApiDeclaration(
+export function buildCodeModeApiDeclaration(
   innerTools: readonly AnyToolDefinition[],
 ): string {
   const netDetailExtraFields: ToolSchema = {};
@@ -1060,7 +1062,7 @@ export function buildReplApiDeclaration(
 
   const methodLines: string[] = [];
   for (const tool of innerTools) {
-    const rawSig = formatReplToolMethodSignatureInternal(tool, {
+    const rawSig = formatCodeModeToolMethodSignatureInternal(tool, {
       collapseLargeStringEnums: true,
     });
     const splitIdx = rawSig.indexOf('): Promise<');

@@ -18,10 +18,10 @@ import {
 } from '../../src/config/mcp-options.js';
 import {zod} from '../../src/third_party/index.js';
 import {
-  INNER_REPL_TOOL_NAMES,
-  partitionToolsForRepl,
+  INNER_CODE_MODE_TOOL_NAMES,
+  partitionToolsForCodeMode,
   STRIPPED_INNER_PARAMS,
-} from '../../src/tools/repl/replPartition.js';
+} from '../../src/tools/codeMode/codeModePartition.js';
 import type {AnyToolDefinition} from '../../src/tools/ToolDefinition.js';
 import {createTools} from '../../src/tools/tools.js';
 import {createMockParsedArguments} from '../mocks.js';
@@ -71,8 +71,8 @@ const EXPECTED_DEFAULT_INNER_TOOLS = [
   'wait_for',
 ];
 
-const EXPECTED_OUTER_REPL_TOOLS = [
-  // DEBUGGING (session, browser, and REPL host entrypoint)
+const EXPECTED_OUTER_CODE_MODE_TOOLS = [
+  // DEBUGGING (session, browser, and Code Mode host entrypoint)
   'evaluate_script',
   'get_devtools_comments',
   'lighthouse_audit',
@@ -82,7 +82,7 @@ const EXPECTED_OUTER_REPL_TOOLS = [
   'screencast_start',
   'screencast_stop',
   'set_logpoints',
-  // NAVIGATION (including wait_for shared with inner REPL)
+  // NAVIGATION (including wait_for shared with inner Code Mode)
   'close_page',
   'get_tab_id',
   'list_pages',
@@ -148,7 +148,9 @@ function parseCliArgs(argv: string[]): ParsedArguments {
 function createUnpartitionedTools(
   overrides: Partial<ParsedArguments> = {},
 ): AnyToolDefinition[] {
-  return createTools(createMockParsedArguments({...overrides, repl: false}));
+  return createTools(
+    createMockParsedArguments({...overrides, codeMode: false}),
+  );
 }
 
 function findTool(
@@ -160,50 +162,54 @@ function findTool(
   return found;
 }
 
-describe('replPartition', () => {
+describe('codeModePartition', () => {
   describe('CLI options and config validation', () => {
-    it('defines repl and replMainWorld boolean options defaulting to false and omits them from getCliOptions', () => {
-      assert.strictEqual(mcpOptions.repl.type, 'boolean');
-      assert.strictEqual(mcpOptions.repl.default, false);
-      assert.ok(mcpOptions.repl.describe);
+    it('defines codeMode and codeModeMainWorld boolean options defaulting to false and omits them from getCliOptions', () => {
+      assert.strictEqual(mcpOptions.codeMode.type, 'boolean');
+      assert.strictEqual(mcpOptions.codeMode.default, false);
+      assert.ok(mcpOptions.codeMode.describe);
 
-      assert.strictEqual(mcpOptions.replMainWorld.type, 'boolean');
-      assert.strictEqual(mcpOptions.replMainWorld.default, false);
-      assert.ok(mcpOptions.replMainWorld.describe);
+      assert.strictEqual(mcpOptions.codeModeMainWorld.type, 'boolean');
+      assert.strictEqual(mcpOptions.codeModeMainWorld.default, false);
+      assert.ok(mcpOptions.codeModeMainWorld.describe);
 
       const defaultArgs = createMockParsedArguments();
-      assert.strictEqual(defaultArgs.repl, false);
-      assert.strictEqual(defaultArgs.replMainWorld, false);
+      assert.strictEqual(defaultArgs.codeMode, false);
+      assert.strictEqual(defaultArgs.codeModeMainWorld, false);
 
-      const replOnly = parseCliArgs(['--repl']);
-      assert.strictEqual(replOnly.repl, true);
-      assert.strictEqual(replOnly.replMainWorld, false);
+      const codeModeOnly = parseCliArgs(['--code-mode']);
+      assert.strictEqual(codeModeOnly.codeMode, true);
+      assert.strictEqual(codeModeOnly.codeModeMainWorld, false);
+
+      const experimentalAlias = parseCliArgs(['--experimental-code-mode']);
+      assert.strictEqual(experimentalAlias.codeMode, true);
+      assert.strictEqual(experimentalAlias.codeModeMainWorld, false);
 
       const cliOptions = getCliOptions();
-      assert.strictEqual('repl' in cliOptions, false);
-      assert.strictEqual('replMainWorld' in cliOptions, false);
+      assert.strictEqual('codeMode' in cliOptions, false);
+      assert.strictEqual('codeModeMainWorld' in cliOptions, false);
     });
 
-    it('rejects --repl with --slim or --no-javascript-evaluation and implies repl=true from --repl-main-world', () => {
-      assert.throws(() => parseCliArgs(['--repl', '--slim']));
+    it('rejects --code-mode with --slim or --no-javascript-evaluation and implies codeMode=true from --code-mode-main-world', () => {
+      assert.throws(() => parseCliArgs(['--code-mode', '--slim']));
       assert.throws(() =>
-        parseCliArgs(['--repl', '--no-javascript-evaluation']),
+        parseCliArgs(['--code-mode', '--no-javascript-evaluation']),
       );
 
-      const mainWorldOnly = parseCliArgs(['--repl-main-world']);
-      assert.strictEqual(mainWorldOnly.replMainWorld, true);
-      assert.strictEqual(mainWorldOnly.repl, true);
+      const mainWorldOnly = parseCliArgs(['--code-mode-main-world']);
+      assert.strictEqual(mainWorldOnly.codeModeMainWorld, true);
+      assert.strictEqual(mainWorldOnly.codeMode, true);
     });
   });
 
   describe('constants', () => {
-    it('declares the exact 20 inner REPL tools (excluding handle_dialog) and stripped inner params', () => {
+    it('declares the exact 20 inner Code Mode tools (excluding handle_dialog) and stripped inner params', () => {
       assert.strictEqual(EXPECTED_ALL_INNER_TOOLS.length, 20);
       assert.deepStrictEqual(
-        [...INNER_REPL_TOOL_NAMES].sort(),
+        [...INNER_CODE_MODE_TOOL_NAMES].sort(),
         EXPECTED_ALL_INNER_TOOLS,
       );
-      assert.ok(!INNER_REPL_TOOL_NAMES.has('handle_dialog'));
+      assert.ok(!INNER_CODE_MODE_TOOL_NAMES.has('handle_dialog'));
       assert.deepStrictEqual([...STRIPPED_INNER_PARAMS].sort(), [
         'filePath',
         'requestFilePath',
@@ -214,9 +220,9 @@ describe('replPartition', () => {
   });
 
   describe('createTools outer surface', () => {
-    it('keeps all standard tools on the outer surface when repl is false', () => {
+    it('keeps all standard tools on the outer surface when codeMode is false', () => {
       const names = new Set(
-        createTools(createMockParsedArguments({repl: false})).map(
+        createTools(createMockParsedArguments({codeMode: false})).map(
           tool => tool.name,
         ),
       );
@@ -236,35 +242,35 @@ describe('replPartition', () => {
       ]) {
         assert.ok(
           names.has(expected),
-          `Expected outer tools with repl=false to include "${expected}"`,
+          `Expected outer tools with codeMode=false to include "${expected}"`,
         );
       }
     });
 
-    it('keeps lifecycle/session/dialog/file tools and excludes inner-only tools when repl is true and slim is false', () => {
+    it('keeps lifecycle/session/dialog/file tools and excludes inner-only tools when codeMode is true and slim is false', () => {
       const outerTools = createTools(
-        createMockParsedArguments({repl: true, slim: false}),
+        createMockParsedArguments({codeMode: true, slim: false}),
       );
       const outerNames = new Set(outerTools.map(tool => tool.name));
 
-      for (const expectedOuter of EXPECTED_OUTER_REPL_TOOLS) {
+      for (const expectedOuter of EXPECTED_OUTER_CODE_MODE_TOOLS) {
         assert.ok(
           outerNames.has(expectedOuter),
-          `Expected outer tools with repl=true to include "${expectedOuter}"`,
+          `Expected outer tools with codeMode=true to include "${expectedOuter}"`,
         );
       }
 
       for (const innerOnly of EXPECTED_INNER_ONLY_TOOLS) {
         assert.ok(
           !outerNames.has(innerOnly),
-          `Expected outer tools with repl=true to exclude inner-only tool "${innerOnly}"`,
+          `Expected outer tools with codeMode=true to exclude inner-only tool "${innerOnly}"`,
         );
       }
     });
 
-    it('does not partition slim tools when slim is true even if repl is true', () => {
+    it('does not partition slim tools when slim is true even if codeMode is true', () => {
       const tools = createTools(
-        createMockParsedArguments({repl: true, slim: true}),
+        createMockParsedArguments({codeMode: true, slim: true}),
       );
       const names = new Set(tools.map(tool => tool.name));
 
@@ -274,10 +280,10 @@ describe('replPartition', () => {
     });
   });
 
-  describe('partitionToolsForRepl', () => {
+  describe('partitionToolsForCodeMode', () => {
     it('includes the 15 default enabled in-page primitives on innerTools, keeps wait_for in both, and keeps handle_dialog outer-only', () => {
-      const replArgs = createMockParsedArguments({
-        repl: true,
+      const codeModeArgs = createMockParsedArguments({
+        codeMode: true,
         slim: false,
         experimentalVision: false,
       });
@@ -286,9 +292,9 @@ describe('replPartition', () => {
         experimentalVision: false,
       });
 
-      const {outerTools, innerTools} = partitionToolsForRepl(
+      const {outerTools, innerTools} = partitionToolsForCodeMode(
         allTools,
-        replArgs,
+        codeModeArgs,
       );
       const outerNames = new Set(outerTools.map(tool => tool.name));
       const innerNames = innerTools.map(tool => tool.name).sort();
@@ -312,9 +318,9 @@ describe('replPartition', () => {
         categoryExperimentalWebmcp: true,
         categoryExperimentalThirdParty: true,
       };
-      const enabledResult = partitionToolsForRepl(
+      const enabledResult = partitionToolsForCodeMode(
         createUnpartitionedTools(allEnabledOverrides),
-        createMockParsedArguments({...allEnabledOverrides, repl: true}),
+        createMockParsedArguments({...allEnabledOverrides, codeMode: true}),
       );
       assert.deepStrictEqual(
         enabledResult.innerTools.map(tool => tool.name).sort(),
@@ -325,9 +331,9 @@ describe('replPartition', () => {
         slim: false,
         categoryNetwork: false,
       };
-      const noNetworkResult = partitionToolsForRepl(
+      const noNetworkResult = partitionToolsForCodeMode(
         createUnpartitionedTools(noNetworkOverrides),
-        createMockParsedArguments({...noNetworkOverrides, repl: true}),
+        createMockParsedArguments({...noNetworkOverrides, codeMode: true}),
       );
       const noNetworkInnerNames = new Set(
         noNetworkResult.innerTools.map(tool => tool.name),
@@ -340,9 +346,9 @@ describe('replPartition', () => {
 
     it('strips filePath, requestFilePath, responseFilePath, and serviceWorkerId from inner tool schemas and rejects them under strict validation', () => {
       const rawTools = createUnpartitionedTools({slim: false});
-      const {innerTools} = partitionToolsForRepl(
+      const {innerTools} = partitionToolsForCodeMode(
         rawTools,
-        createMockParsedArguments({repl: true, slim: false}),
+        createMockParsedArguments({codeMode: true, slim: false}),
       );
 
       const innerSnapshot = findTool(innerTools, 'take_snapshot');

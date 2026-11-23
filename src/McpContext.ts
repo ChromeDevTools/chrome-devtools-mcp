@@ -1289,7 +1289,7 @@ export class McpContext implements Context, BrowserlessContext {
     );
   }
 
-  async runReplInnerTool(
+  async runCodeModeInnerTool(
     tool: AnyToolDefinition,
     params: Record<string, unknown>,
     page: ContextPage,

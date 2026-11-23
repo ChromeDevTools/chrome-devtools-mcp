@@ -2747,8 +2747,8 @@ describe('McpPage', () => {
     });
   });
 
-  describe('REPL execution context, ephemeral nodes, and dialog handling', () => {
-    it('creates, caches, and invalidates the cd4a_repl isolated world and resolves mainWorld contexts in getReplExecutionContext()', async () => {
+  describe('Code Mode execution context, ephemeral nodes, and dialog handling', () => {
+    it('creates, caches, and invalidates the cd4a_code_mode isolated world and resolves mainWorld contexts in getCodeModeExecutionContext()', async () => {
       const pptrPage = createMockPuppeteerPage();
       pptrPage.emulateFocusedPage.resolves();
 
@@ -2791,7 +2791,9 @@ describe('McpPage', () => {
         });
       Object.assign(cdpSession, {send: sendStub});
 
-      const first = await mcpPage.getReplExecutionContext({mainWorld: false});
+      const first = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
       assert.strictEqual(first.contextId, 77);
       assert.strictEqual(first.frameId, 'frame-1');
       assert.strictEqual(first.loaderId, 'loader-1');
@@ -2800,12 +2802,12 @@ describe('McpPage', () => {
         'Page.createIsolatedWorld',
         {
           frameId: 'frame-1',
-          worldName: 'cd4a_repl',
+          worldName: 'cd4a_code_mode',
           grantUniveralAccess: false,
         },
       );
 
-      const secondCached = await mcpPage.getReplExecutionContext({
+      const secondCached = await mcpPage.getCodeModeExecutionContext({
         mainWorld: false,
       });
       assert.strictEqual(secondCached.contextId, 77);
@@ -2817,7 +2819,7 @@ describe('McpPage', () => {
       cdpSession.emit('Runtime.executionContextDestroyed', {
         executionContextId: 77,
       });
-      const afterDestroyed = await mcpPage.getReplExecutionContext({
+      const afterDestroyed = await mcpPage.getCodeModeExecutionContext({
         mainWorld: false,
       });
       assert.strictEqual(afterDestroyed.contextId, 78);
@@ -2830,7 +2832,7 @@ describe('McpPage', () => {
       cdpSession.emit('Page.frameNavigated', {
         frame: {id: 'frame-1', loaderId: 'loader-2'},
       });
-      const afterNavigated = await mcpPage.getReplExecutionContext({
+      const afterNavigated = await mcpPage.getCodeModeExecutionContext({
         mainWorld: false,
       });
       assert.strictEqual(afterNavigated.contextId, 79);
@@ -2841,7 +2843,7 @@ describe('McpPage', () => {
       );
 
       cdpSession.emit('Runtime.executionContextsCleared', undefined);
-      const afterCleared = await mcpPage.getReplExecutionContext({
+      const afterCleared = await mcpPage.getCodeModeExecutionContext({
         mainWorld: false,
       });
       assert.strictEqual(afterCleared.contextId, 80);
@@ -2859,7 +2861,9 @@ describe('McpPage', () => {
           auxData: {isDefault: true, frameId: 'frame-1'},
         },
       });
-      const mainCtx = await mcpPage.getReplExecutionContext({mainWorld: true});
+      const mainCtx = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: true,
+      });
       assert.strictEqual(mainCtx.contextId, 11);
       assert.strictEqual(
         sendStub.withArgs('Page.createIsolatedWorld').callCount,
@@ -2988,19 +2992,19 @@ describe('McpPage', () => {
       }
     });
 
-    it('auto-handles dialogs via setReplDialogAction and suppresses unhandled rejections when dialog handling rejects', async () => {
+    it('auto-handles dialogs via setCodeModeDialogAction and suppresses unhandled rejections when dialog handling rejects', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
       const acceptDialog = createMockDialog({type: 'confirm', message: 'Ok?'});
       acceptDialog.accept.resolves();
-      mcpPage.setReplDialogAction('accept');
+      mcpPage.setCodeModeDialogAction('accept');
       pptrPage.emit('dialog', acceptDialog);
       sinon.assert.calledOnceWithExactly(acceptDialog.accept);
       assert.strictEqual(mcpPage.getDialog(), undefined);
 
       const dismissDialog = createMockDialog({type: 'confirm', message: 'No?'});
       dismissDialog.dismiss.resolves();
-      mcpPage.setReplDialogAction('dismiss');
+      mcpPage.setCodeModeDialogAction('dismiss');
       pptrPage.emit('dialog', dismissDialog);
       sinon.assert.calledOnceWithExactly(dismissDialog.dismiss);
       assert.strictEqual(mcpPage.getDialog(), undefined);
@@ -3010,7 +3014,7 @@ describe('McpPage', () => {
         message: 'Name?',
       });
       promptDialog.accept.resolves();
-      mcpPage.setReplDialogAction('prompt-answer');
+      mcpPage.setCodeModeDialogAction('prompt-answer');
       pptrPage.emit('dialog', promptDialog);
       sinon.assert.calledOnceWithExactly(promptDialog.accept, 'prompt-answer');
       assert.strictEqual(mcpPage.getDialog(), undefined);
@@ -3026,7 +3030,7 @@ describe('McpPage', () => {
           message: 'Closed accept',
         });
         rejectingAccept.accept.rejects(new Error('Target closed'));
-        mcpPage.setReplDialogAction('accept');
+        mcpPage.setCodeModeDialogAction('accept');
         pptrPage.emit('dialog', rejectingAccept);
 
         const rejectingDismiss = createMockDialog({
@@ -3034,14 +3038,14 @@ describe('McpPage', () => {
           message: 'Closed dismiss',
         });
         rejectingDismiss.dismiss.rejects(new Error('No dialog is showing'));
-        mcpPage.setReplDialogAction('dismiss');
+        mcpPage.setCodeModeDialogAction('dismiss');
         pptrPage.emit('dialog', rejectingDismiss);
 
         await settle();
         assert.deepStrictEqual(unhandled, []);
       } finally {
         process.off('unhandledRejection', onUnhandled);
-        mcpPage.setReplDialogAction(undefined);
+        mcpPage.setCodeModeDialogAction(undefined);
       }
     });
   });

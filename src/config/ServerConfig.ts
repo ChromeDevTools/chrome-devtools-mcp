@@ -148,13 +148,13 @@ export class ServerConfig implements ReadonlyServerConfig {
 
   static validateImplications(
     explicitArgs: Partial<ParsedArguments>,
-    options?: {relaxReplJavaScriptEvaluation?: boolean},
+    options?: {relaxCodeModeJavaScriptEvaluation?: boolean},
   ): void {
     for (const [key, implied] of IMPLICATIONS) {
       if (
-        options?.relaxReplJavaScriptEvaluation &&
+        options?.relaxCodeModeJavaScriptEvaluation &&
         implied === 'javascriptEvaluation' &&
-        (key === 'repl' || key === 'replMainWorld')
+        (key === 'codeMode' || key === 'codeModeMainWorld')
       ) {
         continue;
       }
@@ -176,8 +176,11 @@ export class ServerConfig implements ReadonlyServerConfig {
         );
       }
     }
-    if (explicitArgs.replMainWorld === true && explicitArgs.repl === false) {
-      throw new Error('Implications failed:\n  replMainWorld -> repl');
+    if (
+      explicitArgs.codeModeMainWorld === true &&
+      explicitArgs.codeMode === false
+    ) {
+      throw new Error('Implications failed:\n  codeModeMainWorld -> codeMode');
     }
   }
 
@@ -211,14 +214,14 @@ export class ServerConfig implements ReadonlyServerConfig {
       delete resolvedArgs.channel;
     }
 
-    if (resolvedArgs.replMainWorld) {
-      resolvedArgs.repl = true;
+    if (resolvedArgs.codeModeMainWorld) {
+      resolvedArgs.codeMode = true;
     }
 
     if (isViaCli) {
       resolvedArgs.slim = false;
-      resolvedArgs.repl = false;
-      resolvedArgs.replMainWorld = false;
+      resolvedArgs.codeMode = false;
+      resolvedArgs.codeModeMainWorld = false;
       resolvedArgs.pageIdRouting = true;
       if (
         resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
@@ -275,7 +278,7 @@ export class ServerConfig implements ReadonlyServerConfig {
 
   static #createInternal(
     options: ServerConfigCreateOptions & {
-      relaxReplReloadImplications?: boolean;
+      relaxCodeModeReloadImplications?: boolean;
     },
   ): ServerConfig {
     const explicitArgs: Partial<ParsedArguments> = {
@@ -285,7 +288,8 @@ export class ServerConfig implements ReadonlyServerConfig {
     };
     ServerConfig.validateConflicts(explicitArgs);
     ServerConfig.validateImplications(explicitArgs, {
-      relaxReplJavaScriptEvaluation: options.relaxReplReloadImplications,
+      relaxCodeModeJavaScriptEvaluation:
+        options.relaxCodeModeReloadImplications,
     });
     const resolved = ServerConfig.applyDefaults(explicitArgs, {
       env: options.env,
@@ -321,13 +325,14 @@ export class ServerConfig implements ReadonlyServerConfig {
    * preserving this config's CLI arguments, config path, and environment.
    */
   withFileArgs(fileArgs: Partial<ParsedArguments>): ServerConfig {
-    const cliHasRepl =
-      this.#cliArgs.repl === true || this.#cliArgs.replMainWorld === true;
+    const cliHasCodeMode =
+      this.#cliArgs.codeMode === true ||
+      this.#cliArgs.codeModeMainWorld === true;
     const effectiveFileArgs =
-      cliHasRepl && fileArgs.slim === true
+      cliHasCodeMode && fileArgs.slim === true
         ? {...fileArgs, slim: undefined}
         : fileArgs;
-    if (cliHasRepl && fileArgs.slim === true) {
+    if (cliHasCodeMode && fileArgs.slim === true) {
       delete effectiveFileArgs.slim;
     }
     return ServerConfig.#createInternal({
@@ -336,7 +341,7 @@ export class ServerConfig implements ReadonlyServerConfig {
       configPath: this.#configPath,
       env: this.#env,
       suppressUsageStatisticsNotice: true,
-      relaxReplReloadImplications: cliHasRepl,
+      relaxCodeModeReloadImplications: cliHasCodeMode,
     });
   }
 
@@ -351,7 +356,7 @@ export class ServerConfig implements ReadonlyServerConfig {
   ): ServerConfig {
     const mergedFileArgs = mergeLayer(this.#fileArgs, next.#fileArgs);
     const mergedCliArgs = mergeLayer(this.#cliArgs, next.#cliArgs);
-    if (this.#resolved.repl) {
+    if (this.#resolved.codeMode) {
       copyOption(mergedFileArgs, this.#fileArgs, 'slim');
       copyOption(mergedCliArgs, this.#cliArgs, 'slim');
     }
@@ -361,7 +366,7 @@ export class ServerConfig implements ReadonlyServerConfig {
       configPath: this.#configPath,
       env: options?.env ?? this.#env,
       suppressUsageStatisticsNotice: true,
-      relaxReplReloadImplications: this.#resolved.repl,
+      relaxCodeModeReloadImplications: this.#resolved.codeMode,
     });
   }
 
@@ -383,7 +388,7 @@ export class ServerConfig implements ReadonlyServerConfig {
       }
     }
     if (
-      this.#resolved.repl &&
+      this.#resolved.codeMode &&
       Boolean(this.#resolved.slim) !== Boolean(next.#resolved.slim) &&
       !changed.includes('slim')
     ) {

@@ -11,7 +11,7 @@ import {ToolCategory} from './categories.js';
 import {
   getConsoleMessageOutputSchema,
   listConsoleMessagesOutputSchema,
-} from './repl/replSchema.js';
+} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 import {
   GET_CONSOLE_MESSAGE_TOOL_NAME,
