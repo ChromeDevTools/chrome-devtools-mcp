@@ -537,6 +537,25 @@ export default defineConfig([
     },
   },
   {
+    name: 'Modules that must not load the browser bundle',
+    files: ['src/tools/**/*.ts', 'src/config/**/*.ts', 'src/telemetry/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)third_party/browser\\.js$',
+              allowTypeImports: true,
+              message:
+                'Do not import values from third_party/browser.js here; use loadBrowser() or a dynamic import() inside the handler.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     name: 'Tools definitions',
     files: ['src/tools/**/*.ts'],
     rules: {
