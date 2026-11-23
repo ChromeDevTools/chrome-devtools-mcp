@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// The light bundle that the server loads at startup: MCP SDK, zod, ajv and
+// small modules. Puppeteer and DevTools frontend code belong in browser.ts,
+// which loadBrowser() loads on first use.
 import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
