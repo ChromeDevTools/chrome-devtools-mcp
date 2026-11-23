@@ -304,7 +304,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension
+**Description:** Requests the specified page dimensions. Chrome may enforce a minimum window size, so the resulting page dimensions can differ from the requested values.
 
 **Parameters:**
 
