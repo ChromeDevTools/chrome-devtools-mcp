@@ -2190,7 +2190,7 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(toonDetailedText.includes('Test...'));
   });
 
-  it('limits duplicate string node IDs per group and can return all IDs', async () => {
+  describe('duplicate string node IDs', () => {
     const nodes = Array.from({length: 2000}, (_, i) => ({
       id: i + 1,
       selfSize: 1,
@@ -2204,32 +2204,34 @@ describe('McpResponse heap snapshot formatting', () => {
       totalRetainedSize: 2000,
       nodes,
     };
-    const context = createMockMcpContext();
-    for (const [options, shown] of [
-      [{}, 10],
-      [{maxNodeIds: 2000}, 2000],
-    ] as const) {
+
+    it('limits node IDs per group by default', async () => {
       const response = new McpResponse(createMockServerConfig());
-      response.setHeapSnapshotDuplicateStrings([group], {
-        pageSize: 1,
-        ...options,
-      });
-      const result = await response.handle(context);
+      response.setHeapSnapshotDuplicateStrings([group]);
+      const result = await response.handle(createMockMcpContext());
       const text = getTextContent(result.content[0]);
       assert.ok(text.includes('"duplicate",2000,'));
-      assert.strictEqual(text.includes('(+1990 omitted)'), shown === 10);
-      assert.strictEqual(text.includes('@2000'), shown === 2000);
+      assert.ok(text.includes('(+1990 omitted)'));
+      assert.ok(!text.includes('@2000'));
       assert.deepStrictEqual(
         Reflect.get(result.structuredContent, 'heapSnapshotDuplicateStrings'),
-        [
-          {
-            ...group,
-            nodes: nodes.slice(0, shown),
-            omittedNodeIds: 2000 - shown,
-          },
-        ],
+        [{...group, nodes: nodes.slice(0, 10), omittedNodeIds: 1990}],
       );
-    }
+    });
+
+    it('returns all node IDs when the limit covers the group', async () => {
+      const response = new McpResponse(createMockServerConfig());
+      response.setHeapSnapshotDuplicateStrings([group], {maxNodeIds: 2000});
+      const result = await response.handle(createMockMcpContext());
+      const text = getTextContent(result.content[0]);
+      assert.ok(text.includes('"duplicate",2000,'));
+      assert.ok(text.includes('@2000'));
+      assert.ok(!text.includes('omitted'));
+      assert.deepStrictEqual(
+        Reflect.get(result.structuredContent, 'heapSnapshotDuplicateStrings'),
+        [{...group, omittedNodeIds: 0}],
+      );
+    });
   });
 
   it('formats duplicate strings with pagination and object details', async () => {

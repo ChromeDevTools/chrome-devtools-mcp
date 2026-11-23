@@ -129,7 +129,6 @@ export class McpResponse implements Response {
     diff?: HeapSnapshotDiff;
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
-    maxNodeIds?: number;
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
     contextAnalysis?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult;
     contextAnalysisOptions?: ContextAnalysisOptions;
@@ -446,14 +445,12 @@ export class McpResponse implements Response {
 
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions &
-      HeapSnapshotFormatOptions & {maxNodeIds?: number},
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       duplicateStrings,
-      maxNodeIds: options?.maxNodeIds,
       pagination: options,
       formatOptions: options,
     };
@@ -1602,7 +1599,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
 
         const groups = HeapSnapshotFormatter.summarizeDuplicateStrings(
           paginationData.items,
-          this.#heapSnapshotOptions.maxNodeIds,
+          formatOptions.maxNodeIds,
         );
         const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
           groups,

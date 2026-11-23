@@ -27,6 +27,8 @@ export interface HeapSnapshotFormatOptions {
    * a large value to get untruncated values.
    */
   maxNameLength?: number;
+  /** Maximum node IDs shown per duplicate string group. Defaults to `DEFAULT_MAX_NODE_IDS`. */
+  maxNodeIds?: number;
 }
 
 /**
