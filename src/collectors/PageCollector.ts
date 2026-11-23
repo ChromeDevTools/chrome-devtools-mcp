@@ -32,15 +32,23 @@ export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
   readonly session?: CDPSession;
+  /**
+   * True when the exception was thrown by another target than the page that
+   * reported it, such as a dedicated worker. The page's DevTools universe
+   * cannot resolve the scripts of that target.
+   */
+  readonly fromOtherTarget: boolean;
 
   constructor(
     details: Protocol.Runtime.ExceptionDetails,
     targetId: string,
     session?: CDPSession,
+    fromOtherTarget = false,
   ) {
     this.details = details;
     this.targetId = targetId;
     this.session = session;
+    this.fromOtherTarget = fromOtherTarget;
   }
 
   /**
@@ -58,9 +66,21 @@ export class UncaughtError {
     if (!details) {
       return undefined;
     }
+    const handle = exception.handle();
     // Keep the exception object alive so its stack and cause resolve later.
-    exception.handle()?.move();
-    return new UncaughtError(details, targetId, session);
+    handle?.move();
+    // Exceptions of dedicated workers are forwarded to the page. Their objects
+    // and scripts belong to the worker session and target, not the page.
+    const handleSession: CDPSession =
+      // @ts-expect-error use internal Puppeteer API to get the handle session.
+      handle?.client ?? session;
+    if (handleSession === session) {
+      return new UncaughtError(details, targetId, session);
+    }
+    const handleTargetId: string =
+      // @ts-expect-error use internal Puppeteer API to get target ID
+      handleSession.target()?._targetId ?? targetId;
+    return new UncaughtError(details, handleTargetId, handleSession, true);
   }
 }
 

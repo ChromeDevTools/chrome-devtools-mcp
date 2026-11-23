@@ -1034,6 +1034,41 @@ logFromOld();`);
       });
     });
 
+    it('resolves the stack and cause of an uncaught exception in a dedicated worker', async () => {
+      server.addRoute('/worker.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`setTimeout(() => {
+  throw new Error('worker-outer', {cause: new Error('worker-inner')});
+}, 50);`);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>
+          const worker = new Worker('/worker.js');
+          worker.onerror = () => { window.thrown = true; };
+        </script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        await page.pptrPage.waitForFunction(() => 'thrown' in window);
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(rawText.includes('Uncaught Error: worker-outer'), rawText);
+        assert.ok(rawText.includes('worker.js:2'), rawText);
+        assert.ok(rawText.includes('Caused by: Error: worker-inner'), rawText);
+      });
+    });
+
     it('applies source maps to stack traces of Error object (with cause) console.log arguments', async t => {
       server.addRoute('/main.min.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');
