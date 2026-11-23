@@ -132,7 +132,7 @@ describe('ServiceWorkerCollector', () => {
     target.type.returns(TargetType.SERVICE_WORKER);
     target.worker.resolves(worker);
 
-    const collector = new ServiceWorkerConsoleCollector(browser);
+    const collector = new ServiceWorkerCollector(browser);
     await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.strictEqual(worker.listenerCount('exception'), 1);
