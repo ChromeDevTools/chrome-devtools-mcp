@@ -29,7 +29,7 @@ import {
   IS_WINDOWS,
 } from '../../src/daemon/utils.js';
 import type {YargsOptions} from '../../src/third_party/index.js';
-import {createTempDir} from '../utils.js';
+import {createTempDir, spawnReadyProcess} from '../utils.js';
 
 const APP_NAME = 'chrome-devtools-mcp';
 const SESSION_ID = 'aabbccdd-1122-3344-5566-77889900aabb';
@@ -479,55 +479,35 @@ describe('daemon pid handling', () => {
       assert.strictEqual(isDaemonRunning(SESSION_ID), false);
     });
 
-    it('returns true when the pid file points to a live daemon process', () => {
+    it('returns true when the pid file points to a live daemon process', async () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
-        {stdio: 'ignore'},
-      );
-      child.unref();
-      assert.ok(child.pid);
-      try {
-        writePidFile(SESSION_ID, `${child.pid}\n`);
-        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
-      } finally {
-        child.kill();
-      }
+      using proc = await spawnReadyProcess([DAEMON_SCRIPT_PATH]);
+      writePidFile(SESSION_ID, `${proc.pid}\n`);
+      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
     });
 
     it('caches the verified process identity across repeated checks', async () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
-        {stdio: 'ignore'},
+      using proc = await spawnReadyProcess([DAEMON_SCRIPT_PATH]);
+      writePidFile(SESSION_ID, `${proc.pid}\n`);
+      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+
+      const readFileSyncSpy = sinon.spy(fs, 'readFileSync');
+      const execFileSyncSpy = sinon.spy(childProcess, 'execFileSync');
+
+      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      sinon.assert.calledOnceWithExactly(
+        readFileSyncSpy,
+        IS_WINDOWS ? getPidFilePath(SESSION_ID) : sinon.match.number,
+        sinon.match('utf-8'),
       );
-      assert.ok(child.pid);
-      try {
-        writePidFile(SESSION_ID, `${child.pid}\n`);
-        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      sinon.assert.notCalled(execFileSyncSpy);
 
-        const readFileSyncSpy = sinon.spy(fs, 'readFileSync');
-        const execFileSyncSpy = sinon.spy(childProcess, 'execFileSync');
-
-        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
-        sinon.assert.calledOnceWithExactly(
-          readFileSyncSpy,
-          IS_WINDOWS ? getPidFilePath(SESSION_ID) : sinon.match.number,
-          sinon.match('utf-8'),
-        );
-        sinon.assert.notCalled(execFileSyncSpy);
-
-        child.kill();
-        await once(child, 'exit');
-        assert.strictEqual(isDaemonRunning(SESSION_ID), false);
-      } finally {
-        child.kill();
-        child.unref();
-      }
+      proc.child.kill();
+      await once(proc.child, 'exit', {signal: AbortSignal.timeout(10_000)});
+      assert.strictEqual(isDaemonRunning(SESSION_ID), false);
     });
 
     it('returns false when the pid file points to an unrelated live process', () => {
@@ -537,56 +517,36 @@ describe('daemon pid handling', () => {
       assert.strictEqual(isDaemonRunning(SESSION_ID), false);
     });
 
-    it('falls back to true when command line lookup throws for a live process', () => {
+    it('falls back to true when command line lookup throws for a live process', async () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)'],
-        {stdio: 'ignore'},
-      );
-      child.unref();
-      assert.ok(child.pid);
-      try {
-        writePidFile(SESSION_ID, `${child.pid}\n`);
-        sinon
-          .stub(fs, 'existsSync')
-          .callThrough()
-          .withArgs('/proc')
-          .returns(false);
-        sinon
-          .stub(childProcess, 'execFileSync')
-          .throws(new Error('lookup failed'));
+      using proc = await spawnReadyProcess();
+      writePidFile(SESSION_ID, `${proc.pid}\n`);
+      sinon
+        .stub(fs, 'existsSync')
+        .callThrough()
+        .withArgs('/proc')
+        .returns(false);
+      sinon
+        .stub(childProcess, 'execFileSync')
+        .throws(new Error('lookup failed'));
 
-        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
-      } finally {
-        child.kill();
-      }
+      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
     });
 
-    it('falls back to true when command line lookup returns an empty string for a live process', () => {
+    it('falls back to true when command line lookup returns an empty string for a live process', async () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)'],
-        {stdio: 'ignore'},
-      );
-      child.unref();
-      assert.ok(child.pid);
-      try {
-        writePidFile(SESSION_ID, `${child.pid}\n`);
-        sinon
-          .stub(fs, 'existsSync')
-          .callThrough()
-          .withArgs('/proc')
-          .returns(false);
-        sinon.stub(childProcess, 'execFileSync').returns('\r\n');
+      using proc = await spawnReadyProcess();
+      writePidFile(SESSION_ID, `${proc.pid}\n`);
+      sinon
+        .stub(fs, 'existsSync')
+        .callThrough()
+        .withArgs('/proc')
+        .returns(false);
+      sinon.stub(childProcess, 'execFileSync').returns('\r\n');
 
-        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
-      } finally {
-        child.kill();
-      }
+      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
     });
 
     it('returns false when the pid file points to a dead process', async () => {

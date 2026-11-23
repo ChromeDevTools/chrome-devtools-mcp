@@ -663,3 +663,76 @@ export async function createDisposableTempFile(filename: string): Promise<{
     },
   };
 }
+
+/**
+ * Spawns a long-lived Node.js child process and waits until it executes JS so
+ * its OS process command line (e.g. `/proc/<pid>/cmdline`) is populated.
+ */
+export async function spawnReadyProcess(extraArgs: string[] = []): Promise<{
+  pid: number;
+  child: ChildProcess;
+  [Symbol.dispose]: () => void;
+}> {
+  const child = spawn(
+    process.execPath,
+    [
+      '-e',
+      "process.stdout.write('1'); setInterval(() => {}, 1000)",
+      ...extraArgs,
+    ],
+    {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    },
+  );
+  try {
+    await new Promise<void>((resolve, reject) => {
+      function cleanup(): void {
+        clearTimeout(timer);
+        child.stdout.off('data', onData);
+        child.off('error', onError);
+        child.off('exit', onExit);
+      }
+      function onData(): void {
+        cleanup();
+        resolve();
+      }
+      function onError(error: Error): void {
+        cleanup();
+        reject(error);
+      }
+      function onExit(
+        code: number | null,
+        signal: NodeJS.Signals | null,
+      ): void {
+        cleanup();
+        reject(
+          new Error(
+            `Child exited before ready (code=${code}, signal=${signal})`,
+          ),
+        );
+      }
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Timed out waiting for child process to start'));
+      }, 10_000);
+      child.stdout.on('data', onData);
+      child.on('error', onError);
+      child.on('exit', onExit);
+    });
+    const pid = child.pid;
+    assert.ok(pid, 'Child process should have a PID');
+    child.stdout.destroy();
+    child.unref();
+    return {
+      pid,
+      child,
+      [Symbol.dispose](): void {
+        child.kill();
+      },
+    };
+  } catch (error) {
+    child.stdout.destroy();
+    child.kill();
+    throw error;
+  }
+}
