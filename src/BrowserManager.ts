@@ -18,6 +18,7 @@ import type {
   PuppeteerNode,
 } from './third_party/browser.js';
 import {loadBrowser, Mutex} from './third_party/index.js';
+import {devToolsActivePortPermissionError} from './utils/errorHandling.js';
 import {
   logger,
   puppeteerLogger,
@@ -448,6 +449,13 @@ export class BrowserManager {
           const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
           connectOptions.browserWSEndpoint = browserWSEndpoint;
         } catch (error) {
+          const permissionError = devToolsActivePortPermissionError(
+            error,
+            userDataDir,
+          );
+          if (permissionError) {
+            throw permissionError;
+          }
           throw new Error(
             `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
             {
@@ -481,6 +489,10 @@ export class BrowserManager {
       connected.once('disconnected', () => this.#evictIfCurrent(connected));
       return connected;
     } catch (err) {
+      const permissionError = devToolsActivePortPermissionError(err);
+      if (permissionError) {
+        throw permissionError;
+      }
       throw new Error(
         `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
         {
