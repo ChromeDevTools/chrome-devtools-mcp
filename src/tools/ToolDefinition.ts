@@ -292,6 +292,7 @@ export interface Response {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      serviceWorkerId?: string;
     },
   ): void;
   setIncludeConsoleData(
@@ -316,7 +317,11 @@ export interface Response {
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(
     reqId: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: {
+      requestFilePath?: string;
+      responseFilePath?: string;
+      serviceWorkerId?: string;
+    },
   ): void;
   attachConsoleMessage(
     msgid: number,

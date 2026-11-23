@@ -1158,6 +1158,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'Get the request from the service worker with this ID shown by list_pages (sw-N) instead of the page. Requires reqid, using the reqid listed for that service worker.',
+        required: false,
+        positional: false,
+      },
     },
   },
   get_os_app_state: {
@@ -1428,7 +1436,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'Lists the most recent requests for the target page since the last navigation.',
+      'Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead.',
     category: 'Network',
     args: {
       pageId: {
@@ -1466,10 +1474,18 @@ export const commands: Commands = {
         name: 'includePreservedRequests',
         type: 'boolean',
         description:
-          'Set to true to return the preserved requests over the last 3 navigations.',
+          'Set to true to return the preserved requests over the last 3 navigations. Ignored when serviceWorkerId is set.',
         required: false,
         positional: false,
         default: false,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'List requests made by the service worker with this ID shown by list_pages (sw-N) instead of the page. The page selected by pageId is still used for the call and its console errors may be appended.',
+        required: false,
+        positional: false,
       },
     },
   },
