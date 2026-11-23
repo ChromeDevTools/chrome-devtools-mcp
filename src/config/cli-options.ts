@@ -1982,7 +1982,7 @@ export const commands: Commands = {
   },
   resize_page: {
     description:
-      "Resizes the page's window so that the page has specified dimension",
+      'Requests the specified page dimensions. Chrome may enforce a minimum window size, so the resulting page dimensions can differ from the requested values.',
     category: 'Emulation',
     args: {
       pageId: {
