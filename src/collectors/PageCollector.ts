@@ -298,16 +298,11 @@ class PageEventSubscriber {
   #seenKeys = new Set<string>();
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
-  #targetId: string;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
 
   constructor(page: Page) {
     this.#page = page;
-    // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    const session: CDPSession = this.#page._client();
-    // @ts-expect-error use internal Puppeteer API to get target ID
-    this.#targetId = session.target()._targetId;
   }
 
   #resetIssueAggregator(): void {
@@ -364,7 +359,8 @@ class PageEventSubscriber {
     const pageSession: CDPSession = this.#page._client();
     const error = UncaughtError.fromException(
       exception,
-      this.#targetId,
+      // @ts-expect-error use internal Puppeteer API to get target ID
+      pageSession.target()._targetId,
       pageSession,
     );
     if (error) {
