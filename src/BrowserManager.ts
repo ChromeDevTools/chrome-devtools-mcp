@@ -10,13 +10,14 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
-import {
-  puppeteer,
-  type Browser,
-  type ChromeReleaseChannel,
-  type LaunchOptions,
+import type {
+  Browser,
+  ChromeReleaseChannel,
+  ConnectOptions,
+  LaunchOptions,
+  PuppeteerNode,
 } from './third_party/browser.js';
-import {Mutex} from './third_party/index.js';
+import {loadBrowser, Mutex} from './third_party/index.js';
 import {
   logger,
   puppeteerLogger,
@@ -34,6 +35,16 @@ export interface BrowserManagerOptions {
  * reference (`!==`) — see BrowserManager#abandonPendingAttempt().
  */
 class BrowserAttempt {}
+
+/**
+ * Loads Puppeteer and stops it from following symlinks when it reads or
+ * writes files, before each launch or connect.
+ */
+async function loadPuppeteer(): Promise<PuppeteerNode> {
+  const {puppeteer} = await loadBrowser();
+  puppeteer.setFollowSymlinks(false);
+  return puppeteer;
+}
 
 export class BrowserManager {
   #browser?: Browser;
@@ -295,6 +306,7 @@ export class BrowserManager {
       BrowserManager.detectDisplay();
     }
 
+    const puppeteer = await loadPuppeteer();
     let browser: Browser | undefined;
     try {
       browser = await puppeteer.launch({
@@ -385,7 +397,7 @@ export class BrowserManager {
     // Important: only pass channel, if autoConnect is true.
     const channel = isAutoConnect ? this.#config.resolved.channel : undefined;
 
-    const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
+    const connectOptions: ConnectOptions = {
       targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
       defaultViewport: null,
       handleDevToolsAsPage: true,
@@ -460,6 +472,7 @@ export class BrowserManager {
       'Connecting Puppeteer to ',
       JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
     );
+    const puppeteer = await loadPuppeteer();
     try {
       const connected = await puppeteer.connect(connectOptions);
       logger?.('Connected Puppeteer');
