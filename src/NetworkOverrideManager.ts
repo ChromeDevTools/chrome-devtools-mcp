@@ -14,12 +14,8 @@ import {
   validateNetworkUrl,
 } from './utils/network.js';
 
-import {
-  type HTTPRequest,
-  Mutex,
-  type Page,
-  type ResourceType,
-} from './third_party/browser.js';
+import type {HTTPRequest, Page, ResourceType} from './third_party/browser.js';
+import {Mutex} from './third_party/index.js';
 import {logger, redactUrlForLogging} from './utils/logger.js';
 
 interface BaseNetworkOverride {

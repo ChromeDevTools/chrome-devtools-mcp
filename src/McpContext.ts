@@ -23,10 +23,9 @@ import type {
 import {McpPage} from './McpPage.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerCollector} from './collectors/ServiceWorkerCollector.js';
-import type {Root} from './third_party/index.js';
+import {Mutex, type Root} from './third_party/index.js';
 import {
   Locator,
-  Mutex,
   type Browser,
   type BrowserContext,
   type Connection,
