@@ -751,8 +751,12 @@ export class McpContext implements Context, BrowserlessContext {
     return notice;
   }
 
+  #findPageById(pageId: number): McpPage | undefined {
+    return this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
+  }
+
   getPageById(pageId: number): McpPage {
-    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
+    const page = this.#findPageById(pageId);
     if (!page) {
       throw new Error('No page found');
     }
@@ -760,13 +764,16 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * The queue for tasks on page `pageId`. The queue exists before the page
-   * does, so a tool call can enter it before the browser connects. It is a
-   * child of {@link taskQueue}.
+   * The queue for tasks on page `pageId`, a child of {@link taskQueue}.
+   * Returns {@link taskQueue} when no page has this id, for example before
+   * the browser connects. No queue is stored for such an id.
    */
   pageTaskQueue(pageId: number): TaskQueue {
     let queue = this.#pageTaskQueues.get(pageId);
     if (!queue) {
+      if (!this.#findPageById(pageId)) {
+        return this.taskQueue;
+      }
       queue = this.#taskRunner.createQueue(this.taskQueue);
       this.#pageTaskQueues.set(pageId, queue);
     }

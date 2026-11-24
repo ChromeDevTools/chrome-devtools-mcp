@@ -485,8 +485,8 @@ export class ToolHandler {
   /**
    * The queue the call runs on. `'none'` tools run outside the runner.
    * `'page'` tools run on the queue of the page named by `rawArgs.pageId`
-   * when page id routing applies; every other call runs on the context
-   * queue.
+   * when page id routing applies and the page exists; every other call runs
+   * on the context queue.
    */
   #queueFor(
     context: McpContext,
