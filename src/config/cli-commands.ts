@@ -41,6 +41,14 @@ export function buildCommand(
   return {command, usage: `$0 ${command}${flags}`};
 }
 
+/** Maps a non-array JSON Schema type to the yargs type that parses it. */
+function toYargsScalarType(type: string): 'number' | 'boolean' | 'string' {
+  if (type === 'integer' || type === 'number') {
+    return 'number';
+  }
+  return type === 'boolean' ? 'boolean' : 'string';
+}
+
 /**
  * Registers positional and flag definitions for a tool command on a yargs
  * builder instance.
@@ -57,12 +65,7 @@ export function registerCommandArgs(
       if (opt.type === 'array') {
         options.array = true;
       } else {
-        options.type =
-          opt.type === 'integer' || opt.type === 'number'
-            ? 'number'
-            : opt.type === 'boolean'
-              ? 'boolean'
-              : 'string';
+        options.type = toYargsScalarType(opt.type);
       }
       if (opt.default !== undefined) {
         options.default = opt.default;
@@ -74,14 +77,7 @@ export function registerCommandArgs(
     } else {
       const options: Options = {
         describe: opt.description,
-        type:
-          opt.type === 'integer' || opt.type === 'number'
-            ? 'number'
-            : opt.type === 'boolean'
-              ? 'boolean'
-              : opt.type === 'array'
-                ? 'array'
-                : 'string',
+        type: opt.type === 'array' ? 'array' : toYargsScalarType(opt.type),
       };
       if (opt.default !== undefined) {
         // Document the default in --help without populating argv, so the
