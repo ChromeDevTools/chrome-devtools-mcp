@@ -30,8 +30,9 @@ function headerStringTransform(
   if (value === '') {
     return {};
   }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(value);
+    parsed = JSON.parse(value);
     if (
       typeof parsed !== 'object' ||
       parsed === null ||
@@ -39,12 +40,19 @@ function headerStringTransform(
     ) {
       throw new Error('Headers must be a JSON object');
     }
-    return parsed as Record<string, string>;
   } catch (error) {
     throw new Error(
       `Invalid JSON for headers: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  const headers: Record<string, string> = {};
+  for (const [key, headerValue] of Object.entries(parsed)) {
+    if (typeof headerValue !== 'string') {
+      throw new Error(`Header "${key}" must have a string value`);
+    }
+    headers[key] = headerValue;
+  }
+  return headers;
 }
 
 const throttlingOptions: [string, ...string[]] = [
