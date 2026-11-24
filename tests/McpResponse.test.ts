@@ -2025,13 +2025,8 @@ describe('McpResponse heap snapshot formatting', () => {
     );
   });
 
-  it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
+  it('preserves provider order and formats pagination summaries', async () => {
     const response = new McpResponse(createMockServerConfig());
-    const nodeSmall = createMockHeapSnapshotNode({
-      id: 1,
-      name: 'SmallNode',
-      retainedSize: 100,
-    });
     const nodeLarge = createMockHeapSnapshotNode({
       id: 2,
       name: 'LargeNode',
@@ -2042,12 +2037,17 @@ describe('McpResponse heap snapshot formatting', () => {
       name: 'MediumNode',
       retainedSize: 200,
     });
+    const nodeSmall = createMockHeapSnapshotNode({
+      id: 1,
+      name: 'SmallNode',
+      retainedSize: 100,
+    });
 
     const itemsRange =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(0, 3, 3, [
-        nodeSmall,
         nodeLarge,
         nodeMedium,
+        nodeSmall,
       ]);
 
     response.setHeapSnapshotNodes(itemsRange, {
@@ -2073,6 +2073,134 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(
       !text.includes('SmallNode'),
       'SmallNode should be on page 1, not page 0',
+    );
+  });
+
+  it('keeps provider order when nodes are sorted by ascending id', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    const nodes = [
+      createMockHeapSnapshotNode({
+        id: 10,
+        name: 'Id10',
+        selfSize: 100,
+        retainedSize: 100,
+      }),
+      createMockHeapSnapshotNode({
+        id: 20,
+        name: 'Id20',
+        selfSize: 50,
+        retainedSize: 500,
+      }),
+      createMockHeapSnapshotNode({
+        id: 30,
+        name: 'Id30',
+        selfSize: 10,
+        retainedSize: 200,
+      }),
+    ];
+    response.setHeapSnapshotNodes(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+        0,
+        3,
+        3,
+        nodes,
+      ),
+    );
+
+    const {content, structuredContent} = await response.handle(
+      createMockMcpContext(),
+    );
+
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotNodes'),
+      nodes,
+    );
+    const text = getTextContent(content[0]);
+    assert.ok(
+      text.indexOf('Id10') < text.indexOf('Id20'),
+      'Id10 should precede Id20',
+    );
+    assert.ok(
+      text.indexOf('Id20') < text.indexOf('Id30'),
+      'Id20 should precede Id30',
+    );
+  });
+
+  it('keeps provider order when nodes are sorted by descending selfSize', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    const nodes = [
+      createMockHeapSnapshotNode({
+        id: 1,
+        name: 'Self900',
+        selfSize: 900,
+        retainedSize: 100,
+      }),
+      createMockHeapSnapshotNode({
+        id: 2,
+        name: 'Self500',
+        selfSize: 500,
+        retainedSize: 500,
+      }),
+      createMockHeapSnapshotNode({
+        id: 3,
+        name: 'Self100',
+        selfSize: 100,
+        retainedSize: 900,
+      }),
+    ];
+    response.setHeapSnapshotNodes(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+        0,
+        3,
+        3,
+        nodes,
+      ),
+    );
+
+    const {structuredContent} = await response.handle(createMockMcpContext());
+
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotNodes'),
+      nodes,
+    );
+  });
+
+  it('keeps provider order when nodes are sorted by descending retainedSize', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    const nodes = [
+      createMockHeapSnapshotNode({
+        id: 1,
+        name: 'Retained900',
+        selfSize: 1,
+        retainedSize: 900,
+      }),
+      createMockHeapSnapshotNode({
+        id: 2,
+        name: 'Retained500',
+        selfSize: 500,
+        retainedSize: 500,
+      }),
+      createMockHeapSnapshotNode({
+        id: 3,
+        name: 'Retained100',
+        selfSize: 900,
+        retainedSize: 100,
+      }),
+    ];
+    response.setHeapSnapshotNodes(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+        0,
+        3,
+        3,
+        nodes,
+      ),
+    );
+
+    const {structuredContent} = await response.handle(createMockMcpContext());
+
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotNodes'),
+      nodes,
     );
   });
 

@@ -296,6 +296,14 @@ export class HeapSnapshotManager {
       className,
       filter,
     );
+    await provider.sortAndRewind(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ComparatorConfig(
+        'retainedSize',
+        false,
+        'id',
+        true,
+      ),
+    );
 
     return await provider.serializeItemsRange(0, Infinity);
   }
