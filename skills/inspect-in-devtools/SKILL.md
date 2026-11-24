@@ -18,6 +18,14 @@ Use this skill to:
 - **Headed browser**: Chrome must not run in `--headless` mode.
 - **Page targeting**: All tools require a `pageId` from `list_pages` or `new_page`.
 
+## Unsupported Chrome
+
+This skill does not work on Chrome versions earlier than M159. If a tool returns `DevTools comments are not supported by the connected browser`:
+
+1. Stop the workflow. Do not poll, retry, or call other DevTools comment tools.
+2. Tell the user that this feature requires Chrome 159 or later, and that they can update Chrome or restart the MCP server with a newer `--channel` (for example, `--channel=canary`).
+3. Do not tell the user that the page is ready for review in DevTools.
+
 ## Workflows
 
 ### 1. Open DevTools
@@ -56,7 +64,7 @@ Use this mode when the user says the comments are already in DevTools, or asks y
 Use this mode when the user asks you to wait while they debug, review, or add comments.
 
 1. Call `get_devtools_comments` immediately.
-2. While the result is `"No open DevTools comments found."`, wait 10 seconds, then call it again. Call it immediately if a `"DevTools comment threads updated"` notification arrives.
+2. While the result has no threads (`"Waited <n>ms for new DevTools comments."` or `"No open DevTools comments found."`), call it again. The tool waits up to `timeout` ms (default 10 seconds) for a new comment before it returns.
 3. Stop after 12 consecutive empty polls (about 2 minutes) or when the user asks you to stop.
 4. When threads appear, process and resolve them. Then reset the empty-poll counter and continue polling.
 
@@ -64,7 +72,7 @@ Rules for polling:
 
 - **Use a background sub-agent** when sub-agent tools are available, so the main thread stays responsive. The sub-agent returns the threads to the main agent, or resolves them itself if it has workspace and MCP tools.
 - **Poll inline** only when sub-agent tools are unavailable. Do not end your turn early.
-- **Never call `get_devtools_comments` back-to-back** without the 10-second delay.
+- **Never pass `timeout: 0` while polling**: The call then returns at once and the loop does not wait.
 
 #### Process and resolve a thread
 
