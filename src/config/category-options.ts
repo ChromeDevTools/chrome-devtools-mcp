@@ -168,6 +168,10 @@ export function getCategoryOptions(): CategoryFlags {
 export function getCategoryOptionsForViaCli(): CategoryFlags {
   const options = getCategoryOptions();
   for (const category of getOffByDefaultCategories()) {
+    // PWA tools need a pipe connection, so they conflict with connect options.
+    if (category === ToolCategory.PWA) {
+      continue;
+    }
     const flagName = categoryToFlagName(category);
     options[flagName] = {
       ...options[flagName],

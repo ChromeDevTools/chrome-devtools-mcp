@@ -1169,7 +1169,7 @@ export const commands: Commands = {
   },
   get_os_app_state: {
     description:
-      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID.',
+      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)',
     category: 'Progressive Web Apps',
     args: {
       manifestId: {
@@ -1255,7 +1255,7 @@ export const commands: Commands = {
   },
   install_pwa: {
     description:
-      'Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode.',
+      'Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)',
     category: 'Progressive Web Apps',
     args: {
       manifestId: {
@@ -1287,7 +1287,7 @@ export const commands: Commands = {
   },
   launch_pwa: {
     description:
-      'Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL.',
+      'Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)',
     category: 'Progressive Web Apps',
     args: {
       manifestId: {
@@ -2253,7 +2253,7 @@ export const commands: Commands = {
   },
   uninstall_pwa: {
     description:
-      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows.',
+      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)',
     category: 'Progressive Web Apps',
     args: {
       manifestId: {

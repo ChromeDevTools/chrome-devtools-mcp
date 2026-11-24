@@ -177,7 +177,7 @@ chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome ext
 chrome-devtools trigger_extension_action "extension_id" # Triggers the default action of an extension by its ID
 ```
 
-## Progressive Web Apps
+## Progressive Web Apps (requires `--categoryPwa=true`)
 
 ```bash
 chrome-devtools install_pwa "https://example.com/" "https://example.com/" # Install PWA by manifest ID and install URL

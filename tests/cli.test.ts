@@ -98,7 +98,7 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.memoryDebugging, true);
     assert.strictEqual(args.categoryExtensions, true);
     assert.strictEqual(args.categoryNetworkMocks, true);
-    assert.strictEqual(args.categoryPwa, true);
+    assert.strictEqual(args.categoryPwa, undefined);
     assert.strictEqual(args.categoryWebauthn, true);
     assert.strictEqual(args.categoryExperimentalWebmcp, true);
     assert.strictEqual(args.categoryExperimentalThirdParty, true);
@@ -1062,7 +1062,7 @@ describe('cli args parsing', () => {
       cliOptions.categoryNetworkMocks?.defaultDescription,
       'true',
     );
-    assert.strictEqual(cliOptions.categoryPwa?.defaultDescription, 'true');
+    assert.strictEqual(cliOptions.categoryPwa?.defaultDescription, undefined);
     assert.strictEqual(cliOptions.categoryWebauthn?.defaultDescription, 'true');
     assert.strictEqual(
       cliOptions.categoryExperimentalWebmcp?.defaultDescription,
@@ -1355,10 +1355,10 @@ describe('cli args parsing', () => {
       ['--wsEndpoint', 'ws://localhost:9222'],
       ['--auto-connect'],
     ]) {
-      it(`allows viaCli with ${connectArgs[0]} and enables all categories`, async () => {
+      it(`allows viaCli with ${connectArgs[0]} and enables all categories except PWA`, async () => {
         const args = parseConfig(['--viaCli', ...connectArgs]);
         assert.strictEqual(args.categoryExtensions, true);
-        assert.strictEqual(args.categoryPwa, true);
+        assert.strictEqual(args.categoryPwa, undefined);
         assert.strictEqual(args.categoryNetworkMocks, true);
         assert.strictEqual(args.categoryWebauthn, true);
         assert.strictEqual(args.categoryExperimentalWebmcp, true);
@@ -1371,10 +1371,10 @@ describe('cli args parsing', () => {
       const args = parseConfig([
         '--viaCli',
         '--no-category-network-mocks',
-        '--categoryPwa=false',
+        '--categoryWebauthn=false',
       ]);
       assert.strictEqual(args.categoryNetworkMocks, false);
-      assert.strictEqual(args.categoryPwa, false);
+      assert.strictEqual(args.categoryWebauthn, false);
     });
 
     it('allows explicit categoryExtensions with browserUrl in viaCli', async () => {

@@ -128,7 +128,7 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.isolated, true);
       assert.strictEqual(args.categoryExtensions, true);
       assert.strictEqual(args.categoryNetworkMocks, true);
-      assert.strictEqual(args.categoryPwa, true);
+      assert.strictEqual(args.categoryPwa, undefined);
       assert.strictEqual(args.categoryWebauthn, true);
       assert.strictEqual(args.categoryExperimentalWebmcp, true);
       assert.strictEqual(args.categoryExperimentalThirdParty, true);
@@ -148,7 +148,7 @@ describe('ServerConfig', () => {
       assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
 
-    it('does not enable isolated for viaCli with browserUrl but enables all categories', () => {
+    it('does not enable isolated for viaCli with browserUrl but enables all categories except PWA', () => {
       const args = ServerConfig.applyDefaults(
         {
           viaCli: true,
@@ -158,7 +158,7 @@ describe('ServerConfig', () => {
       );
       assert.strictEqual(args.isolated, false);
       assert.strictEqual(args.categoryExtensions, true);
-      assert.strictEqual(args.categoryPwa, true);
+      assert.strictEqual(args.categoryPwa, undefined);
       assert.strictEqual(args.categoryNetworkMocks, true);
       assert.strictEqual(args.categoryWebauthn, true);
       assert.strictEqual(args.categoryExperimentalWebmcp, true);
