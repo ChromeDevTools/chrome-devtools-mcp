@@ -17,6 +17,8 @@ export interface ArgDef {
   required: boolean;
   /** Whether the arg is a positional on the command line, otherwise a flag. */
   positional: boolean;
+  /** Minimum number of items for array args, from JSON Schema minItems. */
+  minItems?: number;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
@@ -2292,6 +2294,7 @@ export const commands: Commands = {
           'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
         positional: true,
+        minItems: 1,
       },
       includeSnapshot: {
         name: 'includeSnapshot',

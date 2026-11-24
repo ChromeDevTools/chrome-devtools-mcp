@@ -158,6 +158,8 @@ chrome-devtools list_console_messages 1 # List all console messages
 chrome-devtools list_console_messages 1 --pageSize 20 --pageIdx 1 # List console messages with pagination
 chrome-devtools list_console_messages 1 --types error --types info # Filter console messages by type
 chrome-devtools list_console_messages 1 --includePreservedMessages true # Include preserved messages
+chrome-devtools set_logpoints 1 "src/app.ts:42 'total', cart.total" # Set logpoints on page 1
+chrome-devtools set_logpoints 1 # Remove all logpoints on page 1
 chrome-devtools take_screenshot 1 # Take a screenshot of the page viewport
 chrome-devtools take_screenshot 1 --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
 chrome-devtools take_screenshot 1 --uid "id" --filePath "s.png" # Take a screenshot of an element

@@ -35,6 +35,7 @@ interface CliOption {
   description: string;
   required: boolean;
   positional: boolean;
+  minItems?: number;
   default?: unknown;
   enum?: unknown[];
 }
@@ -44,6 +45,7 @@ interface JsonSchema {
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: string[];
+  minItems?: number;
   default?: unknown;
   enum?: unknown[];
 }
@@ -69,6 +71,7 @@ function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
       required: isRequired,
       positional:
         isRequired || OPTIONAL_POSITIONAL_ARGS.has(`${toolName}:${name}`),
+      minItems: prop.minItems,
       default: prop.default,
       enum: prop.enum,
     };
@@ -182,6 +185,8 @@ export interface ArgDef {
   required: boolean;
   /** Whether the arg is a positional on the command line, otherwise a flag. */
   positional: boolean;
+  /** Minimum number of items for array args, from JSON Schema minItems. */
+  minItems?: number;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }

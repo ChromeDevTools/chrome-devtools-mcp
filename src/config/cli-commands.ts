@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Argv, Options, PositionalOptions} from 'yargs';
+
 import type {ArgDef} from './cli-options.js';
 
 /**
@@ -13,6 +15,9 @@ import type {ArgDef} from './cli-options.js';
  * part of the command string yargs parses each one as a trailing positional,
  * and a variadic positional has to be the last one. Which args are positional
  * is decided at build time by `scripts/generate-cli.ts`.
+ *
+ * A required positional array without `minItems > 0` is rendered as `[name..]`
+ * so omitting it passes an empty array instead of failing yargs validation.
  */
 export function buildCommand(
   commandName: string,
@@ -23,14 +28,68 @@ export function buildCommand(
   for (const [name, arg] of Object.entries(args)) {
     if (!arg.positional) {
       flags += ` [--${name}]`;
+    } else if (arg.type === 'array') {
+      const requiresItem = arg.required && (arg.minItems ?? 0) > 0;
+      command += requiresItem ? ` <${name}..>` : ` [${name}..]`;
     } else if (arg.required) {
-      command += arg.type === 'array' ? ` <${name}..>` : ` <${name}>`;
+      command += ` <${name}>`;
     } else {
-      command += arg.type === 'array' ? ` [${name}..]` : ` [${name}]`;
+      command += ` [${name}]`;
     }
   }
 
   return {command, usage: `$0 ${command}${flags}`};
+}
+
+/** Maps a non-array JSON Schema type to the yargs type that parses it. */
+function toYargsScalarType(type: string): 'number' | 'boolean' | 'string' {
+  if (type === 'integer' || type === 'number') {
+    return 'number';
+  }
+  return type === 'boolean' ? 'boolean' : 'string';
+}
+
+/**
+ * Registers positional and flag definitions for a tool command on a yargs
+ * builder instance.
+ */
+export function registerCommandArgs(
+  y: Argv,
+  args: Record<string, ArgDef>,
+): void {
+  for (const [argName, opt] of Object.entries(args)) {
+    if (opt.positional) {
+      const options: PositionalOptions = {
+        describe: opt.description,
+      };
+      if (opt.type === 'array') {
+        options.array = true;
+      } else {
+        options.type = toYargsScalarType(opt.type);
+      }
+      if (opt.default !== undefined) {
+        options.default = opt.default;
+      }
+      if (opt.enum) {
+        options.choices = opt.enum;
+      }
+      y.positional(argName, options);
+    } else {
+      const options: Options = {
+        describe: opt.description,
+        type: opt.type === 'array' ? 'array' : toYargsScalarType(opt.type),
+      };
+      if (opt.default !== undefined) {
+        // Document the default in --help without populating argv, so the
+        // daemon applies its current tool schema and config defaults.
+        options.defaultDescription = JSON.stringify(opt.default);
+      }
+      if (opt.enum) {
+        options.choices = opt.enum;
+      }
+      y.option(argName, options);
+    }
+  }
 }
 
 /**
