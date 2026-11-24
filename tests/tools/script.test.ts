@@ -251,6 +251,22 @@ describe('script', () => {
       sinon.assert.calledOnceWithExactly(context.loadResource, sourcePath);
       sinon.assert.calledOnce(page.waitForEventsAfterAction);
     });
+    it('loads script source from an http(s) URL unchanged', async () => {
+      const {page, response, context, args} = createHandlerMocks();
+      const sourcePath = 'https://example.com/app.js';
+      context.loadResource.resolves('() => document.title;');
+
+      await evaluateScript(args).handler(
+        {params: {sourcePath}},
+        response,
+        context,
+      );
+
+      // Not pathToFileURL(sourcePath): that produced
+      // file:///…/https:/example.com/app.js and could never be read.
+      sinon.assert.calledOnceWithExactly(context.loadResource, sourcePath);
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
+    });
     it('requires exactly one script source', async () => {
       const {response, context, args} = createHandlerMocks();
       await assert.rejects(

@@ -231,7 +231,11 @@ const resolveScriptSource = async (
     throw new Error('Specify exactly one of function or sourcePath.');
   }
 
-  const resourceUrl = sourcePath.startsWith('file:')
+  // `sourcePath` may be an http(s): URL the server fetches (see the schema
+  // comment above), and those must reach `loadResource` verbatim: running one
+  // through `pathToFileURL` turns `https://host/app.js` into a file: URL that
+  // can never exist, which makes the http(s) branch unreachable.
+  const resourceUrl = /^(?:https?|file):/i.test(sourcePath)
     ? sourcePath
     : pathToFileURL(sourcePath).href;
   try {
