@@ -5,4 +5,4 @@
  */
 
 /** Default length after which heap snapshot names are truncated. */
-export const MAX_NAME_LENGTH = 100;
+export const HEAP_SNAPSHOT_MAX_NAME_LENGTH = 100;

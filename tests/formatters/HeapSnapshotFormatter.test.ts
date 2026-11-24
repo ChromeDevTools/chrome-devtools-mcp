@@ -14,7 +14,7 @@ import {
   formatName,
   HeapSnapshotFormatter,
 } from '../../src/formatters/HeapSnapshotFormatter.js';
-import {MAX_NAME_LENGTH} from '../../src/formatters/constants.js';
+import {HEAP_SNAPSHOT_MAX_NAME_LENGTH} from '../../src/formatters/constants.js';
 import {
   HeapSnapshotManager,
   type HeapSnapshotAggregate,
@@ -59,17 +59,18 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(formatName('shortName', {}), 'shortName');
     });
 
-    it('truncates name exceeding MAX_NAME_LENGTH', () => {
+    it('truncates name exceeding HEAP_SNAPSHOT_MAX_NAME_LENGTH', () => {
       const longName = 'a'.repeat(150);
-      const expected = 'a'.repeat(MAX_NAME_LENGTH) + '...';
+      const expected = 'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH) + '...';
       assert.strictEqual(formatName(longName, {}), expected);
     });
 
     it('does not split a surrogate pair at the truncation point', () => {
-      const name = 'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
+      const name =
+        'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
       assert.strictEqual(
         formatName(name, {}),
-        'a'.repeat(MAX_NAME_LENGTH - 1) + '...',
+        'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH - 1) + '...',
       );
     });
 
