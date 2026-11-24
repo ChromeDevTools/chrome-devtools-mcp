@@ -257,14 +257,16 @@ export function createMockCDPSession(
 export function createMockHTTPRequest(
   options: {
     url?: string;
+    method?: string;
+    headers?: Record<string, string>;
     resourceType?: ResourceType;
   } = {},
 ): sinon.SinonStubbedInstance<CdpHTTPRequest> {
   const request = sinon.createStubInstance(CdpHTTPRequest);
   request.url.returns(options.url ?? 'https://example.com/app.js');
-  request.method.returns('GET');
+  request.method.returns(options.method ?? 'GET');
   request.resourceType.returns(options.resourceType ?? 'script');
-  request.headers.returns({});
+  request.headers.returns(options.headers ?? {});
   request.continue.resolves();
   request.respond.resolves();
   request.abort.resolves();
