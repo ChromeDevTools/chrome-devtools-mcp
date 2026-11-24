@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import {
   getCategoryOptions,
+  getCategoryOptionsForViaCli,
   type CategoryArguments,
   type McpOption,
   type McpOptionsFor,
@@ -324,6 +325,7 @@ export const mcpOptions: McpOptions = {
 
 export const mcpOptionsForViaCli: McpOptions = {
   ...mcpOptions,
+  ...getCategoryOptionsForViaCli(),
   headless: {
     ...mcpOptions.headless,
     default: true,
@@ -331,11 +333,6 @@ export const mcpOptionsForViaCli: McpOptions = {
   memoryDebugging: {
     ...mcpOptions.memoryDebugging,
     default: true,
-  },
-  categoryExtensions: {
-    ...mcpOptions.categoryExtensions,
-    defaultDescription:
-      'true unless autoConnect, browserUrl or wsEndpoint is set',
   },
   experimentalStructuredContent: {
     ...mcpOptions.experimentalStructuredContent,
