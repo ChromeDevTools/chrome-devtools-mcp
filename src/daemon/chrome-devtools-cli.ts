@@ -34,7 +34,10 @@ import {
 import {yargs} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
-import {stripTerminalEscapes} from '../utils/logger.js';
+import {
+  redactDaemonArgsForLogging,
+  stripTerminalEscapes,
+} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
@@ -208,7 +211,10 @@ export async function runCli(
           console.log(
             `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
           );
-          console.log(`args=${JSON.stringify(data.args)}`);
+          const redactedArgs = Array.isArray(data.args)
+            ? redactDaemonArgsForLogging(data.args)
+            : [];
+          console.log(`args=${JSON.stringify(redactedArgs)}`);
           if (data.version !== VERSION) {
             console.warn(
               `Warning: Daemon server version (${data.version}) does not match CLI version (${VERSION}). Run 'chrome-devtools start' to update and restart the daemon.`,

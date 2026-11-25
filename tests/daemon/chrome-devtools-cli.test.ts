@@ -317,6 +317,39 @@ describe('chrome-devtools CLI', () => {
       sinon.assert.notCalled(mocks.consoleWarn);
     });
 
+    it('redacts sensitive daemon startup args when printing status', async () => {
+      const mocks = createCliMocks();
+      mocks.isDaemonRunning.returns(true);
+      const statusResult: DaemonStatusResult = {
+        pid: 4242,
+        socketPath: '/tmp/server.sock',
+        startDate: '2026-01-01T00:00:00.000Z',
+        version: VERSION,
+        args: [
+          '--viaCli',
+          '--ws-endpoint=wss://user:pass@127.0.0.1:9222/ws?token=SECRET',
+          '--ws-headers={"Authorization":"Bearer HEADER_SECRET"}',
+          '--browser-url=http://admin:pw@127.0.0.1:9222/?key=API_KEY',
+        ],
+      };
+      mocks.sendCommand.resolves({
+        success: true,
+        result: JSON.stringify(statusResult),
+        error: null,
+      });
+
+      const exitCode = await runCli(
+        ['status', '--sessionId', SESSION_ID],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.calledWithExactly(
+        mocks.consoleLog.thirdCall,
+        'args=["--viaCli","--ws-endpoint=wss://127.0.0.1:9222/ws?REDACTED","--ws-headers=[REDACTED]","--browser-url=http://127.0.0.1:9222/?REDACTED"]',
+      );
+    });
+
     it('reports when daemon is not running without querying it', async () => {
       const mocks = createCliMocks();
 

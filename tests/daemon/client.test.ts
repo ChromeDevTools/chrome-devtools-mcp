@@ -21,6 +21,7 @@ import {
   stopDaemon,
   verifyDaemonVersion,
 } from '../../src/daemon/client.js';
+import type {DaemonStatusResult} from '../../src/daemon/types.js';
 import {
   DAEMON_SCRIPT_PATH,
   IS_WINDOWS,
@@ -250,6 +251,27 @@ describe('daemon client', () => {
         undefined,
         'Should not return warning when daemon is stopped',
       );
+    });
+  });
+
+  describe('status', () => {
+    it('redacts sensitive startup args in daemon status responses', async () => {
+      await startDaemon(
+        [
+          '--viaCli',
+          '--ws-endpoint=wss://user:pass@127.0.0.1:9222/ws?token=SECRET',
+          '--ws-headers={"Authorization":"Bearer HEADER_SECRET"}',
+        ],
+        sessionId,
+      );
+      const response = await sendCommand({method: 'status'}, sessionId);
+      assert.strictEqual(response.success, true);
+      const status: DaemonStatusResult = JSON.parse(response.result);
+      assert.deepStrictEqual(status.args, [
+        '--viaCli',
+        '--ws-endpoint=wss://127.0.0.1:9222/ws?REDACTED',
+        '--ws-headers=[REDACTED]',
+      ]);
     });
   });
 
