@@ -937,12 +937,38 @@ describe('McpContext', () => {
     });
 
     it('returns one page task queue per page id', async () => {
-      const context = createLazyContext(async () => createBrowser());
-      const queue = context.pageTaskQueue(1);
-      assert.strictEqual(context.pageTaskQueue(1), queue);
-      assert.notStrictEqual(context.pageTaskQueue(2), queue);
+      const browser = createBrowser();
+      browser.targets.returns([
+        createMockPuppeteerTarget(),
+        createMockPuppeteerTarget(),
+      ]);
+      sinon.stub(McpPage.prototype, 'init').resolves();
+      const context = createLazyContext(async () => browser);
+      await context.ensureBrowser();
+      const [first, second] = context.getPages();
+      const queue = context.pageTaskQueue(first.id);
+      assert.strictEqual(context.pageTaskQueue(first.id), queue);
+      assert.notStrictEqual(context.pageTaskQueue(second.id), queue);
       assert.strictEqual(queue.parent, context.taskQueue);
       context.dispose();
+    });
+
+    it('returns the context task queue for a page id without a page', async () => {
+      const browser = createBrowser();
+      browser.targets.returns([createMockPuppeteerTarget()]);
+      sinon.stub(McpPage.prototype, 'init').resolves();
+      const context = createLazyContext(async () => browser);
+      assert.strictEqual(context.pageTaskQueue(1), context.taskQueue);
+
+      await context.ensureBrowser();
+      const page = context.getSelectedMcpPage();
+      assert.strictEqual(
+        context.pageTaskQueue(page.id + 1000),
+        context.taskQueue,
+      );
+
+      context.dispose();
+      assert.strictEqual(context.pageTaskQueue(page.id), context.taskQueue);
     });
 
     it('disposes the page task queue with the page', async () => {

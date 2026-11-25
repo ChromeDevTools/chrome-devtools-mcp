@@ -17,6 +17,8 @@ export interface ArgDef {
   required: boolean;
   /** Whether the arg is a positional on the command line, otherwise a flag. */
   positional: boolean;
+  /** Minimum number of items for array args, from JSON Schema minItems. */
+  minItems?: number;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
@@ -31,7 +33,7 @@ export type Commands = Record<
 export const commands: Commands = {
   analyze_heapsnapshot_contexts: {
     description:
-      'Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes.',
     category: 'Memory',
     args: {
       filePath: {
@@ -166,7 +168,7 @@ export const commands: Commands = {
   },
   close_heapsnapshot: {
     description:
-      'Closes a previously loaded and cached memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
+      'Closes a previously loaded and cached memory heapsnapshot, freeing its memory.',
     category: 'Memory',
     args: {
       filePath: {
@@ -195,7 +197,7 @@ export const commands: Commands = {
   },
   compare_heapsnapshots: {
     description:
-      'Loads and caches two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)',
+      'Loads and caches two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff.',
     category: 'Memory',
     args: {
       baseFilePath: {
@@ -252,7 +254,7 @@ export const commands: Commands = {
   },
   configure_webauthn: {
     description:
-      'Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page. (requires flag: --categoryWebauthn=true)',
+      'Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page.',
     category: 'WebAuthn',
     args: {
       pageId: {
@@ -527,8 +529,7 @@ export const commands: Commands = {
     },
   },
   execute_3p_developer_tool: {
-    description:
-      'Executes a third-party developer tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
+    description: 'Executes a third-party developer tool exposed by the page.',
     category: 'Third-party',
     args: {
       pageId: {
@@ -556,7 +557,7 @@ export const commands: Commands = {
   },
   execute_webmcp_tool: {
     description:
-      "Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool'). (requires flag: --categoryExperimentalWebmcp=true)",
+      "Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool').",
     category: 'WebMCP',
     args: {
       pageId: {
@@ -701,7 +702,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_class_nodes: {
     description:
-      'Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs.',
     category: 'Memory',
     args: {
       filePath: {
@@ -772,7 +773,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_details: {
     description:
-      'Loads and caches a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates.',
     category: 'Memory',
     args: {
       filePath: {
@@ -836,7 +837,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_dominators: {
     description:
-      'Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive.',
     category: 'Memory',
     args: {
       filePath: {
@@ -865,7 +866,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_duplicate_strings: {
     description:
-      'Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value.',
     category: 'Memory',
     args: {
       filePath: {
@@ -905,7 +906,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_edges: {
     description:
-      'Loads and caches a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns outgoing edges (references) for a specific node ID.',
     category: 'Memory',
     args: {
       filePath: {
@@ -976,7 +977,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_object_details: {
     description:
-      'Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness.',
     category: 'Memory',
     args: {
       filePath: {
@@ -1005,7 +1006,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_retainers: {
     description:
-      'Loads and caches a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns retainers for a specific node ID.',
     category: 'Memory',
     args: {
       filePath: {
@@ -1052,7 +1053,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_retaining_paths: {
     description:
-      'Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected.',
     category: 'Memory',
     args: {
       filePath: {
@@ -1102,7 +1103,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads and caches a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary.',
     category: 'Memory',
     args: {
       filePath: {
@@ -1242,8 +1243,7 @@ export const commands: Commands = {
     },
   },
   install_extension: {
-    description:
-      'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
+    description: 'Installs a Chrome extension from the given path.',
     category: 'Extensions',
     args: {
       path: {
@@ -1352,7 +1352,7 @@ export const commands: Commands = {
   },
   list_3p_developer_tools: {
     description:
-      "Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).\nThird-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\nAlternatively, third-party developer tools exposed via the 'devtoolstooldiscovery' event can be executed by calling 'evaluate_script' and adding the\nfollowing command to the script:\n`window.__dtmcp.executeTool(toolName, params)`\nThis might be helpful when the third-party developer tools return non-serializable values or when composing\nthird-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
+      "Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).\nThird-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\nAlternatively, third-party developer tools exposed via the 'devtoolstooldiscovery' event can be executed by calling 'evaluate_script' and adding the\nfollowing command to the script:\n`window.__dtmcp.executeTool(toolName, params)`\nThis might be helpful when the third-party developer tools return non-serializable values or when composing\nthird-party developer tools with additional functionality.",
     category: 'Third-party',
     args: {
       pageId: {
@@ -1430,7 +1430,7 @@ export const commands: Commands = {
   },
   list_extensions: {
     description:
-      'Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included. (requires flag: --categoryExtensions=true)',
+      'Lists the unpacked Chrome extensions loaded in the browser. This includes their name, ID, version, and enabled status. Extensions installed from the Chrome Web Store are not included.',
     category: 'Extensions',
     args: {},
   },
@@ -1497,7 +1497,7 @@ export const commands: Commands = {
   },
   list_webmcp_tools: {
     description:
-      "Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools'). (requires flag: --categoryExperimentalWebmcp=true)",
+      "Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools').",
     category: 'WebMCP',
     args: {
       pageId: {
@@ -1511,7 +1511,7 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route matches any URL. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. allowOrigin requires a body or upstream source. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks. (requires flag: --categoryNetworkMocks=true)',
+      'Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route matches any URL. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. allowOrigin requires a body or upstream source. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.',
     category: 'Network mocks',
     args: {
       pageId: {
@@ -1823,7 +1823,7 @@ export const commands: Commands = {
   },
   query_heapsnapshot_objects: {
     description:
-      'Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy).',
     category: 'Memory',
     args: {
       filePath: {
@@ -1917,8 +1917,7 @@ export const commands: Commands = {
     },
   },
   reload_extension: {
-    description:
-      'Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
+    description: 'Reloads an unpacked Chrome extension by its ID.',
     category: 'Extensions',
     args: {
       id: {
@@ -1932,7 +1931,7 @@ export const commands: Commands = {
   },
   remove_network_mock: {
     description:
-      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace. (requires flag: --categoryNetworkMocks=true)',
+      'Remove network mocks matching the supplied stored route and/or resource type. Route patterns are compared exactly, not applied as wildcards to other patterns. Omit both filters to remove all mocks for the page. Removing the last mock restores the HTTP cache and stops interception. Changes are rejected during a performance trace.',
     category: 'Network mocks',
     args: {
       pageId: {
@@ -2201,8 +2200,7 @@ export const commands: Commands = {
     },
   },
   trigger_extension_action: {
-    description:
-      'Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)',
+    description: 'Triggers the default action of an extension by its ID.',
     category: 'Extensions',
     args: {
       id: {
@@ -2243,8 +2241,7 @@ export const commands: Commands = {
     },
   },
   uninstall_extension: {
-    description:
-      'Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
+    description: 'Uninstalls a Chrome extension by its ID.',
     category: 'Extensions',
     args: {
       id: {
@@ -2297,6 +2294,7 @@ export const commands: Commands = {
           'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
         positional: true,
+        minItems: 1,
       },
       includeSnapshot: {
         name: 'includeSnapshot',

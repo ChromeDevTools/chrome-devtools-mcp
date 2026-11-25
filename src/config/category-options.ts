@@ -146,8 +146,7 @@ function createOption(category: ToolCategory): CategoryOption {
     reloadable: true,
     ...overrides,
     // Off-by-default categories have no default so that they stay unset unless
-    // passed explicitly. This keeps them out of conflict checks and lets
-    // --viaCli apply its own categoryExtensions default.
+    // passed explicitly. This keeps them out of conflict checks.
     ...(overrides.offByDefault ? {} : {default: true}),
   };
 }
@@ -163,6 +162,22 @@ export function getCategoryOptions(): CategoryFlags {
     options[flagName] = createOption(category);
   }
 
+  return options;
+}
+
+export function getCategoryOptionsForViaCli(): CategoryFlags {
+  const options = getCategoryOptions();
+  for (const category of getOffByDefaultCategories()) {
+    // PWA tools need a pipe connection, so they conflict with connect options.
+    if (category === ToolCategory.PWA) {
+      continue;
+    }
+    const flagName = categoryToFlagName(category);
+    options[flagName] = {
+      ...options[flagName],
+      default: true,
+    };
+  }
   return options;
 }
 

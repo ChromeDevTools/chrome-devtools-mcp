@@ -91,9 +91,10 @@ export type FileVerificationOption =
  *   state or that is not reviewed for page-only access.
  * - `'page'`: the queue of the page named by `pageId`, a child of the
  *   context queue. Tools on different pages run at the same time; tools on
- *   one page and `'exclusive'` tools wait. Without page id routing the call
- *   runs on the context queue. Only for page-scoped tools whose handler
- *   touches the target page and no browser-global state.
+ *   one page and `'exclusive'` tools wait. Without page id routing, or
+ *   when no page has this id, the call runs on the context queue. Only for
+ *   page-scoped tools whose handler touches the target page and no
+ *   browser-global state.
  * - `'none'`: no queue. The tool runs at the same time as any other tool.
  *   For browserless tools, whose data guards itself (see
  *   `HeapSnapshotManager`), and for page tools that only read page state

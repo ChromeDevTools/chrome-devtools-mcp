@@ -127,6 +127,11 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.isolated, true);
       assert.strictEqual(args.categoryExtensions, true);
+      assert.strictEqual(args.categoryNetworkMocks, true);
+      assert.strictEqual(args.categoryPwa, undefined);
+      assert.strictEqual(args.categoryWebauthn, true);
+      assert.strictEqual(args.categoryExperimentalWebmcp, true);
+      assert.strictEqual(args.categoryExperimentalThirdParty, true);
       assert.strictEqual(args.allowUnrestrictedPaths, true);
       assert.strictEqual(args.filesystemRoot, undefined);
     });
@@ -143,7 +148,7 @@ describe('ServerConfig', () => {
       assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
 
-    it('does not enable isolated or extensions for viaCli with browserUrl', () => {
+    it('does not enable isolated for viaCli with browserUrl but enables all categories except PWA', () => {
       const args = ServerConfig.applyDefaults(
         {
           viaCli: true,
@@ -152,7 +157,12 @@ describe('ServerConfig', () => {
         {env: {}},
       );
       assert.strictEqual(args.isolated, false);
-      assert.strictEqual(args.categoryExtensions, undefined);
+      assert.strictEqual(args.categoryExtensions, true);
+      assert.strictEqual(args.categoryPwa, undefined);
+      assert.strictEqual(args.categoryNetworkMocks, true);
+      assert.strictEqual(args.categoryWebauthn, true);
+      assert.strictEqual(args.categoryExperimentalWebmcp, true);
+      assert.strictEqual(args.categoryExperimentalThirdParty, true);
     });
 
     it('locks slim=false and pageIdRouting=true for viaCli even when set in explicitArgs', () => {
@@ -449,8 +459,6 @@ describe('ServerConfig', () => {
         '--browserUrl=http://127.0.0.1:9222',
       ]);
 
-      assert.strictEqual(previous.resolved.categoryExtensions, true);
-      assert.strictEqual(next.resolved.categoryExtensions, undefined);
       assert.strictEqual(previous.resolved.isolated, true);
       assert.strictEqual(next.resolved.isolated, false);
       assert.strictEqual(previous.resolved.channel, 'stable');

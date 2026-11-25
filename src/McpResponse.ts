@@ -630,7 +630,7 @@ export class McpResponse implements Response {
     }
     const consoleMessageStableId = this.#attachedConsoleMessageId;
     if (this.#attachedConsoleMessageServiceWorkerId) {
-      // Service workers have no DevTools universe, so no stack trace is resolved.
+      // Service workers have no DevTools universe; stacks use raw frames.
       return await ConsoleFormatter.from(
         context.getServiceWorkerConsoleMessageById(
           this.#attachedConsoleMessageServiceWorkerId,
@@ -992,7 +992,13 @@ export class McpResponse implements Response {
       traceInsight?: string;
       error?: string;
       lighthouseResult?: object;
-      extensions?: object[];
+      extensions?: Array<{
+        id: string;
+        name: string;
+        version: string;
+        enabled: boolean;
+        path: string;
+      }>;
       thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
@@ -1704,13 +1710,19 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
     }
 
     if (data.extensions) {
-      const extensionArray = Array.from(data.extensions.values());
-      structuredContent.extensions = extensionArray;
+      const extensions = Array.from(data.extensions.values(), extension => ({
+        id: extension.id,
+        name: extension.name,
+        version: extension.version,
+        enabled: extension.enabled,
+        path: extension.path,
+      }));
+      structuredContent.extensions = extensions;
       response.push('## Extensions');
-      if (extensionArray.length === 0) {
+      if (extensions.length === 0) {
         response.push('No unpacked extensions found.');
       } else {
-        const extensionsMessage = extensionArray
+        const extensionsMessage = extensions
           .map(extension => {
             return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.enabled ? 'Enabled' : 'Disabled'}`;
           })

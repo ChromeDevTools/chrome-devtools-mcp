@@ -7,11 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {
-  isCategoryOffByDefault,
-  categoryToFlagName,
-} from '../out/Default/gen/src/config/category-options.js';
-import {mcpOptions} from '../out/Default/gen/src/config/mcp-options.js';
+import {categoryToFlagName} from '../out/Default/gen/src/config/category-options.js';
 import {ServerConfig} from '../out/Default/gen/src/config/ServerConfig.js';
 import {zod} from '../out/Default/gen/src/third_party/index.js';
 import {labels, ToolCategory} from '../out/Default/gen/src/tools/categories.js';
@@ -39,6 +35,7 @@ interface CliOption {
   description: string;
   required: boolean;
   positional: boolean;
+  minItems?: number;
   default?: unknown;
   enum?: unknown[];
 }
@@ -48,6 +45,7 @@ interface JsonSchema {
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: string[];
+  minItems?: number;
   default?: unknown;
   enum?: unknown[];
 }
@@ -73,6 +71,7 @@ function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
       required: isRequired,
       positional:
         isRequired || OPTIONAL_POSITIONAL_ARGS.has(`${toolName}:${name}`),
+      minItems: prop.minItems,
       default: prop.default,
       enum: prop.enum,
     };
@@ -80,12 +79,11 @@ function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
 }
 
 async function generateCli() {
-  const tools = createTools(
-    ServerConfig.applyDefaults(
-      {viaCli: true},
-      {suppressUsageStatisticsNotice: true},
-    ),
+  const cliDefaults = ServerConfig.applyDefaults(
+    {viaCli: true},
+    {suppressUsageStatisticsNotice: true},
   );
+  const tools = createTools(cliDefaults);
 
   // Sort tools by name
   const sortedTools = tools
@@ -143,16 +141,14 @@ async function generateCli() {
     let description = tool.description;
     const requiredFlags: string[] = [];
 
-    const isOffByDefault = isCategoryOffByDefault(categoryEnum);
-    if (isOffByDefault) {
-      const categoryFlag = categoryToFlagName(categoryEnum);
+    const categoryFlag = categoryToFlagName(categoryEnum);
+    if (!cliDefaults[categoryFlag]) {
       requiredFlags.push(`--${categoryFlag}=true`);
     }
 
     const conditions = tool.annotations.conditions || [];
     for (const condition of conditions) {
-      const option = mcpOptions[condition as keyof typeof mcpOptions];
-      if (!option || !('default' in option) || option.default !== true) {
+      if (!cliDefaults[condition]) {
         requiredFlags.push(`--${condition}=true`);
       }
     }
@@ -189,6 +185,8 @@ export interface ArgDef {
   required: boolean;
   /** Whether the arg is a positional on the command line, otherwise a flag. */
   positional: boolean;
+  /** Minimum number of items for array args, from JSON Schema minItems. */
+  minItems?: number;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
