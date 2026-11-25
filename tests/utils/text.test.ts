@@ -86,4 +86,19 @@ describe('truncateUrl', () => {
     const url = 'data:image/png;base64,' + 'A'.repeat(5000);
     assert.strictEqual(truncateUrl(url), url.slice(0, 255) + '... <truncated>');
   });
+
+  it('does not leave a partial percent escape at the cut', () => {
+    const suffix = '... <truncated>';
+    const cases = [
+      {prefix: 'https://example.com/?q=', expectedEnd: '%E9%A0'},
+      {prefix: 'https://example.com/?qxy=', expectedEnd: '%E9'},
+    ];
+    for (const {prefix, expectedEnd} of cases) {
+      const result = truncateUrl(prefix + '%E9%A0%80'.repeat(30));
+      assert.ok(result.endsWith(suffix));
+      const cut = result.slice(0, -suffix.length);
+      assert.ok(cut.endsWith(expectedEnd), cut.slice(-10));
+      assert.doesNotMatch(cut, /%[0-9a-fA-F]?$/);
+    }
+  });
 });

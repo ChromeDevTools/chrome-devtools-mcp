@@ -54,10 +54,22 @@ export function truncateText(
 }
 
 const URL_SIZE_LIMIT = 255;
+const URL_TRUNCATION_SUFFIX = '... <truncated>';
 
 /**
  * Truncates a URL for tool output, such as a `data:` URL with a base64 payload.
  */
 export function truncateUrl(url: string): string {
-  return truncateText(url, URL_SIZE_LIMIT, {ellipsis: '... <truncated>'});
+  const truncated = truncateText(url, URL_SIZE_LIMIT, {
+    ellipsis: URL_TRUNCATION_SUFFIX,
+  });
+  if (truncated.length === url.length) {
+    return url;
+  }
+  let prefix = truncated.slice(0, -URL_TRUNCATION_SUFFIX.length);
+  const lastPercent = prefix.lastIndexOf('%');
+  if (lastPercent !== -1 && prefix.length - lastPercent < 3) {
+    prefix = prefix.slice(0, lastPercent);
+  }
+  return prefix + URL_TRUNCATION_SUFFIX;
 }
