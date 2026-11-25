@@ -4,16 +4,15 @@ Use these JavaScript snippets with the `evaluate_script` tool.
 
 ## 1. Find Orphaned Form Inputs
 
-Finds form inputs that lack an associated label (no `label[for]`, `aria-label`, `aria-labelledby`, or wrapping `<label>`).
+Finds non-hidden inputs, selects, and textareas that have no associated HTML label and no `aria-label` or `aria-labelledby` value.
 
 ```js
 () =>
   Array.from(document.querySelectorAll('input, select, textarea'))
     .filter(i => {
-      const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
       const hasAria =
         i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
-      return !hasId && !hasAria && !i.closest('label');
+      return i.labels?.length === 0 && !hasAria;
     })
     .map(i => ({
       tag: i.tagName,
