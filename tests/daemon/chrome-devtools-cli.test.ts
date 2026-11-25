@@ -327,6 +327,47 @@ describe('chrome-devtools CLI', () => {
         SESSION_ID,
       );
     });
+
+    it('preserves security flags when a start option value matches a tool name', async () => {
+      const mocks = createCliMocks();
+
+      const exitCode = await runCli(
+        [
+          'start',
+          '--workspace',
+          'click',
+          '--no-javascript-evaluation',
+          '--sessionId',
+          SESSION_ID,
+        ],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.calledOnceWithExactly(
+        mocks.startDaemon,
+        ['--viaCli', '--no-javascript-evaluation', '--filesystem-root=click'],
+        SESSION_ID,
+      );
+    });
+
+    it('rejects prototype property names as unknown commands without crashing', async () => {
+      const mocks = createCliMocks();
+
+      const exitCode = await runCli(
+        ['constructor', '--sessionId', SESSION_ID],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 1);
+      sinon.assert.notCalled(mocks.startDaemon);
+      sinon.assert.notCalled(mocks.sendCommand);
+      sinon.assert.calledWithExactly(
+        mocks.consoleError.firstCall,
+        'Error:',
+        'Unknown argument: constructor',
+      );
+    });
   });
 
   describe('status', () => {

@@ -223,6 +223,7 @@ export function shieldLiteralArgs(
     result.push(placeholder);
   };
 
+  let commandSeen = false;
   let spec: CommandArgSpec | undefined;
   let filled = 0;
   let afterDoubleDash = false;
@@ -245,21 +246,28 @@ export function shieldLiteralArgs(
       continue;
     }
     if (token === '-') {
-      shield(token);
-      filled++;
+      if (spec) {
+        shield(token);
+        filled++;
+      } else {
+        result.push(token);
+      }
       continue;
     }
     if (!token.startsWith('-') || NEGATIVE_NUMBER.test(token)) {
       result.push(token);
-      if (!spec) {
+      if (!commandSeen) {
+        commandSeen = true;
         spec = getSpec(token);
-      } else {
+      } else if (spec) {
         filled++;
       }
       continue;
     }
 
-    const kind = spec?.options.get(optionName(token));
+    const kind = (
+      spec?.options ?? (commandSeen ? undefined : GLOBAL_CLI_OPTIONS)
+    )?.get(optionName(token));
     if (kind !== undefined) {
       result.push(token);
       if (token.includes('=')) {

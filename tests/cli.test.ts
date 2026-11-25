@@ -1784,6 +1784,23 @@ describe('cli literal args', () => {
     assert.deepStrictEqual(shield(input).shielded, input);
   });
 
+  it('does not treat a tool-named option value after a non-tool command as a tool command', () => {
+    const input = [
+      '--sessionId',
+      'abc',
+      'start',
+      '--workspace',
+      'click',
+      '--no-javascript-evaluation',
+    ];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield a lone hyphen for non-tool commands', () => {
+    const input = ['start', '--userDataDir', '-'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
   it('restores values nested in arrays and leaves other values alone', () => {
     const {argv, restore} = shieldLiteralArgs(
       ['cmd', '--', '-a', '-b'],
