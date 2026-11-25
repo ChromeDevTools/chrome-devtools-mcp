@@ -35,6 +35,8 @@ ts_library("tests") {
     "config/ConfigWatcher.test.ts",
     "config/ServerConfig.test.ts",
     "config/mcp-options.test.ts",
+    "daemon/chrome-devtools-cli.test.ts",
+    "daemon/cli-mocks.ts",
     "daemon/client.test.ts",
     "daemon/symlink.test.ts",
     "daemon/utils.test.ts",
