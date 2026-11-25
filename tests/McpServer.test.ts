@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import {once} from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
@@ -30,8 +31,8 @@ import {saveLogsToFile} from '../src/utils/logger.js';
 import {
   createMockMcpContext,
   createMockPuppeteerBrowser,
+  createMockMcpPage,
   createMockWebMCPTool,
-  type MockMcpPage,
 } from './mocks.js';
 import {createTempFile} from './utils.js';
 
@@ -273,8 +274,9 @@ describe('McpServer', () => {
           return await new Promise(() => {});
         });
       });
-      const page = context.getSelectedMcpPage() as MockMcpPage;
+      const page = createMockMcpPage();
       page.getWebMcpTools.returns([tool]);
+      context.getSelectedMcpPage.returns(page);
       context.getPageById.returns(page);
 
       const client = await connectClient(server);
@@ -291,15 +293,15 @@ describe('McpServer', () => {
         controller.abort();
         await assert.rejects(call);
 
-        assert.ok(executeSignal, 'tool.execute() did not receive a signal');
-        if (!executeSignal.aborted) {
-          await new Promise(resolve =>
-            executeSignal!.addEventListener('abort', resolve, {once: true}),
-          );
+        const signal = executeSignal;
+        assert.ok(signal, 'tool.execute() did not receive a signal');
+        if (!signal.aborted) {
+          await once(signal, 'abort', {signal: AbortSignal.timeout(5_000)});
         }
-        assert.strictEqual(executeSignal.aborted, true);
+        assert.strictEqual(signal.aborted, true);
       } finally {
         await client.close();
+        await server.close();
       }
     });
   });

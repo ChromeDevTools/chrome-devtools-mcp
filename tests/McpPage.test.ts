@@ -2319,12 +2319,45 @@ describe('McpPage', () => {
         response,
       );
 
-      sinon.assert.calledOnceWithExactly(mockTool.execute, {x: 21});
+      sinon.assert.calledOnceWithExactly(
+        mockTool.execute,
+        {x: 21},
+        {signal: undefined},
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         JSON.stringify({result: 42}, null, 2),
       );
       sinon.assert.notCalled(pptrPage.evaluate);
+    });
+
+    it('forwards the abort signal to the WebMCP tool in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Completed',
+        output: {result: 42},
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+      const controller = new AbortController();
+
+      await mcpPage.executeThirdPartyDeveloperTool(
+        'webmcp_tool',
+        {x: 21},
+        response,
+        controller.signal,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        mockTool.execute,
+        {x: 21},
+        {signal: controller.signal},
+      );
     });
 
     it('appends "Tool returned no result." when WebMCP tool output is undefined in executeThirdPartyDeveloperTool()', async () => {
@@ -2347,7 +2380,11 @@ describe('McpPage', () => {
         response,
       );
 
-      sinon.assert.calledOnceWithExactly(mockTool.execute, {});
+      sinon.assert.calledOnceWithExactly(
+        mockTool.execute,
+        {},
+        {signal: undefined},
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Tool returned no result.',
