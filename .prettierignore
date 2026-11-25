@@ -13,6 +13,5 @@ third_party
 .cursor-plugin/plugin.json
 .github/plugin/plugin.json
 gemini-extension.json
-.mcp.json
 mcp.json
 plugin.json
