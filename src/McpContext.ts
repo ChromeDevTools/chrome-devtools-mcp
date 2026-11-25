@@ -282,10 +282,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * Stops and saves active screencast recordings across all pages when
-   * screencast tools are disabled.
+   * Stops and saves active screencast recordings across all pages.
    */
-  async releaseScreencasts(): Promise<void> {
+  async releaseScreencasts(
+    reason = 'screencast tools were disabled',
+  ): Promise<void> {
     for (const mcpPage of this.#allMcpPages()) {
       const screenRecorderData = mcpPage.getScreenRecorder();
       if (!screenRecorderData) {
@@ -296,7 +297,7 @@ export class McpContext implements Context, BrowserlessContext {
       try {
         await recorder.stop();
         this.logger?.(
-          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+          `The screencast recording was stopped and saved to ${filePath} because ${reason}.`,
         );
       } catch (err) {
         this.logger?.('Failed to stop the screencast recording', err);
@@ -317,10 +318,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * Discards recorded performance traces and stops any running trace when
-   * performance tools are disabled.
+   * Discards recorded performance traces and stops any running trace.
    */
-  async releasePerformanceTrace(): Promise<void> {
+  async releasePerformanceTrace(
+    reason = 'performance tools were disabled',
+  ): Promise<void> {
     this.#traceResults = [];
     for (const mcpPage of this.#allMcpPages()) {
       if (!mcpPage.isRunningPerformanceTrace()) {
@@ -333,7 +335,7 @@ export class McpContext implements Context, BrowserlessContext {
         this.logger?.('Failed to stop the performance trace', err);
       }
       this.logger?.(
-        'The running performance trace was discarded because performance tools were disabled.',
+        `The running performance trace was discarded because ${reason}.`,
       );
     }
   }
@@ -425,6 +427,18 @@ export class McpContext implements Context, BrowserlessContext {
     this.#serviceWorkerCollector = undefined;
     this.#browser = undefined;
     this.#browserReady = undefined;
+  }
+
+  /**
+   * Releases all state bound to the current browser connection before the
+   * browser is closed or disconnected, while preserving `#hasConnected` so the
+   * next connection surfaces a reconnect notice.
+   */
+  onBrowserClosed(): void {
+    if (!this.#browser) {
+      return;
+    }
+    this.#resetBrowserState();
   }
 
   dispose(): void {

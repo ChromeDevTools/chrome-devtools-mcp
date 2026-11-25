@@ -23,12 +23,18 @@ import {getIssueDescription} from '../src/devtools/issueDescriptions.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {ScreenRecorder} from '../src/third_party/browser.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 import {saveLogsToFile} from '../src/utils/logger.js';
 
-import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
+import {
+  createMockMcpContext,
+  createMockPuppeteerBrowser,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+} from './mocks.js';
 import {createTempFile} from './utils.js';
 
 describe('McpServer', () => {
@@ -1167,6 +1173,308 @@ describe('McpServer', () => {
         applyError,
       );
       sinon.assert.notCalled(watched.logStream.write);
+    });
+  });
+
+  describe('idleTimeout', () => {
+    it('closes the browser after idleTimeout elapses following a tool call', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer([
+        '--idleTimeout=1s',
+      ]);
+
+      await server.callTool('list_pages', {});
+      await clock.tickAsync(999);
+      sinon.assert.notCalled(context.onBrowserClosed);
+      sinon.assert.notCalled(browserManager.close);
+
+      await clock.tickAsync(1);
+      sinon.assert.calledOnceWithExactly(
+        context.releaseScreencasts,
+        'the browser was idle',
+      );
+      sinon.assert.calledOnceWithExactly(
+        context.releasePerformanceTrace,
+        'the browser was idle',
+      );
+      sinon.assert.calledOnceWithExactly(context.onBrowserClosed);
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+      sinon.assert.callOrder(
+        context.releaseScreencasts,
+        context.releasePerformanceTrace,
+        context.onBrowserClosed,
+        browserManager.close,
+      );
+      await server.close();
+    });
+
+    it('stops and saves an active screencast recording before closing the idle browser', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const pptrPage = createMockPuppeteerPage();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([target]);
+      const browserManager = sinon.createStubInstance(BrowserManager);
+      browserManager.ensureBrowser.resolves(browser);
+      browserManager.close.resolves();
+      const createContextSpy = sinon.spy(McpContext, 'create');
+
+      const server = await McpServer.from(parseConfig(['--idleTimeout=1s']), {
+        browserManager,
+      });
+      await server.callTool('list_pages', {});
+      const realContext = createContextSpy.firstCall.returnValue;
+      const [mcpPage] = realContext.getPages();
+      assert.ok(mcpPage);
+
+      const {promise: recorderStopped, resolve: finishRecorderStop} =
+        Promise.withResolvers<void>();
+      const recorder = sinon.createStubInstance(ScreenRecorder);
+      recorder.stop.returns(recorderStopped);
+      mcpPage.setScreenRecorder({recorder, filePath: '/tmp/idle-video.mp4'});
+
+      await clock.tickAsync(1_000);
+      sinon.assert.calledOnceWithExactly(recorder.stop);
+      sinon.assert.notCalled(browserManager.close);
+
+      finishRecorderStop();
+      await clock.tickAsync(0);
+      assert.strictEqual(mcpPage.getScreenRecorder(), null);
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+      await server.close();
+    });
+
+    it('stops a running performance trace before closing the idle browser', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const pptrPage = createMockPuppeteerPage();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([target]);
+      const browserManager = sinon.createStubInstance(BrowserManager);
+      browserManager.ensureBrowser.resolves(browser);
+      browserManager.close.resolves();
+      const createContextSpy = sinon.spy(McpContext, 'create');
+
+      const server = await McpServer.from(parseConfig(['--idleTimeout=1s']), {
+        browserManager,
+      });
+      await server.callTool('list_pages', {});
+      const realContext = createContextSpy.firstCall.returnValue;
+      const [mcpPage] = realContext.getPages();
+      assert.ok(mcpPage);
+
+      const {promise: traceStopped, resolve: finishTraceStop} =
+        Promise.withResolvers<Uint8Array<ArrayBuffer>>();
+      pptrPage.tracing.stop.returns(traceStopped);
+      mcpPage.setIsRunningPerformanceTrace(true);
+
+      await clock.tickAsync(1_000);
+      sinon.assert.calledOnceWithExactly(pptrPage.tracing.stop);
+      sinon.assert.notCalled(browserManager.close);
+
+      finishTraceStop(new Uint8Array());
+      await clock.tickAsync(0);
+      assert.strictEqual(realContext.isRunningPerformanceTrace(), false);
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+      await server.close();
+    });
+
+    it('cancels a waiting idle pause when a new tool call starts so other page queues are not blocked', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const pptrPage1 = createMockPuppeteerPage();
+      const pptrPage2 = createMockPuppeteerPage();
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([
+        createMockPuppeteerTarget({page: pptrPage1}),
+        createMockPuppeteerTarget({page: pptrPage2}),
+      ]);
+      const browserManager = sinon.createStubInstance(BrowserManager);
+      browserManager.ensureBrowser.resolves(browser);
+      browserManager.close.resolves();
+      const createContextSpy = sinon.spy(McpContext, 'create');
+
+      const server = await McpServer.from(parseConfig(['--idleTimeout=1s']), {
+        browserManager,
+      });
+      const client = await connectClient(server);
+      const {promise: stuckInit, resolve: releaseStuckPage1} =
+        Promise.withResolvers<void>();
+      try {
+        await client.callTool({name: 'list_pages', arguments: {}});
+        const realContext = createContextSpy.firstCall.returnValue;
+        const [page1, page2] = realContext.getPages();
+        assert.ok(page1);
+        assert.ok(page2);
+
+        const {promise: page1Entered, resolve: markPage1Entered} =
+          Promise.withResolvers<void>();
+        sinon.stub(page1, 'init').callsFake(async () => {
+          markPage1Entered();
+          await stuckInit;
+        });
+
+        const call1Controller = new AbortController();
+        const call1 = client.callTool(
+          {name: 'list_console_messages', arguments: {pageId: page1.id}},
+          {signal: call1Controller.signal},
+        );
+        await page1Entered;
+        call1Controller.abort();
+        await assert.rejects(call1);
+
+        // Let the idle timer fire while page1 still holds its page queue.
+        await clock.tickAsync(1_000);
+
+        const page2Result = await server.callTool('list_console_messages', {
+          pageId: page2.id,
+        });
+        assert.strictEqual(page2Result.isError, undefined);
+        sinon.assert.notCalled(browserManager.close);
+      } finally {
+        releaseStuckPage1();
+        await clock.tickAsync(0);
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it('does not close while an MCP tool call is in flight and restarts the countdown when it finishes', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer([
+        '--idleTimeout=1s',
+      ]);
+      const client = await connectClient(server);
+      try {
+        const {promise: browserReady, resolve: finishBrowser} =
+          Promise.withResolvers<
+            ReturnType<typeof createMockPuppeteerBrowser>
+          >();
+        const {promise: entered, resolve: markEntered} =
+          Promise.withResolvers<void>();
+        context.ensureBrowser.callsFake(async () => {
+          markEntered();
+          return await browserReady;
+        });
+
+        const call = client.callTool({name: 'list_pages', arguments: {}});
+        await entered;
+        await clock.tickAsync(5_000);
+        sinon.assert.notCalled(context.onBrowserClosed);
+        sinon.assert.notCalled(browserManager.close);
+
+        finishBrowser(createMockPuppeteerBrowser());
+        await call;
+        await clock.tickAsync(999);
+        sinon.assert.notCalled(context.onBrowserClosed);
+        sinon.assert.notCalled(browserManager.close);
+
+        await clock.tickAsync(1);
+        sinon.assert.calledOnceWithExactly(context.onBrowserClosed);
+        sinon.assert.calledOnceWithExactly(browserManager.close);
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it('resets the countdown when another tool call runs before the timeout', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer([
+        '--idleTimeout=1s',
+      ]);
+
+      await server.callTool('list_pages', {});
+      await clock.tickAsync(900);
+      await server.callTool('list_pages', {});
+      await clock.tickAsync(999);
+      sinon.assert.notCalled(context.onBrowserClosed);
+      sinon.assert.notCalled(browserManager.close);
+
+      await clock.tickAsync(1);
+      sinon.assert.calledOnceWithExactly(context.onBrowserClosed);
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+      await server.close();
+    });
+
+    it('aborts closing when a new tool call arrives while waiting for the task runner', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer([
+        '--idleTimeout=1s',
+      ]);
+
+      await server.callTool('list_pages', {});
+
+      const {promise: configDone, resolve: finishConfig} =
+        Promise.withResolvers<void>();
+      const {promise: configEntered, resolve: markConfigEntered} =
+        Promise.withResolvers<void>();
+      context.onConfigChanged.callsFake(async () => {
+        markConfigEntered();
+        await configDone;
+      });
+
+      const reload = server.applyConfig(parseConfig());
+      await configEntered;
+
+      await clock.tickAsync(1_000);
+      const nextCall = server.callTool('list_pages', {});
+      finishConfig();
+      await reload;
+      await nextCall;
+
+      sinon.assert.notCalled(context.onBrowserClosed);
+      sinon.assert.notCalled(browserManager.close);
+
+      await clock.tickAsync(1_000);
+      sinon.assert.calledOnceWithExactly(context.onBrowserClosed);
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+      await server.close();
+    });
+
+    it('does not fire after server.close()', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer([
+        '--idleTimeout=1s',
+      ]);
+
+      await server.callTool('list_pages', {});
+      await server.close();
+      browserManager.close.resetHistory();
+
+      await clock.tickAsync(5_000);
+      sinon.assert.notCalled(context.onBrowserClosed);
+      sinon.assert.notCalled(browserManager.close);
+    });
+
+    it('does not close the browser when idleTimeout is not configured', async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const {server, browserManager, context} = await createTestServer();
+
+      await server.callTool('list_pages', {});
+      await clock.tickAsync(60_000);
+
+      assert.strictEqual(clock.countTimers(), 0);
+      sinon.assert.notCalled(context.onBrowserClosed);
+      sinon.assert.notCalled(browserManager.close);
+      await server.close();
     });
   });
 });
