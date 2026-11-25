@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import {once} from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
@@ -27,7 +28,12 @@ import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 import {saveLogsToFile} from '../src/utils/logger.js';
 
-import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
+import {
+  createMockMcpContext,
+  createMockPuppeteerBrowser,
+  createMockMcpPage,
+  createMockWebMCPTool,
+} from './mocks.js';
 import {createTempFile} from './utils.js';
 
 describe('McpServer', () => {
@@ -251,6 +257,52 @@ describe('McpServer', () => {
       assert.match(result.content[0].text, /## Heap Snapshot Data/);
       sinon.assert.notCalled(browserManager.ensureBrowser);
       await server.close();
+    });
+  });
+
+  describe('cancellation', () => {
+    it('aborts the WebMCP tool call when the client cancels the request', async () => {
+      const {server, context} = await createTestServer([
+        '--categoryExperimentalWebmcp',
+      ]);
+      const tool = createMockWebMCPTool({name: 'slow'});
+      let executeSignal: AbortSignal | undefined;
+      const executeStarted = new Promise<void>(resolve => {
+        tool.execute.callsFake(async (_input, options) => {
+          executeSignal = options?.signal;
+          resolve();
+          return await new Promise(() => {});
+        });
+      });
+      const page = createMockMcpPage();
+      page.getWebMcpTools.returns([tool]);
+      context.getSelectedMcpPage.returns(page);
+      context.getPageById.returns(page);
+
+      const client = await connectClient(server);
+      try {
+        const controller = new AbortController();
+        const call = client.callTool(
+          {
+            name: 'execute_webmcp_tool',
+            arguments: {pageId: 1, toolName: 'slow'},
+          },
+          {signal: controller.signal},
+        );
+        await executeStarted;
+        controller.abort();
+        await assert.rejects(call);
+
+        const signal = executeSignal;
+        assert.ok(signal, 'tool.execute() did not receive a signal');
+        if (!signal.aborted) {
+          await once(signal, 'abort', {signal: AbortSignal.timeout(5_000)});
+        }
+        assert.strictEqual(signal.aborted, true);
+      } finally {
+        await client.close();
+        await server.close();
+      }
     });
   });
 
