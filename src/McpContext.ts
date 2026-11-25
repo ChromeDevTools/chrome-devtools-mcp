@@ -67,6 +67,7 @@ import {
   fetchWithValidatedRedirects,
   validateUrlNotBlocked,
 } from './utils/network.js';
+import {raceWithTimeout} from './utils/raceWithTimeout.js';
 import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
 import {isAllowedUrl} from './utils/url.js';
 
@@ -171,27 +172,16 @@ function extensionTimeoutError(
   );
 }
 
-// Mirrors ToolHandler.#raceWithTimeout: the loser keeps running, the timer is
-// unref'd so it cannot hold the process open after a successful call, and it
-// is cleared on every exit path.
-async function raceExtensionOperation<T>(
+// The loser keeps running: Chrome has no cancel command for either operation,
+// so the deadline bounds only our wait (see utils/raceWithTimeout.ts).
+function raceExtensionOperation<T>(
   operation: Promise<T>,
   action: 'install' | 'uninstall',
 ): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () =>
-        reject(extensionTimeoutError(action, EXTENSION_OPERATION_TIMEOUT_MS)),
-      EXTENSION_OPERATION_TIMEOUT_MS,
-    );
-    timer.unref?.();
+  return raceWithTimeout(operation, {
+    timeoutMs: EXTENSION_OPERATION_TIMEOUT_MS,
+    error: extensionTimeoutError(action, EXTENSION_OPERATION_TIMEOUT_MS),
   });
-  try {
-    return await Promise.race([operation, deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 export class McpContext implements Context, BrowserlessContext {
