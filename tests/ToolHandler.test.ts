@@ -1710,7 +1710,7 @@ describe('ToolHandler', () => {
 
       sinon.assert.calledOnceWithExactly(
         toolHandler,
-        {params: {}},
+        {params: {}, signal: sinon.match.instanceOf(AbortSignal)},
         sinon.match.instanceOf(SlimMcpResponse),
         context,
       );
@@ -1727,7 +1727,7 @@ describe('ToolHandler', () => {
 
       sinon.assert.calledOnceWithExactly(
         toolHandler,
-        {params: {}},
+        {params: {}, signal: sinon.match.instanceOf(AbortSignal)},
         sinon.match(
           response =>
             response instanceof McpResponse &&
