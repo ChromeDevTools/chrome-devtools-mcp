@@ -17,7 +17,7 @@ import {
 } from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import type {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
@@ -63,7 +63,9 @@ export class McpServer {
   readonly server: SdkMcpServer;
   #config: ServerConfig;
   #browserManager: BrowserManager;
-  #context: McpContext;
+  #context?: McpContext;
+  #contextPromise?: Promise<McpContext>;
+  #closed = false;
   /** Runs every tool call and config reload. */
   #taskRunner = new TaskRunner();
   #heapSnapshotManager = new HeapSnapshotManager(this.#taskRunner);
@@ -111,14 +113,6 @@ export class McpServer {
         debouncedNotificationMethods: ['notifications/tools/list_changed'],
       },
     );
-
-    this.#context = McpContext.create(logger, {
-      config: this.#config,
-      heapSnapshotManager: this.#heapSnapshotManager,
-      taskRunner: this.#taskRunner,
-      getBrowser: () => this.#browserManager.ensureBrowser(),
-    });
-    this.#context.setRoots(this.#combinedRoots());
 
     this.server.server.setRequestHandler('logging/setLevel', () => {
       return {};
@@ -224,8 +218,10 @@ export class McpServer {
       logCruxDisclaimer(nextArgs);
     }
 
-    this.#context.setRoots(this.#combinedRoots());
-    await this.#context.onConfigChanged(previousArgs);
+    if (this.#context) {
+      this.#context.setRoots(this.#combinedRoots());
+      await this.#context.onConfigChanged(previousArgs);
+    }
   }
 
   /**
@@ -289,10 +285,11 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
+    this.#closed = true;
     this.#configWatcher?.dispose();
     this.#configWatcher = undefined;
     try {
-      this.#context.dispose();
+      this.#context?.dispose();
     } catch (err) {
       logger?.('Failed to dispose context', err);
     }
@@ -318,17 +315,16 @@ export class McpServer {
     options: McpServerOptions,
   ): Promise<McpServer> {
     const server = new McpServer(config, options);
-    await server.#init();
+    server.#init();
     return server;
   }
 
-  async #init(): Promise<void> {
+  #init(): void {
     // Tool definitions take a ParsedArguments snapshot; reload recreates them.
     for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
     this.#setToolCallRequestHandler();
-    await loadIssueDescriptions();
   }
 
   #combinedRoots(): Root[] | undefined {
@@ -364,10 +360,47 @@ export class McpServer {
         timeout === undefined ? undefined : {timeout},
       );
       this.#lastClientRoots = result.roots;
-      this.#context.setRoots(this.#combinedRoots());
+      this.#context?.setRoots(this.#combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
+  }
+
+  #ensureContext(): Promise<McpContext> {
+    if (this.#closed) {
+      return Promise.reject(new Error('MCP server is closed'));
+    }
+    if (this.#context) {
+      return Promise.resolve(this.#context);
+    }
+    this.#contextPromise ??= Promise.all([
+      import('./McpContext.js'),
+      loadIssueDescriptions(),
+    ])
+      .then(([mcpContextModule]) => {
+        const context = mcpContextModule.McpContext.create(logger, {
+          config: this.#config,
+          heapSnapshotManager: this.#heapSnapshotManager,
+          taskRunner: this.#taskRunner,
+          getBrowser: () => this.#browserManager.ensureBrowser(),
+        });
+        if (this.#closed) {
+          try {
+            context.dispose();
+          } catch (err) {
+            logger?.('Failed to dispose context', err);
+          }
+          throw new Error('MCP server is closed');
+        }
+        context.setRoots(this.#combinedRoots());
+        this.#context = context;
+        return context;
+      })
+      .catch((err: unknown) => {
+        this.#contextPromise = undefined;
+        throw err;
+      });
+    return this.#contextPromise;
   }
 
   async #getContext(): Promise<McpContext> {
@@ -377,7 +410,7 @@ export class McpServer {
       this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
       await this.#initialRoots;
     }
-    return this.#context;
+    return await this.#ensureContext();
   }
 
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {

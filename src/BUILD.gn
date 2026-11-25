@@ -198,6 +198,7 @@ ts_library("mcp_lib") {
     "config/mcp-options.ts",
     "config/puppeteer-options.ts",
     "config/tool-options.ts",
+    "daemon/chrome-devtools-cli.ts",
     "daemon/client.ts",
     "daemon/daemon.ts",
     "daemon/types.ts",

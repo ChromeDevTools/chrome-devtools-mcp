@@ -9,6 +9,7 @@ third_party
 
 # Release-please formatting breaks CI checks
 .claude-plugin/plugin.json
+.codex-plugin/plugin.json
 .cursor-plugin/plugin.json
 .github/plugin/plugin.json
 gemini-extension.json
