@@ -435,6 +435,30 @@ describe('daemon response deadline', () => {
     await assertion;
   });
 
+  for (const tool of ['lighthouse_audit', 'get_heapsnapshot_class_nodes']) {
+    it(`waits for ${tool}, which has no timeout argument`, async () => {
+      const clock = sinon.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+      });
+      const result = sendCommand({method: 'invoke_tool', tool, args: {}}, '');
+      const expected = {success: true, result: 'done', error: null};
+      const received = result.catch((error: unknown) => error);
+      await clock.tickAsync(2 ** 31 - 1);
+      sinon.assert.notCalled(destroy);
+      socket.emit('data', Buffer.from(JSON.stringify(expected) + '\0'));
+      assert.deepStrictEqual(await received, expected);
+    });
+  }
+
+  it('rejects when the socket closes while waiting for a tool without a timeout', async () => {
+    const result = sendCommand(
+      {method: 'invoke_tool', tool: 'lighthouse_audit', args: {}},
+      '',
+    );
+    socket.emit('close');
+    await assert.rejects(result, /Socket closed/);
+  });
+
   it('status still times out at exactly 60 seconds', async () => {
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
@@ -465,7 +489,7 @@ describe('daemon response deadline', () => {
   });
 
   for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
-    it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
+    it(`does not bound a tool with timeout ${timeout}`, async () => {
       const clock = sinon.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],
       });
@@ -473,15 +497,12 @@ describe('daemon response deadline', () => {
         {method: 'invoke_tool', tool: 'wait_for', args: {timeout}},
         '',
       );
-      const assertion = assert.rejects(
-        result,
-        /Timeout waiting for daemon response/,
-      );
-      await clock.tickAsync(59_999);
+      const expected = {success: true, result: 'done', error: null};
+      const received = result.catch((error: unknown) => error);
+      await clock.tickAsync(600_000);
       sinon.assert.notCalled(destroy);
-      await clock.tickAsync(1);
-      await assertion;
-      sinon.assert.calledOnceWithExactly(destroy);
+      socket.emit('data', Buffer.from(JSON.stringify(expected) + '\0'));
+      assert.deepStrictEqual(await received, expected);
     });
   }
 

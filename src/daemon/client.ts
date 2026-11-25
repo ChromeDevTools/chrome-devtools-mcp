@@ -157,7 +157,14 @@ const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 // Allow browser connection (up to TOOL_CALL_TIMEOUT_MS) and response construction.
 const RESPONSE_GRACE_MS = 60_000;
 
-function getCommandResponseTimeout(command: DaemonMessage): number {
+/**
+ * Returns the response deadline for `command`, or `undefined` for no deadline.
+ *
+ * The daemon does not bound a tool's own work (see `TOOL_CALL_TIMEOUT_MS`), so
+ * a tool without a `timeout` argument (e.g. `lighthouse_audit` or the
+ * heapsnapshot tools) is awaited until it responds or the socket closes.
+ */
+function getCommandResponseTimeout(command: DaemonMessage): number | undefined {
   if (command.method !== 'invoke_tool') {
     return SEND_COMMAND_TIMEOUT;
   }
@@ -167,7 +174,7 @@ function getCommandResponseTimeout(command: DaemonMessage): number {
     !Number.isFinite(toolTimeout) ||
     toolTimeout <= 0
   ) {
-    return SEND_COMMAND_TIMEOUT;
+    return undefined;
   }
   return Math.min(toolTimeout + RESPONSE_GRACE_MS, MAX_TIMER_DELAY_MS);
 }
@@ -178,7 +185,7 @@ function getCommandResponseTimeout(command: DaemonMessage): number {
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout: number = getCommandResponseTimeout(command),
+  timeout: number | undefined = getCommandResponseTimeout(command),
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {
@@ -192,10 +199,13 @@ export async function sendCommand(
   });
 
   return await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      socket.destroy();
-      reject(new Error('Timeout waiting for daemon response'));
-    }, timeout);
+    const timer =
+      timeout === undefined
+        ? undefined
+        : setTimeout(() => {
+            socket.destroy();
+            reject(new Error('Timeout waiting for daemon response'));
+          }, timeout);
 
     const transport = new PipeTransport(socket, socket, puppeteerLogger);
     transport.onmessage = async (message: string) => {
