@@ -272,6 +272,61 @@ describe('chrome-devtools CLI', () => {
         sinon.match.instanceOf(Error),
       );
     });
+
+    for (const argv of [
+      ['start', '--workspace', '--sessionId', SESSION_ID],
+      ['start', '--workspace', '--headless', '--sessionId', SESSION_ID],
+      ['start', '--filesystem-root', '--sessionId', SESSION_ID],
+      ['start', '--workspace=', '--sessionId', SESSION_ID],
+    ]) {
+      it(`rejects ${argv.slice(0, -2).join(' ')} without starting or stopping the daemon`, async () => {
+        const mocks = createCliMocks();
+        mocks.isDaemonRunning.returns(true);
+
+        const exitCode = await runCli(argv, mocks.options);
+
+        assert.strictEqual(exitCode, 1);
+        sinon.assert.notCalled(mocks.startDaemon);
+        sinon.assert.notCalled(mocks.stopDaemon);
+      });
+    }
+
+    for (const value of ['', '   ']) {
+      it(`rejects --workspace ${JSON.stringify(value)} without starting or stopping the daemon`, async () => {
+        const mocks = createCliMocks();
+        mocks.isDaemonRunning.returns(true);
+
+        const exitCode = await runCli(
+          ['start', '--workspace', value, '--sessionId', SESSION_ID],
+          mocks.options,
+        );
+
+        assert.strictEqual(exitCode, 1);
+        sinon.assert.notCalled(mocks.startDaemon);
+        sinon.assert.notCalled(mocks.stopDaemon);
+        sinon.assert.calledOnceWithExactly(
+          mocks.consoleError,
+          'Error:',
+          'Invalid --filesystemRoot: at least one non-empty path is required.',
+        );
+      });
+    }
+
+    it('forwards non-empty --workspace paths on start', async () => {
+      const mocks = createCliMocks();
+
+      const exitCode = await runCli(
+        ['start', '--workspace', '/tmp/project', '--sessionId', SESSION_ID],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.calledOnceWithExactly(
+        mocks.startDaemon,
+        ['--viaCli', '--filesystem-root=/tmp/project'],
+        SESSION_ID,
+      );
+    });
   });
 
   describe('status', () => {
