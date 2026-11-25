@@ -363,9 +363,7 @@ function main(): void {
       'Name: lighthouse',
       'License: Apache-2.0',
       '',
-      readText(
-        path.join(devtoolsRoot, 'front_end/third_party/lighthouse/LICENSE'),
-      ),
+      readText(path.join(projectRoot, 'node_modules/lighthouse/LICENSE')),
     ].join('\n'),
   );
   for (const directory of Array.from(devToolsThirdPartyDirs).sort()) {
