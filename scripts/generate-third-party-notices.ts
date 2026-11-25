@@ -6,8 +6,8 @@
 
 /**
  * @file Writes THIRD_PARTY_NOTICES and bundled-packages.json for the bundles
- * in src/third_party. The esbuild depfiles list the files of each bundle.
- * Based on `generateThirdPartyNotices` in Lighthouse's
+ * in src/third_party. The esbuild metafiles list the files included in each
+ * bundle. Based on `generateThirdPartyNotices` in Lighthouse's
  * build/build-bundle-mcp.js.
  */
 
@@ -56,6 +56,14 @@ function getString(value: unknown, key: string): string | undefined {
   return typeof property === 'string' ? property : undefined;
 }
 
+function getNumber(value: unknown, key: string): number | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const property = value[key];
+  return typeof property === 'number' ? property : undefined;
+}
+
 function getRecord(value: unknown, key: string): Record<string, unknown> {
   if (!isRecord(value)) {
     return {};
@@ -70,6 +78,18 @@ function readJson(filePath: string): unknown {
 
 function readText(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8').replaceAll('\r', '');
+}
+
+function writeIfChanged(filePath: string, content: string): void {
+  try {
+    if (fs.readFileSync(filePath, 'utf-8') === content) {
+      return;
+    }
+  } catch {
+    // File does not exist yet.
+  }
+  fs.mkdirSync(path.dirname(filePath), {recursive: true});
+  fs.writeFileSync(filePath, content);
 }
 
 function formatNotice(notice: Notice): string {
@@ -94,15 +114,42 @@ function assertAllowedLicense(license: string, source: string): void {
   }
 }
 
-/** Returns the files of all bundles as paths relative to the project root. */
-function readBundledFiles(depfiles: string[]): Set<string> {
+function isVirtualModule(modulePath: string): boolean {
+  return (
+    /^(?:[a-z][a-z0-9+.-]+|\([^)]+\)):/i.test(modulePath) ||
+    modulePath.startsWith('<')
+  );
+}
+
+/**
+ * Returns the non-tree-shaken input files of all bundles as paths relative to
+ * the project root.
+ */
+function readBundledFiles(metafiles: string[]): Set<string> {
   const files = new Set<string>();
-  for (const depfile of depfiles) {
-    const content = fs.readFileSync(depfile, 'utf-8');
-    const inputs = content.slice(content.indexOf(': ') + 2);
-    for (const input of inputs.split(/\s+/)) {
-      if (input) {
-        const relativePath = path.relative(projectRoot, path.resolve(input));
+  for (const metafilePath of metafiles) {
+    const metafile = readJson(metafilePath);
+    const outputs = getRecord(metafile, 'outputs');
+    const jsOutputs = Object.entries(outputs).filter(([outputPath]) =>
+      outputPath.endsWith('.js'),
+    );
+    if (jsOutputs.length === 0) {
+      throw new Error(`No .js output found in metafile ${metafilePath}`);
+    }
+    for (const [, output] of jsOutputs) {
+      const inputs = getRecord(output, 'inputs');
+      for (const [inputPath, info] of Object.entries(inputs)) {
+        if (isVirtualModule(inputPath)) {
+          continue;
+        }
+        const bytesInOutput = getNumber(info, 'bytesInOutput');
+        if (bytesInOutput === undefined || bytesInOutput <= 0) {
+          continue;
+        }
+        const relativePath = path.relative(
+          projectRoot,
+          path.resolve(inputPath),
+        );
         files.add(relativePath.replaceAll('\\', '/'));
       }
     }
@@ -245,13 +292,13 @@ function writeBundledPackages(
   if (devToolsCommit) {
     bundled[DEVTOOLS_URL] = devToolsCommit;
   }
-  fs.writeFileSync(outputPath, JSON.stringify(bundled, null, 2));
+  writeIfChanged(outputPath, JSON.stringify(bundled, null, 2));
 }
 
 function main(): void {
   const {values} = parseArgs({
     options: {
-      depfile: {type: 'string', multiple: true, default: []},
+      metafile: {type: 'string', multiple: true, default: []},
       notices: {type: 'string'},
       'bundled-packages': {type: 'string'},
     },
@@ -259,16 +306,16 @@ function main(): void {
   });
   const noticesPath = values.notices;
   const bundledPackagesPath = values['bundled-packages'];
-  if (!values.depfile.length || !noticesPath || !bundledPackagesPath) {
+  if (!values.metafile.length || !noticesPath || !bundledPackagesPath) {
     throw new Error(
-      'Usage: generate-third-party-notices.ts --depfile <path>... ' +
+      'Usage: generate-third-party-notices.ts --metafile <path>... ' +
         '--notices <path> --bundled-packages <path>',
     );
   }
 
   const packageDirs = new Set<string>();
   const devToolsThirdPartyDirs = new Set<string>();
-  for (const file of readBundledFiles(values.depfile)) {
+  for (const file of readBundledFiles(values.metafile)) {
     const packageDir = getPackageDir(file);
     if (packageDir) {
       packageDirs.add(packageDir);
@@ -325,7 +372,7 @@ function main(): void {
     ),
     'utf-8',
   );
-  fs.writeFileSync(
+  writeIfChanged(
     noticesPath,
     `${notices.join(DIVIDER).trim()}${DIVIDER}${lighthouseNotices}`,
   );

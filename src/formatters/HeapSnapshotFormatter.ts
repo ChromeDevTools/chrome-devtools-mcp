@@ -11,18 +11,19 @@ import type {
   HeapSnapshotDiffObject,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/browser.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
 import {truncateText} from '../utils/text.js';
 
-const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+import {HEAP_SNAPSHOT_MAX_NAME_LENGTH} from './constants.js';
 
-export const MAX_NAME_LENGTH = 100;
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
 export interface HeapSnapshotFormatOptions {
   /**
-   * Values longer than this are truncated. Defaults to `MAX_NAME_LENGTH`. Pass
-   * a large value to get untruncated values.
+   * Values longer than this are truncated. Defaults to
+   * `HEAP_SNAPSHOT_MAX_NAME_LENGTH`. Pass a large value to get untruncated
+   * values.
    */
   maxNameLength?: number;
 }
@@ -43,7 +44,10 @@ export function formatName(
 /**
  * Truncates `value` to `maxLength`, appending an ellipsis if it was cut off.
  */
-function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
+function truncateValue(
+  value: string,
+  maxLength = HEAP_SNAPSHOT_MAX_NAME_LENGTH,
+): string {
   return truncateText(value, maxLength);
 }
 

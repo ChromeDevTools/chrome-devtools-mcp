@@ -154,6 +154,7 @@ const structuredCssPropertySchema = zod
   .object({
     name: zod.string(),
     value: zod.string(),
+    resolvedValue: zod.string().optional(),
     status: cssPropertyStatusSchema,
     important: zod.boolean().optional(),
   })
@@ -168,6 +169,12 @@ const keyframeStepSchema = zod
   .strict();
 
 const cascadeRuleSchema = zod.union([
+  zod
+    .object({
+      type: zod.literal('computed'),
+      properties: zod.record(zod.string(), zod.string()),
+    })
+    .strict(),
   zod
     .object({
       type: zod.enum(['inline', 'attributes', 'transition']),
@@ -608,6 +615,9 @@ export const ambientMcpResponseOutputSchema: ToolSchema = {
   forcedColors: zod.string().optional(),
   prefersContrast: zod.string().optional(),
   prefersReducedMotion: zod.string().optional(),
+  consoleErrors: zod
+    .array(zod.union([consoleMessageConciseSchema, issueConciseSchema]))
+    .optional(),
   snapshotFilePath: zod.string().optional(),
 };
 
@@ -965,7 +975,9 @@ function compactTsWhitespace(ts: string): string {
     .replaceAll(' }', '}')
     .replaceAll('; ', ';')
     .replaceAll(': ', ':')
-    .replaceAll(' | ', '|');
+    .replaceAll(' | ', '|')
+    .replaceAll(', ', ',')
+    .replaceAll(' = ', '=');
 }
 
 function collectCascadeRuleTypeLiterals(): string {
@@ -1056,7 +1068,7 @@ export function buildCodeModeApiDeclaration(
     compactTsWhitespace(`type IssueMsg = ${ISSUE_CONCISE_TS};`),
     compactTsWhitespace(`type CssProp = ${CSS_PROP_TS};`),
     compactTsWhitespace(
-      `type CssRule = { type: ${CSS_RULE_TYPES_TS}; selector?: string; name?: string; source?: string; matchingSelectors?: string[]; isUserAgent?: boolean; active?: boolean; pseudoType?: string; atRuleType?: string; subsection?: string; node?: { selector: string; uid?: string }; ancestors?: Array<{ type: string; name?: string; query?: string; selector?: string; atRuleType?: string; container?: { selector: string; uid?: string } }>; properties?: CssProp[]; keyframes?: Array<{ keyText: string; source?: string; properties: CssProp[] }> };`,
+      `type CssRule = { type: ${CSS_RULE_TYPES_TS}; selector?: string; name?: string; source?: string; matchingSelectors?: string[]; isUserAgent?: boolean; active?: boolean; pseudoType?: string; atRuleType?: string; subsection?: string; node?: { selector: string; uid?: string }; ancestors?: Array<{ type: string; name?: string; query?: string; selector?: string; atRuleType?: string; container?: { selector: string; uid?: string } }>; properties?: CssProp[] | Record<string, string>; keyframes?: Array<{ keyText: string; source?: string; properties: CssProp[] }> };`,
     ),
   ];
 

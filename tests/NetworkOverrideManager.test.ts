@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkOverrideManager} from '../src/NetworkOverrideManager.js';
-import {CdpFrame} from '../src/third_party/index.js';
+import {CdpFrame} from '../src/third_party/browser.js';
 import {
   createMockHTTPRequest,
   createMockPuppeteerPage,
@@ -175,6 +175,35 @@ describe('NetworkOverrideManager', () => {
     );
     sinon.assert.calledOnceWithExactly(request.abort, 'failed');
     sinon.assert.notCalled(request.respond);
+    await manager.dispose();
+  });
+
+  it('matches preflight and prefetch mocks, which Chrome reports as other', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({resourceType: 'preflight', abort: true});
+    await manager.mock({resourceType: 'prefetch', abort: true});
+    const preflight = createMockHTTPRequest({
+      resourceType: 'other',
+      method: 'OPTIONS',
+      headers: {'access-control-request-method': 'PUT'},
+    });
+    const prefetch = createMockHTTPRequest({
+      resourceType: 'other',
+      headers: {'sec-purpose': 'prefetch'},
+    });
+    const other = createMockHTTPRequest({resourceType: 'other'});
+    pptrPage.emit('request', preflight);
+    pptrPage.emit('request', prefetch);
+    pptrPage.emit('request', other);
+    await settle();
+    sinon.assert.calledOnce(preflight.abort);
+    sinon.assert.calledOnce(prefetch.abort);
+    sinon.assert.notCalled(other.abort);
+    sinon.assert.calledOnce(other.continue);
     await manager.dispose();
   });
 

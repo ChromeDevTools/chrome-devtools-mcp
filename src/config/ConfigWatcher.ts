@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {DevTools} from '../third_party/index.js';
+import {Debouncer} from '../third_party/index.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
 import {logger} from '../utils/logger.js';
 
@@ -43,7 +43,7 @@ export class ConfigWatcher implements Disposable {
   readonly #onChange: (content: string) => Promise<void>;
   readonly #debounceMs: number;
   #watcher?: fs.FSWatcher;
-  #debounced?: ReturnType<typeof DevTools.Common.Debouncer.debounce>;
+  #debounced?: ReturnType<typeof Debouncer.debounce>;
   #content?: string;
   #pending = Promise.resolve();
 
@@ -67,7 +67,7 @@ export class ConfigWatcher implements Disposable {
     const realPath = fs.realpathSync(this.#configPath);
     const fileName = path.basename(realPath);
     this.#content = readContent(realPath);
-    this.#debounced = DevTools.Common.Debouncer.debounce(() => {
+    this.#debounced = Debouncer.debounce(() => {
       const content = readContent(realPath);
       if (content === undefined || content === this.#content) {
         return;

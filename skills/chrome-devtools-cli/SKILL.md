@@ -158,6 +158,8 @@ chrome-devtools list_console_messages 1 # List all console messages
 chrome-devtools list_console_messages 1 --pageSize 20 --pageIdx 1 # List console messages with pagination
 chrome-devtools list_console_messages 1 --types error --types info # Filter console messages by type
 chrome-devtools list_console_messages 1 --includePreservedMessages true # Include preserved messages
+chrome-devtools set_logpoints 1 "src/app.ts:42 'total', cart.total" # Set logpoints on page 1
+chrome-devtools set_logpoints 1 # Remove all logpoints on page 1
 chrome-devtools take_screenshot 1 # Take a screenshot of the page viewport
 chrome-devtools take_screenshot 1 --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
 chrome-devtools take_screenshot 1 --uid "id" --filePath "s.png" # Take a screenshot of an element
@@ -188,14 +190,12 @@ chrome-devtools uninstall_pwa "https://example.com/" # Uninstall PWA and close w
 
 ## Experimental Features
 
-Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
-
 ```bash
 chrome-devtools click_at 1 100 200 # Clicks at the provided coordinates on page 1 (requires --experimentalVision=true)
-chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1 (requires --categoryExperimentalWebmcp=true)
-chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1 (requires --categoryExperimentalWebmcp=true)
-chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1 (requires --categoryExperimentalThirdParty=true)
-chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}' # Execute third-party developer tool on page 1 (requires --categoryExperimentalThirdParty=true)
+chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1
+chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1
+chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1
+chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}' # Execute third-party developer tool on page 1
 ```
 
 ## Service Management

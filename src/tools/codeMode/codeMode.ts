@@ -8,13 +8,8 @@ import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import type {ParsedArguments} from '../../config/mcp-options.js';
-import {
-  DisposableStack,
-  Mutex,
-  zod,
-  type CDPSession,
-  type Protocol,
-} from '../../third_party/index.js';
+import {DisposableStack, Mutex, zod} from '../../third_party/index.js';
+import type {CDPSession, Protocol} from '../../third_party/browser.js';
 import {isPlainRecord} from '../../utils/objects.js';
 import {getNetworkMultiplierFromString} from '../../utils/WaitForHelper.js';
 

@@ -9,7 +9,7 @@ import type {
   Protocol,
   SerializedAXNode,
   ElementHandle,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
@@ -237,7 +237,8 @@ export class TextSnapshot {
         id,
         backendNodeId,
         children: [],
-        elementHandle: async () => handle,
+        // Callers dispose their handle, so keep the page-owned one alive.
+        elementHandle: () => handle.evaluateHandle(element => element),
       };
       return extraNode;
     };

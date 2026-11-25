@@ -10,7 +10,7 @@ import {
   DevTools,
   type HTTPRequest,
   type HTTPResponse,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 import type {
   NetworkRequestConcise,
   NetworkRequestDetailed,

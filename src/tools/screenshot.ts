@@ -5,13 +5,13 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {
-  zod,
-  type BoundingBox,
-  type ElementHandle,
-  type Page,
-  type ScreenshotClip,
-} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
+import type {
+  BoundingBox,
+  ElementHandle,
+  Page,
+  ScreenshotClip,
+} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
 import {messageOutputSchema} from './codeMode/codeModeSchema.js';
@@ -148,8 +148,10 @@ async function captureScreenshotBytes(options: {
   fullPage: boolean;
   type: ScreenshotFormat;
   quality: number | undefined;
+  omitBackground: boolean | undefined;
 }): Promise<Uint8Array> {
-  const {page, element, clip, fullPage, type, quality} = options;
+  const {page, element, clip, fullPage, type, quality, omitBackground} =
+    options;
   if (clip) {
     // page.screenshot with clip lets the CDP scale param downscale the
     // capture for viewport, full-page and element shots alike. We rely on
@@ -159,6 +161,7 @@ async function captureScreenshotBytes(options: {
       type,
       quality,
       optimizeForSpeed: true,
+      omitBackground,
       clip,
     });
   }
@@ -167,6 +170,7 @@ async function captureScreenshotBytes(options: {
       type,
       quality,
       optimizeForSpeed: true,
+      omitBackground,
     });
   }
   return await page.screenshot({
@@ -174,6 +178,7 @@ async function captureScreenshotBytes(options: {
     fullPage,
     quality,
     optimizeForSpeed: true,
+    omitBackground,
   });
 }
 
@@ -222,6 +227,12 @@ export const screenshot: PageToolFactory = definePageTool(
           .optional()
           .describe(
             'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+          ),
+        omitBackground: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.',
           ),
         filePath: zod
           .string()
@@ -289,6 +300,7 @@ export const screenshot: PageToolFactory = definePageTool(
           fullPage,
           type: format,
           quality,
+          omitBackground: request.params.omitBackground,
         });
 
         if (request.params.uid) {
@@ -329,6 +341,7 @@ export const screenshot: PageToolFactory = definePageTool(
               fullPage,
               type: 'webp',
               quality: 80,
+              omitBackground: request.params.omitBackground,
             });
             if (webpFallback.length >= 2_000_000) {
               throw new Error(

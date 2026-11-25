@@ -204,7 +204,7 @@ describe('TaskRunner', () => {
   });
 
   it('orders by queue, not by task duration', async () => {
-    const clock = sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const runner = new TaskRunner();
       const order: string[] = [];

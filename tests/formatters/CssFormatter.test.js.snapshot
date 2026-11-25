@@ -452,6 +452,74 @@ Styles for button (uid: "elem-at-4"):
   }
 `;
 
+exports[`CssFormatter > formats computed styles alongside matched rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-computed",
+    "selector": "div.box"
+  },
+  "rules": [
+    {
+      "type": "computed",
+      "properties": {
+        "color": "rgb(255, 0, 0)",
+        "display": "block",
+        "height": "40px",
+        "padding-bottom": "8px",
+        "padding-left": "8px",
+        "padding-right": "8px",
+        "padding-top": "8px",
+        "user-select": "none",
+        "width": "120px"
+      }
+    },
+    {
+      "type": "matched",
+      "selector": ".box",
+      "source": "app.css",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "8px",
+          "status": "active"
+        },
+        {
+          "name": "user-select",
+          "value": "none",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats computed styles alongside matched rules toString 1`] = `
+Styles for div.box (uid: "elem-computed"):
+
+  Computed styles:
+    color: rgb(255, 0, 0);
+    display: block;
+    height: 40px;
+    padding-bottom: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    user-select: none;
+    width: 120px;
+
+  .box (app.css) {
+    color: red;
+    padding: 8px;
+    user-select: none;
+  }
+`;
+
 exports[`CssFormatter > formats constructed stylesheets with and without sourceURL pragma toJSON 1`] = `
 {
   "element": {
@@ -1137,6 +1205,42 @@ Styles for table#data (uid: "table-1"):
   }
 `;
 
+exports[`CssFormatter > includes requested computedProperties and expands shorthands toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-computed-extra",
+    "selector": "div#card"
+  },
+  "rules": [
+    {
+      "type": "computed",
+      "properties": {
+        "display": "flex",
+        "height": "100px",
+        "overflow-x": "hidden",
+        "overflow-y": "auto",
+        "position": "static",
+        "width": "200px",
+        "--brand": "#00aaff"
+      }
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > includes requested computedProperties and expands shorthands toString 1`] = `
+Styles for div#card (uid: "elem-computed-extra"):
+
+  Computed styles:
+    display: flex;
+    height: 100px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: static;
+    width: 200px;
+    --brand: #00aaff;
+`;
+
 exports[`CssFormatter > maps invalid and disabled property statuses toJSON 1`] = `
 {
   "element": {
@@ -1176,6 +1280,54 @@ Styles for button (uid: "elem-diag"):
     color: red;
     [invalid] background: invalid-val;
     [disabled] opacity: 0.5;
+  }
+`;
+
+exports[`CssFormatter > omits resolved value when var() is unresolved, disabled, or absent toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-var-omitted",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "selector": "element.style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "var(--undefined)",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "var(--gap) var(--undefined)",
+          "status": "active"
+        },
+        {
+          "name": "border-width",
+          "value": "var(--gap)",
+          "status": "disabled"
+        },
+        {
+          "name": "background",
+          "value": "red /* brand */",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > omits resolved value when var() is unresolved, disabled, or absent toString 1`] = `
+Styles for button (uid: "elem-var-omitted"):
+
+  element.style {
+    color: var(--undefined);
+    padding: var(--gap) var(--undefined);
+    [disabled] border-width: var(--gap);
+    background: red /* brand */;
   }
 `;
 
@@ -1221,6 +1373,66 @@ Styles for button (uid: "elem-widget"):
     .widget (<style>) {
       padding: 10px;
     }
+  }
+`;
+
+exports[`CssFormatter > resolves var() values inline toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-var",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "selector": "element.style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "var(--brand)",
+          "resolvedValue": "#ff0000",
+          "status": "active"
+        },
+        {
+          "name": "padding",
+          "value": "calc(var(--gap) * 2)",
+          "resolvedValue": "calc(8px * 2)",
+          "status": "active"
+        },
+        {
+          "name": "margin",
+          "value": "var(--missing, 12px)",
+          "resolvedValue": "12px",
+          "status": "active"
+        },
+        {
+          "name": "background-color",
+          "value": "var(--accent)",
+          "resolvedValue": "#00ff88",
+          "status": "active",
+          "important": true
+        },
+        {
+          "name": "content",
+          "value": "var(--note)",
+          "resolvedValue": "\\"a */ b\\"",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > resolves var() values inline toString 1`] = `
+Styles for button (uid: "elem-var"):
+
+  element.style {
+    color: var(--brand); /* #ff0000 */
+    padding: calc(var(--gap) * 2); /* calc(8px * 2) */
+    margin: var(--missing, 12px); /* 12px */
+    background-color: var(--accent) !important; /* #00ff88 */
+    content: var(--note); /* "a *\\/ b" */
   }
 `;
 

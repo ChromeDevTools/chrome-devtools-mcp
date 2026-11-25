@@ -345,10 +345,17 @@ describe('codeModePartition', () => {
     });
 
     it('strips filePath, requestFilePath, responseFilePath, and serviceWorkerId from inner tool schemas and rejects them under strict validation', () => {
-      const rawTools = createUnpartitionedTools({slim: false});
+      const rawTools = createUnpartitionedTools({
+        slim: false,
+        categoryExtensions: true,
+      });
       const {innerTools} = partitionToolsForCodeMode(
         rawTools,
-        createMockParsedArguments({codeMode: true, slim: false}),
+        createMockParsedArguments({
+          codeMode: true,
+          slim: false,
+          categoryExtensions: true,
+        }),
       );
 
       const innerSnapshot = findTool(innerTools, 'take_snapshot');

@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -20,7 +20,7 @@
     "gen": "npm run build && npm run cli:generate && npm run docs:generate && npm run update-metrics && npm run format",
     "docs:generate": "node scripts/generate-docs.ts",
     "start": "npm run build && node out/Default/gen/src/bin/chrome-devtools-mcp.js",
-    "start-debug": "NODE_DEBUG=mcp:* npm run build && node out/Default/gen/src/bin/chrome-devtools-mcp.js",
+    "start-debug": "npm run build && NODE_DEBUG=mcp:* node out/Default/gen/src/bin/chrome-devtools-mcp.js",
     "test": "npm run build && node scripts/test.js",
     "test:no-build": "node scripts/test.js",
     "test:only": "npm run build && node scripts/test.js --test-only",
@@ -46,6 +46,7 @@
     "!**/*.js.map",
     "!**/*.d.ts",
     "!**/*-tsconfig*.json",
+    "!**/*.meta.json",
     "!**/*.stamp",
     "!**/*.d"
   ],
@@ -59,11 +60,11 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
-    "@google/genai": "^2.0.1",
+    "@google/genai": "^3.0.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",
-    "@stylistic/eslint-plugin": "^5.4.0",
+    "@stylistic/eslint-plugin": "^6.0.0",
     "@toon-format/toon": "^4.1.0",
     "@types/node": "^26.0.0",
     "@types/semver": "^7.7.1",
@@ -81,7 +82,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.6.0",
     "prettier": "^3.6.2",
-    "puppeteer": "25.17.0",
+    "puppeteer": "25.18.1",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",

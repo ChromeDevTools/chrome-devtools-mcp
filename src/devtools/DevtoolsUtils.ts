@@ -9,7 +9,7 @@ import {
   type CDPSession,
   type ConsoleMessage,
   type Protocol,
-} from '../third_party/index.js';
+} from '../third_party/browser.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
@@ -182,7 +182,7 @@ export async function createTargetUniverse(
   );
   skipAllPausesSetting.set(true);
 
-  // @ts-expect-error devtools-frontend has diffrent types.
+  // @ts-expect-error devtools-frontend has different types.
   const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
@@ -226,8 +226,70 @@ export type ExceptionDetailsLike =
   | Protocol.Runtime.ExceptionDetails
   | DevTools.Protocol.Runtime.ExceptionDetails;
 
+// Only `send()` is used, so the session of a handle from any copy of
+// Puppeteer qualifies.
+export type SessionLike = Pick<CDPSession, 'send'>;
+
 export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
+
+/**
+ * The parts of a DevTools stack trace that are formatted. A stack trace built
+ * from raw CDP call frames (without a DevTools universe) also fits.
+ */
+export interface FormattableFrame {
+  readonly url?: string;
+  readonly uiSourceCode?: DevTools.StackTrace.StackTrace.Frame['uiSourceCode'];
+  readonly name?: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+export interface FormattableFragment {
+  readonly frames: readonly FormattableFrame[];
+}
+
+export interface FormattableAsyncFragment extends FormattableFragment {
+  readonly description: string;
+}
+
+export interface FormattableStackTrace {
+  readonly syncFragment: FormattableFragment;
+  readonly asyncFragments: readonly FormattableAsyncFragment[];
+}
+
+/**
+ * Builds a stack trace from raw CDP call frames, without source maps. Used for
+ * targets that have no DevTools universe, such as extension service workers.
+ */
+export function createRawStackTrace(
+  rawStackTrace: StackTraceLike,
+): FormattableStackTrace {
+  const toFrames = (
+    callFrames: StackTraceLike['callFrames'],
+  ): FormattableFrame[] =>
+    callFrames.map(frame => ({
+      url: frame.url,
+      name: frame.functionName || undefined,
+      line: frame.lineNumber,
+      column: frame.columnNumber,
+    }));
+  const asyncFragments = [];
+  for (
+    let asyncStack = rawStackTrace.parent;
+    asyncStack;
+    asyncStack = asyncStack.parent
+  ) {
+    asyncFragments.push({
+      description: asyncStack.description ?? '',
+      frames: toFrames(asyncStack.callFrames),
+    });
+  }
+  return {
+    syncFragment: {frames: toFrames(rawStackTrace.callFrames)},
+    asyncFragments,
+  };
+}
 
 /**
  * Maximum number of `cause` links resolved for one error. A page can create a
@@ -245,12 +307,12 @@ const MAX_CAUSE_DEPTH = 10;
  */
 export class SymbolizedError {
   readonly message: string;
-  readonly stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
+  readonly stackTrace?: FormattableStackTrace;
   readonly cause?: SymbolizedError;
 
   private constructor(
     message: string,
-    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    stackTrace?: FormattableStackTrace,
     cause?: SymbolizedError,
   ) {
     this.message = message;
@@ -264,9 +326,9 @@ export class SymbolizedError {
     devTools?: TargetUniverse;
     // The session that reported `details`. Remote object ids are scoped to
     // the session that issued them, so the cause has to be resolved there.
-    session?: CDPSession;
+    session?: SessionLike;
     includeStackAndCause?: boolean;
-    resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
+    resolvedStackTraceForTesting?: FormattableStackTrace;
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
     return await SymbolizedError.#fromDetails(opts, 0);
@@ -285,7 +347,7 @@ export class SymbolizedError {
       );
     }
 
-    let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    let stackTrace: FormattableStackTrace | undefined;
     if (opts.resolvedStackTraceForTesting) {
       stackTrace = opts.resolvedStackTraceForTesting;
     } else if (opts.devTools && opts.details.stackTrace) {
@@ -298,6 +360,8 @@ export class SymbolizedError {
       } catch {
         // ignore
       }
+    } else if (opts.details.stackTrace) {
+      stackTrace = createRawStackTrace(opts.details.stackTrace);
     }
 
     // TODO: Turn opts.details.exception into a JSHandle and retrieve the 'cause' property.
@@ -335,7 +399,7 @@ export class SymbolizedError {
     error: RemoteObjectLike;
     targetId: string;
     devTools?: TargetUniverse;
-    session?: CDPSession;
+    session?: SessionLike;
   }): Promise<SymbolizedError> {
     return await SymbolizedError.#fromError(opts, 0);
   }
@@ -405,7 +469,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<ExceptionDetailsLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
@@ -442,7 +506,7 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-    session?: CDPSession,
+    session?: SessionLike,
   ): Promise<RemoteObjectLike | null> {
     if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
@@ -517,9 +581,9 @@ export async function createStackTrace(
   // work in the MCP case, so we'll collect all script IDs upfront and wait for any pending source map
   // loads before creating the stack trace. We might also have to wait for Debugger.ScriptParsed events if
   // the stack trace is created particularly early.
-  const scriptIds = new Set<string>();
+  const scriptUrls = new Map<string, string>();
   for (const frame of rawStackTrace.callFrames) {
-    scriptIds.add(frame.scriptId);
+    scriptUrls.set(frame.scriptId, frame.url);
   }
   for (
     let asyncStack: StackTraceLike | undefined = rawStackTrace.parent;
@@ -527,26 +591,65 @@ export async function createStackTrace(
     asyncStack = asyncStack.parent
   ) {
     for (const frame of asyncStack.callFrames) {
-      scriptIds.add(frame.scriptId);
+      scriptUrls.set(frame.scriptId, frame.url);
     }
   }
 
   const signal = AbortSignal.timeout(1_000);
   const scripts = await Promise.all(
-    [...scriptIds].map(id => waitForScript(model, id, signal)),
+    [...scriptUrls].map(async ([scriptId, url]) => {
+      try {
+        const script = await waitForScript(model, scriptId, signal);
+        // V8 leaves data: URLs out of stack frames.
+        const scriptUrl = script.sourceURL.startsWith('data:')
+          ? ''
+          : script.sourceURL;
+        // Script ids restart in a new renderer process, so after a
+        // cross-process navigation the id can belong to another script.
+        return scriptUrl === url ? script : undefined;
+      } catch {
+        // The script is gone, e.g. after a navigation.
+        return undefined;
+      }
+    }),
   );
-  await waitForSourceMaps(model, scripts, signal);
+  const knownScripts = scripts.filter(script => script !== undefined);
+  await waitForSourceMaps(model, knownScripts, signal);
+  const knownScriptIds = new Set<string>(
+    knownScripts.map(script => script.scriptId),
+  );
 
   const binding = devTools.universe.context.get(
     DevTools.DebuggerWorkspaceBinding,
   );
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
   return await binding.createStackTraceFromProtocolRuntime(
-    rawStackTrace as Parameters<
+    withUnknownScriptsRaw(rawStackTrace, knownScriptIds) as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],
     target,
   );
+}
+
+/**
+ * Copies `stackTrace` and gives the frames of scripts that are not in
+ * `knownScriptIds` the script id 0, which V8 never assigns, so DevTools
+ * resolves them neither by id nor by URL and keeps their raw location.
+ */
+function withUnknownScriptsRaw(
+  stackTrace: StackTraceLike,
+  knownScriptIds: ReadonlySet<string>,
+): Protocol.Runtime.StackTrace {
+  const copy: Protocol.Runtime.StackTrace = {
+    ...stackTrace,
+    callFrames: stackTrace.callFrames.map(frame =>
+      knownScriptIds.has(frame.scriptId) ? frame : {...frame, scriptId: '0'},
+    ),
+  };
+  if (stackTrace.parent) {
+    copy.parent = withUnknownScriptsRaw(stackTrace.parent, knownScriptIds);
+  }
+  return copy;
 }
 
 /**

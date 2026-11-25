@@ -17,7 +17,7 @@ import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {
   CdpScreenRecording,
   ScreenRecorder,
-} from '../../src/third_party/index.js';
+} from '../../src/third_party/browser.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';
 import {createTempDir, html, withMcpContext} from '../utils.js';

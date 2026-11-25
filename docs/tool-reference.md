@@ -304,7 +304,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension
+**Description:** Requests the specified page dimensions. Chrome may enforce a minimum window size, so the resulting page dimensions can differ from the requested values.
 
 **Parameters:**
 
@@ -365,20 +365,22 @@
 - **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
 - **requestFilePath** (string) _(optional)_: The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.
 - **responseFilePath** (string) _(optional)_: The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.
+- **serviceWorkerId** (string) _(optional)_: Get the request from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. Requires reqid, using the reqid listed for that service worker.
 
 ---
 
 ### `list_network_requests`
 
-**Description:** Lists the most recent requests for the target page since the last navigation.
+**Description:** Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead.
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
+- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations. Ignored when serviceWorkerId is set.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+- **serviceWorkerId** (string) _(optional)_: List requests made by the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. The page selected by pageId is still used for the call and its console errors may be appended.
 
 ---
 
@@ -411,22 +413,25 @@
 
 **Parameters:**
 
-- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+- **msgid** (number) **(required)**: The msgid of a console message from [`list_console_messages`](#list_console_messages): for the page, or for the service worker when serviceWorkerId is set.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
+- **serviceWorkerId** (string) _(optional)_: Get the message from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.
 
 ---
 
 ### `get_css_styles`
 
-**Description:** Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
-Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded].
-Treat the output as authoritative and complete.
-Results are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from [`take_snapshot`](#take_snapshot).
+**Description:** Retrieve computed styles, matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
+Computed styles for the target element itself (not its pseudo-elements) appears as the first entry, showing display, width, height, and properties from matched or inherited rules; pass computedProperties to include additional CSS properties in Computed styles.
+Matched CSS rules follow from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded]. Declarations referencing custom properties via var() include their resolved token values as inline comments (e.g. color: var(--brand); /* #ff0000 */). Computed styles shows final browser-computed longhand values.
+Treat the matched cascade and computed values as authoritative.
+Results are paginated (10 entries per page by default); use pageIdx to page through the remaining rules. Requires a UID from [`take_snapshot`](#take_snapshot).
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **uid** (string) **(required)**: The uid of the element on the page from the page content snapshot to inspect CSS styles for
+- **computedProperties** (array) _(optional)_: Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). Defaults to 0 (the first page).
 - **pageSize** (integer) _(optional)_: Maximum number of CSS rules to return per page. Defaults to 10.
 
@@ -503,6 +508,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **omitBackground** (boolean) _(optional)_: Hide the default white background, allowing transparent PNG and WebP screenshots. Does not remove CSS backgrounds. Ignored for JPEG.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.
 
@@ -707,13 +713,13 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **className** (string) _(optional)_: Optional regex or text matching object class name.
+- **className** (string) _(optional)_: Optional case-insensitive regex matching object class name. Escape special characters to match them literally.
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
 - **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
 - **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
-- **propertyName** (string) _(optional)_: Optional property name filter for outgoing reference edges.
+- **propertyName** (string) _(optional)_: Optional case-insensitive regex matching property names of outgoing reference edges. Escape special characters to match them literally.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **sortBy** (enum: "retainedSize", "selfSize", "id") _(optional)_: Sort order for results. Default is retainedSize.

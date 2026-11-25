@@ -9,81 +9,158 @@ import type {
   ConsoleMessage,
   WebWorker,
   Target,
-  CDPSession,
-  Protocol,
   Browser,
-} from '../third_party/index.js';
+  HTTPRequest,
+  RemoteException,
+} from '../third_party/browser.js';
 import type {McpWorker} from '../McpWorker.js';
 import {
   createIdGenerator,
   stableIdSymbol,
   type WithSymbolId,
 } from '../utils/id.js';
+import {logger} from '../utils/logger.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 
+interface ServiceWorkerSubscriberCallbacks {
+  onConsole: (item: ConsoleMessage | UncaughtError) => void;
+  onRequest: (request: HTTPRequest) => void;
+}
+
+/**
+ * Subscribes to one service worker target. All listeners are attached to the
+ * same {@link WebWorker} in one synchronous block, so no event is emitted
+ * before every listener exists and the target is attached only once.
+ */
 export class ServiceWorkerSubscriber {
   #target: Target;
-  #callback: (item: ConsoleMessage | UncaughtError) => void;
-  #session?: CDPSession;
+  #extensionId: string;
+  #callbacks: ServiceWorkerSubscriberCallbacks;
   #worker?: WebWorker;
 
   constructor(
     target: Target,
-    callback: (item: ConsoleMessage | UncaughtError) => void,
+    extensionId: string,
+    callbacks: ServiceWorkerSubscriberCallbacks,
   ) {
     this.#target = target;
-    this.#callback = callback;
+    this.#extensionId = extensionId;
+    this.#callbacks = callbacks;
   }
 
   async subscribe(): Promise<void> {
-    this.#session = await this.#target.createCDPSession();
-    await this.#session.send('Runtime.enable');
-    this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
-
     this.#worker = (await this.#target.worker()) ?? undefined;
     if (this.#worker) {
       this.#worker.on('console', this.#onConsole);
+      this.#worker.on('exception', this.#onException);
+      this.#worker.on('request', this.#onRequest);
     }
   }
 
-  async unsubscribe(): Promise<void> {
+  unsubscribe(): void {
     if (this.#worker) {
       this.#worker.off('console', this.#onConsole);
+      this.#worker.off('exception', this.#onException);
+      this.#worker.off('request', this.#onRequest);
     }
-    await this.#session?.detach();
   }
 
   #onConsole = (message: ConsoleMessage): void => {
-    this.#callback(message);
+    this.#callbacks.onConsole(message);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
-    const url = this.#target.url();
-
-    const extensionId = extractExtensionId(url);
-
-    if (extensionId) {
-      this.#callback(
-        new UncaughtError(event.exceptionDetails, extensionId, this.#session),
-      );
+  #onException = (exception: RemoteException): void => {
+    if (!this.#worker) {
+      return;
     }
+    const error = UncaughtError.fromException(
+      exception,
+      this.#extensionId,
+      this.#worker.client,
+    );
+    if (error) {
+      this.#callbacks.onConsole(error);
+    }
+  };
+
+  #onRequest = (request: HTTPRequest): void => {
+    this.#callbacks.onRequest(request);
   };
 }
 
-export class ServiceWorkerConsoleCollector {
-  #storage = new Map<
-    string,
-    Array<WithSymbolId<ConsoleMessage | UncaughtError>>
-  >();
-  #maxLogs: number;
-  #browser?: Browser;
-  #serviceWorkerSubscribers = new Map<Target, ServiceWorkerSubscriber>();
+/**
+ * Stores items per extension id with stable ids, keeping at most `maxItems`
+ * per extension.
+ */
+export class ExtensionItemStore<T extends object> {
+  #storage = new Map<string, Array<WithSymbolId<T>>>();
+  #maxItems: number;
   #idGenerator = createIdGenerator();
 
-  constructor(browser?: Browser, maxLogs = 1000) {
+  constructor(maxItems: number) {
+    this.#maxItems = maxItems;
+  }
+
+  addLog(extensionId: string, log: T): void {
+    const logs = this.#storage.get(extensionId) ?? [];
+    const withId: WithSymbolId<T> = Object.assign(log, {
+      [stableIdSymbol]: this.#idGenerator(),
+    });
+    logs.push(withId);
+    if (logs.length > this.#maxItems) {
+      logs.shift();
+    }
+    this.#storage.set(extensionId, logs);
+  }
+
+  getData(extensionId: string): Array<WithSymbolId<T>> {
+    return this.#storage.get(extensionId) ?? [];
+  }
+
+  getById(extensionId: string, stableId: number): WithSymbolId<T> {
+    const logs = this.#storage.get(extensionId);
+    if (!logs) {
+      throw new Error(`No items found for extension ${extensionId}.`);
+    }
+    const item = logs.find(item => item[stableIdSymbol] === stableId);
+    if (item) {
+      return item;
+    }
+    throw new Error(`Item ${stableId} not found for extension ${extensionId}.`);
+  }
+
+  find(
+    extensionId: string,
+    filter: (item: WithSymbolId<T>) => boolean,
+  ): WithSymbolId<T> | undefined {
+    const logs = this.#storage.get(extensionId);
+    if (!logs) {
+      return undefined;
+    }
+    return logs.find(filter);
+  }
+
+  clearLogs(extensionId: string): void {
+    this.#storage.delete(extensionId);
+  }
+}
+
+/**
+ * Tracks extension service worker targets across the browser and stores their
+ * console messages and network requests, keyed by extension id so data
+ * survives service worker restarts.
+ */
+export class ServiceWorkerCollector {
+  readonly console: ExtensionItemStore<ConsoleMessage | UncaughtError>;
+  readonly network: ExtensionItemStore<HTTPRequest>;
+  #browser?: Browser;
+  #serviceWorkerSubscribers = new Map<Target, ServiceWorkerSubscriber>();
+
+  constructor(browser?: Browser, maxItems = 1000) {
     this.#browser = browser;
-    this.#maxLogs = maxLogs;
+    this.console = new ExtensionItemStore(maxItems);
+    this.network = new ExtensionItemStore(maxItems);
   }
 
   async init(workers: McpWorker[]): Promise<void> {
@@ -105,11 +182,7 @@ export class ServiceWorkerConsoleCollector {
     this.#browser.off('targetcreated', this.#onTargetCreated);
     this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
     for (const subscriber of this.#serviceWorkerSubscribers.values()) {
-      subscriber.unsubscribe().catch(err => {
-        if (!isIgnoredTargetError(err)) {
-          // Swallow error as we are tearing down the system
-        }
-      });
+      subscriber.unsubscribe();
     }
     this.#serviceWorkerSubscribers.clear();
   }
@@ -126,86 +199,37 @@ export class ServiceWorkerConsoleCollector {
         return;
       }
 
-      const subscriber = new ServiceWorkerSubscriber(target, item => {
-        this.addLog(extensionId, item);
+      const subscriber = new ServiceWorkerSubscriber(target, extensionId, {
+        onConsole: item => this.console.addLog(extensionId, item),
+        onRequest: request => this.network.addLog(extensionId, request),
       });
       this.#serviceWorkerSubscribers.set(target, subscriber);
       try {
         await subscriber.subscribe();
         if (this.#serviceWorkerSubscribers.get(target) !== subscriber) {
-          await subscriber.unsubscribe();
+          subscriber.unsubscribe();
         }
       } catch (err) {
         if (this.#serviceWorkerSubscribers.get(target) === subscriber) {
           this.#serviceWorkerSubscribers.delete(target);
         }
         if (!isIgnoredTargetError(err)) {
-          throw err;
+          logger?.(
+            `Failed to subscribe to service worker of extension ${extensionId} (${origin})`,
+            err,
+          );
         }
       }
     }
   };
 
-  #onTargetDestroyed = async (target: Target): Promise<void> => {
+  #onTargetDestroyed = (target: Target): void => {
     const subscriber = this.#serviceWorkerSubscribers.get(target);
     if (subscriber) {
       this.#serviceWorkerSubscribers.delete(target);
-      try {
-        await subscriber.unsubscribe();
-      } catch (err) {
-        if (!isIgnoredTargetError(err)) {
-          throw err;
-        }
-      }
+      subscriber.unsubscribe();
     }
   };
-
-  addLog(extensionId: string, log: ConsoleMessage | UncaughtError): void {
-    const logs = this.#storage.get(extensionId) ?? [];
-    const withId = log as WithSymbolId<ConsoleMessage | UncaughtError>;
-    withId[stableIdSymbol] = this.#idGenerator();
-    logs.push(withId);
-    if (logs.length > this.#maxLogs) {
-      logs.shift();
-    }
-    this.#storage.set(extensionId, logs);
-  }
-
-  getData(
-    extensionId: string,
-  ): Array<WithSymbolId<ConsoleMessage | UncaughtError>> {
-    return this.#storage.get(extensionId) ?? [];
-  }
-
-  getById(
-    extensionId: string,
-    stableId: number,
-  ): WithSymbolId<ConsoleMessage | UncaughtError> {
-    const logs = this.#storage.get(extensionId);
-    if (!logs) {
-      throw new Error('No logs found for selected extension');
-    }
-    const item = logs.find(item => item[stableIdSymbol] === stableId);
-    if (item) {
-      return item;
-    }
-    throw new Error('Log not found for selected extension');
-  }
-
-  find(
-    extensionId: string,
-    filter: (item: WithSymbolId<ConsoleMessage | UncaughtError>) => boolean,
-  ): WithSymbolId<ConsoleMessage | UncaughtError> | undefined {
-    const logs = this.#storage.get(extensionId);
-    if (!logs) {
-      return;
-    }
-    return logs.find(filter);
-  }
-
-  clearLogs(extensionId: string): void {
-    this.#storage.delete(extensionId);
-  }
 }
 
 function extractExtensionId(origin: string): string | null {

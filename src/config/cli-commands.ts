@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Argv, Options, PositionalOptions} from 'yargs';
+
 import type {ArgDef} from './cli-options.js';
 
 /**
@@ -13,6 +15,9 @@ import type {ArgDef} from './cli-options.js';
  * part of the command string yargs parses each one as a trailing positional,
  * and a variadic positional has to be the last one. Which args are positional
  * is decided at build time by `scripts/generate-cli.ts`.
+ *
+ * A required positional array without `minItems > 0` is rendered as `[name..]`
+ * so omitting it passes an empty array instead of failing yargs validation.
  */
 export function buildCommand(
   commandName: string,
@@ -23,17 +28,76 @@ export function buildCommand(
   for (const [name, arg] of Object.entries(args)) {
     if (!arg.positional) {
       flags += ` [--${name}]`;
+    } else if (arg.type === 'array') {
+      const requiresItem = arg.required && (arg.minItems ?? 0) > 0;
+      command += requiresItem ? ` <${name}..>` : ` [${name}..]`;
     } else if (arg.required) {
-      command += arg.type === 'array' ? ` <${name}..>` : ` <${name}>`;
+      command += ` <${name}>`;
     } else {
-      command += arg.type === 'array' ? ` [${name}..]` : ` [${name}]`;
+      command += ` [${name}]`;
     }
   }
 
   return {command, usage: `$0 ${command}${flags}`};
 }
 
-export type OptionKind = 'boolean' | 'array' | 'value';
+/** Maps a non-array JSON Schema type to the yargs type that parses it. */
+function toYargsScalarType(type: string): 'number' | 'boolean' | 'string' {
+  if (type === 'integer' || type === 'number') {
+    return 'number';
+  }
+  return type === 'boolean' ? 'boolean' : 'string';
+}
+
+/**
+ * Registers positional and flag definitions for a tool command on a yargs
+ * builder instance.
+ */
+export function registerCommandArgs(
+  y: Argv,
+  args: Record<string, ArgDef>,
+): void {
+  for (const [argName, opt] of Object.entries(args)) {
+    if (opt.positional) {
+      const options: PositionalOptions = {
+        describe: opt.description,
+      };
+      if (opt.type === 'array') {
+        options.array = true;
+      } else {
+        options.type = toYargsScalarType(opt.type);
+      }
+      if (opt.default !== undefined) {
+        options.default = opt.default;
+      }
+      if (opt.enum) {
+        options.choices = opt.enum;
+      }
+      y.positional(argName, options);
+    } else {
+      const options: Options = {
+        describe: opt.description,
+        type: opt.type === 'array' ? 'array' : toYargsScalarType(opt.type),
+      };
+      if (opt.default !== undefined) {
+        // Document the default in --help without populating argv, so the
+        // daemon applies its current tool schema and config defaults.
+        options.defaultDescription = JSON.stringify(opt.default);
+      }
+      if (opt.enum) {
+        options.choices = opt.enum;
+      }
+      y.option(argName, options);
+    }
+  }
+}
+
+/**
+ * How an option takes its value. `text` is a free-form string, which can start
+ * with `-`. `value` is any other single value: a number or one of a fixed set
+ * of choices.
+ */
+export type OptionKind = 'boolean' | 'array' | 'text' | 'value';
 
 /**
  * Options that are available on every tool command and are consumed by yargs
@@ -74,25 +138,32 @@ export function getCommandArgSpec(
       positionalCount++;
       variadic = arg.type === 'array';
     } else {
-      options.set(name, toOptionKind(arg.type));
+      options.set(name, toOptionKind(arg.type, arg.enum));
     }
   }
   return {options, positionalCount, variadic};
 }
 
-export function toOptionKind(type: string | undefined): OptionKind {
+export function toOptionKind(
+  type: string | undefined,
+  choices?: ReadonlyArray<string | number>,
+): OptionKind {
   if (type === 'boolean') {
     return 'boolean';
   }
   if (type === 'array') {
     return 'array';
   }
+  if (type === 'string' && !choices) {
+    return 'text';
+  }
   return 'value';
 }
 
 const LITERAL_ARG_PREFIX = '\0literal:';
-// Mirrors yargs-parser's negative number detection.
-const NEGATIVE_NUMBER = /^-\d+(\.\d*)?(e-?\d+)?$/;
+// Mirrors yargs-parser's negative number detection. A token it does not match,
+// such as `-1e5` or `-5.`, is parsed by yargs as a group of short flags.
+const NEGATIVE_NUMBER = /^-([0-9]+(\.[0-9]+)?|\.[0-9]+)$/;
 
 function optionName(token: string): string {
   let name = token.replace(/^-+/, '');
@@ -107,12 +178,13 @@ function optionName(token: string): string {
 }
 
 /**
- * Shields positional values that yargs cannot carry through its parsing.
+ * Shields values that yargs cannot carry through its parsing.
  *
- * yargs re-parses command positionals as `--name value` pairs, and in that
- * pass yargs-parser treats any value starting with `-` (other than a negative
- * number) as the next flag, replacing the value with `''`. It also never fills
- * positionals from the tokens after `--`. See
+ * yargs-parser treats a token starting with `-` (other than a negative number)
+ * that follows an option as the next flag, replacing the option value with
+ * `''`. yargs re-parses command positionals as `--name value` pairs, so they
+ * are affected in the same way. It also never fills positionals from the
+ * tokens after `--`. See
  * https://github.com/yargs/yargs/issues/1312 and
  * https://github.com/yargs/yargs/issues/1821.
  *
@@ -126,7 +198,12 @@ function optionName(token: string): string {
  *   still has an unfilled positional. Known options and their values are
  *   skipped the way yargs consumes them, so a dash-prefixed value such as
  *   `--flag` in a positional slot is passed through as text, while an unknown
- *   flag after all positionals are filled is still rejected by yargs.
+ *   flag after all positionals are filled is still rejected by yargs;
+ * - it starts with `-`, is neither `--` nor a known option of the command, and
+ *   follows an option that takes free-form text, as in
+ *   `--geolocation -33.86,151.2`. After an option that takes a number or one
+ *   of a fixed set of choices, such a token is left to yargs, which rejects
+ *   it.
  *
  * `getSpec` resolves the spec of a command by name and returns `undefined`
  * for tokens that are not a command.
@@ -149,6 +226,14 @@ export function shieldLiteralArgs(
   let spec: CommandArgSpec | undefined;
   let filled = 0;
   let afterDoubleDash = false;
+  const isLiteralOptionValue = (token: string): boolean => {
+    return (
+      token.startsWith('-') &&
+      token !== '--' &&
+      !NEGATIVE_NUMBER.test(token) &&
+      spec?.options.get(optionName(token)) === undefined
+    );
+  };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (afterDoubleDash) {
@@ -189,7 +274,12 @@ export function shieldLiteralArgs(
           result.push(argv[++i]);
         }
       } else if (i + 1 < argv.length) {
-        result.push(argv[++i]);
+        const value = argv[++i];
+        if (kind === 'text' && isLiteralOptionValue(value)) {
+          shield(value);
+        } else {
+          result.push(value);
+        }
       }
       continue;
     }

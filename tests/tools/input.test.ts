@@ -11,7 +11,8 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {TimeoutError, zod} from '../../src/third_party/index.js';
+import {zod} from '../../src/third_party/index.js';
+import {TimeoutError} from '../../src/third_party/browser.js';
 import {
   click,
   hover,
@@ -655,6 +656,31 @@ describe('input', () => {
       });
       sinon.assert.calledOnce(response.includeSnapshot);
     });
+
+    it('returns when the click opens a dialog', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<button
+            style="position: fixed; left: 0; top: 0; width: 100px; height: 100px;"
+            onclick="alert('clicked')"
+            >alert</button
+          >`,
+        );
+
+        await clickAt(args).handler(
+          {params: {x: 50, y: 50}, page},
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(response.responseLines, [
+          'The click at the coordinates opened a dialog.',
+        ]);
+        assert.strictEqual(page.getDialog()?.message(), 'clicked');
+        await page.getDialog()?.dismiss();
+      });
+    });
   });
 
   describe('fill', () => {
@@ -921,6 +947,30 @@ describe('input', () => {
             );
           }),
         );
+      });
+    });
+
+    it('returns when typing opens a dialog', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<input
+            onkeydown="if (event.key === 'Enter') alert('submitted')"
+          />`,
+        );
+        await page.pptrPage.focus('input');
+
+        await typeText(args).handler(
+          {params: {text: 'test', submitKey: 'Enter'}, page},
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(response.responseLines, [
+          'Typing text "test + Enter" opened a dialog.',
+        ]);
+        assert.strictEqual(page.getDialog()?.message(), 'submitted');
+        await page.getDialog()?.dismiss();
       });
     });
 
@@ -1291,6 +1341,38 @@ describe('input', () => {
           'Successfully dragged an element',
         );
         assert.ok(await page.$('text/dropped'));
+      });
+    });
+
+    it('returns when the drop opens a dialog', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<div
+              role="button"
+              draggable="true"
+              >drag me</div
+            >
+            <div
+              aria-label="drop"
+              style="width: 100px; height: 100px; border: 1px solid black;"
+              ondragover="event.preventDefault();"
+              ondrop="event.preventDefault(); alert('dropped');"
+            ></div>`,
+        );
+        page.textSnapshot = await TextSnapshot.create(page);
+
+        await drag(args).handler(
+          {params: {from_uid: '1_1', to_uid: '1_2'}, page},
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(response.responseLines, [
+          'The element was dragged and it opened a dialog.',
+        ]);
+        assert.strictEqual(page.getDialog()?.message(), 'dropped');
+        await page.getDialog()?.dismiss();
       });
     });
 
@@ -1731,6 +1813,104 @@ describe('input', () => {
       });
     });
 
+    it('uploads multiple files when clicking an element opens a multi-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload files</button>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile(args).handler(
+          {
+            params: {
+              uid: '1_1',
+              filePaths: [firstFile.path, secondFile.path],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          `File uploaded from ${firstFile.path}, ${secondFile.path}.`,
+        );
+        const uploadedFileNames = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return Array.from(input.files ?? []).map(file => file.name);
+        });
+        assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+      });
+    });
+
+    it('throws an error if multiple files are uploaded through an element that opens a single-file uploader', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_1',
+                filePaths: [firstFile.path, secondFile.path],
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {
+            message:
+              'Multiple file uploads only work with <input type=file multiple>',
+          },
+        );
+        const uploadedFileCount = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return input.files?.length ?? 0;
+        });
+        assert.strictEqual(uploadedFileCount, 0);
+      });
+    });
+
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
       using testFile = createTempFile('test file content', 'test.txt');
 
@@ -1764,7 +1944,7 @@ describe('input', () => {
       });
     });
 
-    it('throws an error if multiple files are uploaded to an input without multiple attribute', async () => {
+    it('throws an error without opening a file chooser if multiple files are uploaded to an input without multiple attribute', async () => {
       using firstFile = createTempFile('first file content', 'first.txt');
       using secondFile = createTempFile('second file content', 'second.txt');
 
@@ -1782,6 +1962,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
 
+        const waitForFileChooser = sinon.spy(page, 'waitForFileChooser');
         await assert.rejects(
           uploadFile(args).handler(
             {
@@ -1799,6 +1980,7 @@ describe('input', () => {
               'Multiple file uploads only work with <input type=file multiple>',
           },
         );
+        sinon.assert.notCalled(waitForFileChooser);
       });
     });
   });
@@ -1841,6 +2023,33 @@ describe('input', () => {
           'uShift',
           'uControl',
         ]);
+      });
+    });
+
+    it('returns when the key press opens a dialog', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<input
+            onkeydown="if (event.key === 'Enter') alert('pressed')"
+            onkeyup="if (event.key === 'Shift') this.dataset.released = 'true'"
+          />`,
+        );
+        await page.pptrPage.focus('input');
+
+        await pressKey(args).handler(
+          {params: {key: ['Enter', 'Shift']}, page},
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(response.responseLines, [
+          'Pressing the key Shift+Enter opened a dialog.',
+        ]);
+        assert.strictEqual(page.getDialog()?.message(), 'pressed');
+        await page.getDialog()?.dismiss();
+        // The held modifier is still released once the dialog is closed.
+        await page.pptrPage.waitForSelector('input[data-released="true"]');
       });
     });
 

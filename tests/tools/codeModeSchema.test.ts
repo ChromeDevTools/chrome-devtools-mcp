@@ -213,6 +213,7 @@ describe('codeModeSchema', () => {
         createMockParsedArguments({
           codeMode: false,
           pageIdRouting: true,
+          categoryExtensions: true,
           experimentalVision: true,
           categoryExperimentalWebmcp: true,
           categoryExperimentalThirdParty: true,

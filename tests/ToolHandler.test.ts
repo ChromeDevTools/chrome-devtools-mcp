@@ -18,6 +18,7 @@ import {ConfigParser} from '../src/config/ConfigParser.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
+import {SlimMcpResponse} from '../src/SlimMcpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {FilePersistence} from '../src/telemetry/persistence.js';
 import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
@@ -710,6 +711,7 @@ describe('ToolHandler', () => {
         .stub(McpResponse.prototype, 'handle')
         .resolves({content: [], structuredContent: {}});
       const mockContext = createContext();
+      mockContext.getPageById.returns(createMockMcpPage());
       const events: string[] = [];
       const {promise: release, resolve: finishBlocking} =
         Promise.withResolvers<void>();
@@ -1262,7 +1264,7 @@ describe('ToolHandler', () => {
     ClearcutLogger.initialize({
       persistence: mockPersistence,
       appVersion: '1.0.0',
-      watchdogClient: mockWatchdogClient,
+      createWatchdogClient: () => mockWatchdogClient,
     });
     await Promise.resolve();
 
@@ -1611,6 +1613,67 @@ describe('ToolHandler', () => {
       ]);
     });
 
+    function createResponseRecordingHandler(slim: boolean) {
+      const config = parseConfig(slim ? ['--slim'] : []);
+      const toolHandler = sinon.stub().resolves();
+      const tool = defineBrowserlessTool(() => ({
+        name: 'response_tool',
+        description: 'A tool that records the response it gets',
+        annotations: {
+          category: ToolCategory.MEMORY,
+          readOnlyHint: true,
+          conditions: slim ? ['slim'] : [],
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: toolHandler,
+      }))(config.resolved);
+      const context = createMockMcpContext();
+      const handler = new ToolHandler(
+        tool,
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      return {handler, toolHandler, context};
+    }
+
+    it('creates a SlimMcpResponse for slim tools', async () => {
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(true);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match.instanceOf(SlimMcpResponse),
+        context,
+      );
+    });
+
+    it('creates an McpResponse that is not a SlimMcpResponse for other tools', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(false);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match(
+          response =>
+            response instanceof McpResponse &&
+            !(response instanceof SlimMcpResponse),
+        ),
+        context,
+      );
+    });
+
     it('enables slim tools with --slim', () => {
       assert.strictEqual(createHandler('navigate', ['--slim']).disabled, false);
     });
@@ -1706,6 +1769,54 @@ describe('ToolHandler', () => {
         path.resolve('/canonical/list2.txt'),
         'https://example.com/remote.txt',
       ],
+    });
+  });
+
+  it('validates a POSIX file URL argument without a drive letter', async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const tool: ToolDefinition = {
+      name: 'file_tool',
+      description: 'A tool requiring file validation',
+      annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: true,
+      },
+      schema: {
+        filePath: zod.string(),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePath: true,
+      },
+      handler: async request => {
+        receivedParams = request.params;
+      },
+    };
+
+    const mockContext = createMockMcpContext();
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
+    mockContext.validatePath.callsFake(async p => path.resolve(p ?? ''));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePath: 'file:///home/user/project/shot.png',
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.calledOnceWithExactly(
+      mockContext.validatePath,
+      '/home/user/project/shot.png',
+    );
+    assert.deepStrictEqual(receivedParams, {
+      filePath: pathToFileURL(path.resolve('/home/user/project/shot.png')).href,
     });
   });
 
@@ -2426,6 +2537,7 @@ describe('ToolHandler', () => {
     mockContext.getDevToolsData.resolves({});
     const mockPage = sinon.createStubInstance(McpPage);
     mockPage.getDialog.returns(undefined);
+    mockPage.getConsoleDataAfter.returns([]);
     sinon.stub(mockPage, 'networkConditions').get(() => undefined);
     sinon.stub(mockPage, 'geolocation').get(() => undefined);
     sinon.stub(mockPage, 'viewport').get(() => undefined);
@@ -2647,6 +2759,55 @@ describe('ToolHandler', () => {
       assert.notStrictEqual(result.isError, true);
     });
     assert.deepStrictEqual(focusStates, [false, true]);
+  });
+
+  async function handlePageToolCall(
+    concurrency: DefinedPageTool['concurrency'],
+  ) {
+    sinon
+      .stub(McpResponse.prototype, 'handle')
+      .resolves({content: [], structuredContent: {}});
+    const includeConsoleErrorsFrom = sinon.spy(
+      McpResponse.prototype,
+      'includeConsoleErrorsFrom',
+    );
+    const config = parseConfig();
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({process: sinon.createStubInstance(ChildProcess)}),
+    );
+    const mockPage = createMockMcpPage();
+    mockContext.getPageById.returns(mockPage);
+    const tool = definePageTool(() => ({
+      name: 'page_tool',
+      description: 'A page scoped tool',
+      annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
+      schema: {},
+      blockedByDialog: false,
+      concurrency,
+      verifyFilesSchema: {},
+      handler: async () => {},
+    }))(config.resolved);
+
+    await new ToolHandler(
+      tool,
+      config,
+      async () => mockContext,
+      sinon.spy(),
+    ).handle({pageId: 1});
+
+    return {includeConsoleErrorsFrom, mockPage};
+  }
+
+  it("hands the page of a page tool with concurrency 'exclusive' to the response", async () => {
+    const {includeConsoleErrorsFrom, mockPage} =
+      await handlePageToolCall('exclusive');
+    sinon.assert.calledOnceWithExactly(includeConsoleErrorsFrom, mockPage);
+  });
+
+  it("does not hand the page of a page tool with concurrency 'none' to the response", async () => {
+    const {includeConsoleErrorsFrom} = await handlePageToolCall('none');
+    sinon.assert.notCalled(includeConsoleErrorsFrom);
   });
 
   describe('browserless tools', () => {

@@ -19,6 +19,7 @@ import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {ConfigWatcher} from '../src/config/ConfigWatcher.js';
 import {mcpOptions} from '../src/config/mcp-options.js';
+import {getIssueDescription} from '../src/devtools/issueDescriptions.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
@@ -98,13 +99,32 @@ describe('McpServer', () => {
     return tools.map(tool => tool.name);
   }
 
-  it('passes the navigation limit to the lazily connected context', async () => {
+  it('loads issue descriptions on the first tool call instead of startup', async () => {
+    const {server} = await createTestServer();
+
+    assert.strictEqual(
+      getIssueDescription('bounceTrackingMitigations.md'),
+      null,
+    );
+
+    await server.callTool('list_pages', {});
+
+    assert.ok(getIssueDescription('bounceTrackingMitigations.md'));
+    await server.close();
+  });
+
+  it('creates the context on the first tool call with the navigation limit', async () => {
     const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
     const createContext = sinon.stub(McpContext, 'create').returns(context);
     const {server, browserManager, config} = await createTestServer(
       ['--maxNavigationSaved=5'],
       {mockContext: false},
     );
+
+    sinon.assert.notCalled(createContext);
+    await server.callTool('list_pages', {});
 
     sinon.assert.calledOnceWithExactly(
       createContext,
@@ -113,6 +133,178 @@ describe('McpServer', () => {
     );
     assert.strictEqual(config.resolved.maxNavigationSaved, 5);
     sinon.assert.notCalled(browserManager.ensureBrowser);
+    await server.close();
+  });
+
+  it('applies roots updates and config reloads received while idle when the first tool call creates the context', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, config} = await createTestServer([], {mockContext: false});
+
+    const initialClientRoot = 'file:///tmp/initial-client-root';
+    const updatedClientRoot = 'file:///tmp/updated-client-root';
+    let currentClientRoot = initialClientRoot;
+    const rootsListed = Promise.withResolvers<void>();
+    let listCount = 0;
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client(
+      {name: 'test', version: '1.0.0'},
+      {capabilities: {roots: {listChanged: true}}},
+    );
+    client.setRequestHandler('roots/list', () => {
+      listCount++;
+      if (listCount === 2) {
+        rootsListed.resolve();
+      }
+      return {roots: [{uri: currentClientRoot, name: 'client-root'}]};
+    });
+    await client.connect(clientTransport);
+
+    try {
+      currentClientRoot = updatedClientRoot;
+      await client.notification({method: 'notifications/roots/list_changed'});
+      await rootsListed.promise;
+
+      const reloadedRootPath = path.resolve('/tmp/reloaded-workspace');
+      await server.applyConfig(
+        parseConfig([
+          '--no-performance-crux',
+          `--workspace=${reloadedRootPath}`,
+        ]),
+      );
+
+      sinon.assert.notCalled(createContext);
+      sinon.assert.notCalled(context.setRoots);
+      sinon.assert.notCalled(context.onConfigChanged);
+
+      const result = await server.callTool('list_pages', {});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledOnceWithExactly(
+        createContext,
+        sinon.match.any,
+        sinon.match({config: sinon.match.same(config)}),
+      );
+      assert.strictEqual(config.resolved.performanceCrux, false);
+      sinon.assert.calledOnceWithExactly(context.setRoots, [
+        {
+          uri: pathToFileURL(reloadedRootPath).href,
+          name: 'reloaded-workspace',
+        },
+        {
+          uri: updatedClientRoot,
+          name: 'client-root',
+        },
+      ]);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('creates a single context when two tool calls start concurrently', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, config} = await createTestServer([], {mockContext: false});
+
+    const [firstResult, secondResult] = await Promise.all([
+      server.callTool('list_pages', {}),
+      server.callTool('list_pages', {}),
+    ]);
+
+    assert.strictEqual(firstResult.isError, undefined);
+    assert.strictEqual(secondResult.isError, undefined);
+    sinon.assert.calledOnceWithExactly(
+      createContext,
+      sinon.match.any,
+      sinon.match({config: sinon.match.same(config)}),
+    );
+    await server.close();
+  });
+
+  it('closes without creating or disposing a context when no tool ran', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server} = await createTestServer([], {mockContext: false});
+
+    await server.close();
+
+    sinon.assert.notCalled(createContext);
+    sinon.assert.notCalled(context.dispose);
+  });
+
+  it('rejects tool calls after close without creating a context', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server} = await createTestServer([], {mockContext: false});
+
+    await server.close();
+
+    await assert.rejects(
+      server.callTool('list_pages', {}),
+      /MCP server is closed/,
+    );
+    sinon.assert.notCalled(createContext);
+    sinon.assert.notCalled(context.dispose);
+  });
+
+  it('disposes a context created while the server is closing and rejects the call', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, config} = await createTestServer([], {mockContext: false});
+
+    const callPromise = server.callTool('list_pages', {});
+    // Let #getContext() finish awaiting #initialRoots and start import().
+    await Promise.resolve();
+    const closePromise = server.close();
+
+    await assert.rejects(callPromise, /MCP server is closed/);
+    await closePromise;
+    sinon.assert.calledOnceWithExactly(
+      createContext,
+      sinon.match.any,
+      sinon.match({config: sinon.match.same(config)}),
+    );
+    sinon.assert.calledOnceWithExactly(context.dispose);
+  });
+
+  it('retries creating the context when a previous creation threw', async () => {
+    const context = createMockMcpContext();
+    context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+    context.getPages.returns([]);
+    const createContext = sinon
+      .stub(McpContext, 'create')
+      .onFirstCall()
+      .throws(new Error('context init failed'))
+      .onSecondCall()
+      .returns(context);
+    const {server, config} = await createTestServer([], {mockContext: false});
+
+    await assert.rejects(
+      server.callTool('list_pages', {}),
+      /context init failed/,
+    );
+    const result = await server.callTool('list_pages', {});
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.calledTwice(createContext);
+    sinon.assert.calledWithExactly(
+      createContext.firstCall,
+      sinon.match.any,
+      sinon.match({config: sinon.match.same(config)}),
+    );
+    sinon.assert.calledWithExactly(
+      createContext.secondCall,
+      sinon.match.any,
+      sinon.match({config: sinon.match.same(config)}),
+    );
     await server.close();
   });
 
@@ -379,25 +571,49 @@ describe('McpServer', () => {
       assert.deepStrictEqual(exposedNames, definedNames.sort());
     });
 
-    for (const mode of ['MCP', 'CLI']) {
-      it(`rejects network mocks by default in ${mode} mode`, async () => {
-        const {server, browserManager} = await createTestServer(
-          mode === 'CLI' ? ['--viaCli'] : [],
-        );
-        const names = await listServerToolNames(server);
-        assert.ok(names.includes('list_network_requests'));
-        for (const name of ['mock_network', 'remove_network_mock']) {
-          assert.strictEqual(names.includes(name), mode === 'CLI');
-          const result = await server.callTool(name, {pageId: 1});
-          assert.strictEqual(result.isError, true);
-          const content = result.content[0];
-          assert.strictEqual(content.type, 'text');
-          assert.match(content.text, /--categoryNetworkMocks=true/);
-        }
-        sinon.assert.notCalled(browserManager.ensureBrowser);
-        await server.close();
-      });
-    }
+    it('rejects network mocks by default in MCP mode', async () => {
+      const {server, browserManager} = await createTestServer();
+      const names = await listServerToolNames(server);
+      assert.ok(names.includes('list_network_requests'));
+      for (const name of ['mock_network', 'remove_network_mock']) {
+        assert.strictEqual(names.includes(name), false);
+        const result = await server.callTool(name, {pageId: 1});
+        assert.strictEqual(result.isError, true);
+        const content = result.content[0];
+        assert.strictEqual(content.type, 'text');
+        assert.match(content.text, /--categoryNetworkMocks=true/);
+      }
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
+
+    it('enables network mocks by default in CLI mode', async () => {
+      const {server, context} = await createTestServer(['--viaCli']);
+      const names = await listServerToolNames(server);
+      assert.ok(names.includes('mock_network'));
+      assert.ok(names.includes('remove_network_mock'));
+      await server.callTool('mock_network', {pageId: 1});
+      sinon.assert.calledOnce(context.ensureBrowser);
+      await server.close();
+    });
+
+    it('rejects network mocks in CLI mode when explicitly disabled', async () => {
+      const {server, browserManager} = await createTestServer([
+        '--viaCli',
+        '--no-category-network-mocks',
+      ]);
+      const names = await listServerToolNames(server);
+      for (const name of ['mock_network', 'remove_network_mock']) {
+        assert.strictEqual(names.includes(name), true);
+        const result = await server.callTool(name, {pageId: 1});
+        assert.strictEqual(result.isError, true);
+        const content = result.content[0];
+        assert.strictEqual(content.type, 'text');
+        assert.match(content.text, /--categoryNetworkMocks=true/);
+      }
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
 
     it('enables network mocks independently of network inspection', async () => {
       const names = await listToolNames([
@@ -578,6 +794,7 @@ describe('McpServer', () => {
       const {server, context, config} = await createTestServer([
         '--chromeArg=--foo',
       ]);
+      await server.callTool('list_pages');
       const previousArgs = config.resolved;
       let cruxWhenNotified: boolean | undefined;
       context.onConfigChanged.callsFake(async () => {
@@ -935,6 +1152,8 @@ describe('McpServer', () => {
         'cd4a.watch.apply-error.json',
       );
       await using watched = await watchTestServer(configFile.path);
+      await watched.server.callTool('list_pages');
+      watched.logStream.write.resetHistory();
       const applyError = new Error('failed to update pages');
       watched.context.onConfigChanged.rejects(applyError);
       const consoleError = sinon.stub(console, 'error');

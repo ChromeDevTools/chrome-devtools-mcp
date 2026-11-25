@@ -25,6 +25,18 @@ const RESTRICTED_IMPORT_MCP_CLIENT = {
   message:
     'Do not import @modelcontextprotocol/client in src/; it is only for tests and scripts.',
 };
+const RESTRICTED_IMPORT_BROWSER_BUNDLE = {
+  regex: '(^|/)third_party/browser\\.js$',
+  allowTypeImports: true,
+  message:
+    'Do not import values from third_party/browser.js here; use loadBrowser() or a dynamic import() inside the handler.',
+};
+const RESTRICTED_IMPORT_MCP_CONTEXT = {
+  regex: '(^|/)McpContext\\.js$',
+  allowTypeImports: true,
+  message:
+    'Do not import values from ./McpContext.js in src/index.ts; load it dynamically in #ensureContext().',
+};
 
 export default defineConfig([
   globalIgnores([
@@ -537,6 +549,42 @@ export default defineConfig([
     },
   },
   {
+    name: 'Modules that must not load the browser bundle',
+    files: [
+      'src/bin/**/*.ts',
+      'src/config/**/*.ts',
+      'src/daemon/**/*.ts',
+      'src/telemetry/**/*.ts',
+      'src/tools/**/*.ts',
+      'src/BrowserManager.ts',
+      'src/processors/HeapSnapshotManager.ts',
+      'src/ToolHandler.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [RESTRICTED_IMPORT_BROWSER_BUNDLE],
+        },
+      ],
+    },
+  },
+  {
+    name: 'Server entrypoint',
+    files: ['src/index.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            RESTRICTED_IMPORT_BROWSER_BUNDLE,
+            RESTRICTED_IMPORT_MCP_CONTEXT,
+          ],
+        },
+      ],
+    },
+  },
+  {
     name: 'Tools definitions',
     files: ['src/tools/**/*.ts'],
     rules: {
@@ -578,6 +626,7 @@ export default defineConfig([
       'mocha/no-async-suite': 'error',
       'mocha/no-top-level-tests': 'error',
       'mocha/no-nested-tests': 'error',
+      '@local/require-explicit-fake-timers': 'error',
 
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',

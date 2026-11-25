@@ -10,8 +10,12 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
-import {createTempDir} from '../utils.js';
+import {
+  fileUrlToPathWithPosixFallback,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from '../../src/utils/files.js';
+import {createDisposableTempFile, createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
   t: it.TestContext,
@@ -160,4 +164,61 @@ describe('resolveCanonicalPath', () => {
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
     );
   });
+});
+
+describe('fileUrlToPathWithPosixFallback', () => {
+  it('reads a host-less URL without a drive letter as POSIX on Windows', () => {
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback('file:///home/user/my%20project', true),
+      '/home/user/my project',
+    );
+  });
+
+  it('keeps drive-letter URLs as Windows paths', () => {
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback('file:///C:/src/app', true),
+      'C:\\src\\app',
+    );
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback('file:///c%3A/Users/user', true),
+      'c:\\Users\\user',
+    );
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback('file:///C|/src', true),
+      'C:\\src',
+    );
+  });
+
+  it('keeps UNC URLs as Windows paths', () => {
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback(
+        'file://wsl.localhost/Ubuntu/home/user',
+        true,
+      ),
+      '\\\\wsl.localhost\\Ubuntu\\home\\user',
+    );
+  });
+
+  it('matches fileURLToPath on POSIX', () => {
+    assert.strictEqual(
+      fileUrlToPathWithPosixFallback('file:///home/user/my%20project', false),
+      '/home/user/my project',
+    );
+  });
+});
+
+describe('getTempFilePath', () => {
+  it('keeps the file under the created temp directory', async () => {
+    using tempFile = await createDisposableTempFile('shot.png');
+    const dir = path.dirname(tempFile.path);
+    assert.strictEqual(path.basename(tempFile.path), 'shot.png');
+    assert.ok(path.basename(dir).startsWith('chrome-devtools-mcp-'));
+    assert.strictEqual(path.relative(dir, tempFile.path), 'shot.png');
+  });
+
+  for (const name of ['../escape.png', 'sub/shot.png', '..', '.', '']) {
+    it(`rejects "${name}" instead of writing outside the temp directory`, async () => {
+      await assert.rejects(getTempFilePath(name), /Invalid temp file name/);
+    });
+  }
 });

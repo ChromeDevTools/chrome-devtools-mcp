@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {TimeoutError, zod} from '../third_party/index.js';
+import {loadBrowser, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -94,6 +94,7 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
         visible: request.params.visible,
       });
     } catch (error) {
+      const {TimeoutError} = await loadBrowser();
       if (error instanceof TimeoutError) {
         throw new TimeoutError(
           `${error.message}. Text matching is case-sensitive. DOM text must ` +

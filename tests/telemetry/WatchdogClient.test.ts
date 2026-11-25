@@ -40,35 +40,24 @@ describe('WatchdogClient', () => {
         parentPid: 100,
         appVersion: '1.2.3',
         osType: OsType.OS_TYPE_MACOS,
+        sessionId: 'session-1',
+        clearcutEndpoint: 'http://127.0.0.1:1234',
       },
       {spawn: spawnStub},
     );
 
-    assert.ok(spawnStub.calledOnce, 'Expected `spawn` to be called');
-    const args = spawnStub.firstCall.args;
-    const cmdArgs = args[1];
-
-    assert.match(
-      cmdArgs[0],
-      /watchdog[/\\]main\.js$/,
-      'First argument should be path to watchdog/main.js',
-    );
-    assert.ok(
-      cmdArgs.includes('--parent-pid=100'),
-      'Arguments should include parent PID',
-    );
-    assert.ok(
-      cmdArgs.includes('--app-version=1.2.3'),
-      'Arguments should include app version',
-    );
-    assert.ok(
-      cmdArgs.includes('--os-type=2'),
-      'Arguments should include OS type',
-    );
-    assert.strictEqual(
-      spawnStub.firstCall.args[2].detached,
-      true,
-      'Process should be spawned as detached',
+    sinon.assert.calledOnceWithExactly(
+      spawnStub,
+      process.execPath,
+      [
+        sinon.match(/watchdog[/\\]main\.js$/),
+        '--parent-pid=100',
+        '--app-version=1.2.3',
+        '--os-type=2',
+        '--session-id=session-1',
+        '--clearcut-endpoint=http://127.0.0.1:1234',
+      ],
+      {stdio: ['pipe', 'ignore', 'ignore'], detached: true},
     );
   });
 
@@ -78,6 +67,8 @@ describe('WatchdogClient', () => {
         parentPid: 100,
         appVersion: '1.0.0',
         osType: OsType.OS_TYPE_LINUX,
+        sessionId: 'session-1',
+        clearcutEndpoint: 'http://127.0.0.1:1234',
         logFile: '/tmp/test.log',
       },
       {spawn: spawnStub},
@@ -96,6 +87,8 @@ describe('WatchdogClient', () => {
         parentPid: 100,
         appVersion: '1.0.0',
         osType: OsType.OS_TYPE_LINUX,
+        sessionId: 'session-1',
+        clearcutEndpoint: 'http://127.0.0.1:1234',
       },
       {spawn: spawnStub},
     );
@@ -122,6 +115,8 @@ describe('WatchdogClient', () => {
         parentPid: 100,
         appVersion: '1.0.0',
         osType: OsType.OS_TYPE_LINUX,
+        sessionId: 'session-1',
+        clearcutEndpoint: 'http://127.0.0.1:1234',
       },
       {spawn: spawnStub},
     );

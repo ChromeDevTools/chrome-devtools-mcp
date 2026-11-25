@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
-import {runCli, stopDaemonForCleanup} from '../utils.js';
+import {runCli, startCli, stopDaemonForCleanup} from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
@@ -22,10 +22,7 @@ describe('chrome-devtools', () => {
   });
 
   it('can record a performance trace', async () => {
-    const startResult = await runCli(
-      ['start', '--performanceCrux=false'],
-      sessionId,
-    );
+    const startResult = await startCli(sessionId, ['--performanceCrux=false']);
     assert.strictEqual(
       startResult.status,
       0,

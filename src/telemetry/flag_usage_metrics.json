@@ -500,6 +500,14 @@
     "flagType": "boolean"
   },
   {
+    "name": "background_new_pages_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "background_new_pages",
+    "flagType": "boolean"
+  },
+  {
     "name": "code_mode_present",
     "flagType": "boolean"
   },

@@ -224,6 +224,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--backgroundNewPages`/ `--background-new-pages`**
+  Set to true to open every page created by new_page in the background, without bringing it to the front, whatever the tool call passes for background. Useful when several agents or the user share one visible browser and new tabs should not take focus.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--sourceMaps`/ `--source-maps`**
   Whether to enable source maps in DevTools. Use --no-source-maps to disable.
   - **Type:** boolean

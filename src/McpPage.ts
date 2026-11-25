@@ -16,8 +16,8 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
-import type {Logpoint, LogpointOptions} from './LogpointManager.js';
 import {LogpointManager} from './LogpointManager.js';
+import type {Logpoint, LogpointOptions} from './utils/logpoint.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   NetworkOverrideManager,
@@ -26,11 +26,18 @@ import {
   type NetworkMockInput,
 } from './NetworkOverrideManager.js';
 import {
+  type Flags,
+  type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  PredefinedNetworkConditions,
+  type RunnerResult,
+} from './third_party/index.js';
+import {
   CdpFrame,
   ElementHandle,
-  type Locator,
-  PredefinedNetworkConditions,
   type CDPSession,
+  type Locator,
   type Dialog,
   type Frame,
   type Viewport,
@@ -41,18 +48,13 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
-  type Flags,
-  type JSONSchema7Definition,
-  lighthouseNavigation,
-  lighthouseSnapshot,
-  type RunnerResult,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
   DomEventListenerSummary,
-  MatchedStyles,
+  ElementCssStyles,
   Response,
   ScreenRecorderData,
   WebAuthnAuthenticatorConfig,
@@ -1022,6 +1024,19 @@ export class McpPage implements ContextPage {
     return this.consoleCollector.getById(id);
   }
 
+  getLatestConsoleMessageId(): number {
+    const latest = this.consoleCollector.getData(true).at(-1);
+    return latest ? this.consoleCollector.getIdForResource(latest) : 0;
+  }
+
+  getConsoleDataAfter(
+    id: number,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector
+      .getData(true)
+      .filter(item => this.consoleCollector.getIdForResource(item) > id);
+  }
+
   getNetworkRequestById(reqid: number): HTTPRequest {
     return this.networkCollector.getById(reqid);
   }
@@ -1826,10 +1841,10 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getMatchedStylesForBackendNodeId(
+  async getCssStylesForBackendNodeId(
     backendNodeId: number,
     elementLabel = `backendNodeId=${backendNodeId}`,
-  ): Promise<MatchedStyles> {
+  ): Promise<ElementCssStyles> {
     if (!isBackendNodeId(backendNodeId)) {
       throw new Error(
         `Failed to resolve backend node ID for element with ${elementLabel}.`,
@@ -1873,20 +1888,28 @@ export class McpPage implements ContextPage {
       );
     }
 
-    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    const [matchedStyles, computedStyles] = await Promise.all([
+      cssModel.getMatchedStyles(targetElement.id),
+      cssModel.getComputedStyle(targetElement.id),
+    ]);
     if (!matchedStyles) {
       throw new Error(
         `Could not retrieve matched styles for element with ${elementLabel}.`,
       );
     }
+    if (!computedStyles) {
+      logger?.(
+        `Could not retrieve computed styles for element with ${elementLabel}.`,
+      );
+    }
 
-    return matchedStyles;
+    return {matchedStyles, computedStyles};
   }
 
-  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
     const ephemeral = this.#ephemeralNodes.get(uid);
     if (ephemeral) {
-      return await this.getMatchedStylesForBackendNodeId(
+      return await this.getCssStylesForBackendNodeId(
         ephemeral.backendNodeId,
         `uid "${uid}"`,
       );
@@ -1909,7 +1932,7 @@ export class McpPage implements ContextPage {
       );
     }
 
-    return await this.getMatchedStylesForBackendNodeId(
+    return await this.getCssStylesForBackendNodeId(
       backendNodeId,
       `uid "${uid}"`,
     );

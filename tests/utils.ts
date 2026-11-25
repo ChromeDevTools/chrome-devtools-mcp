@@ -12,20 +12,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type {TestContext} from 'node:test';
+import {after, type TestContext} from 'node:test';
 
-import type {Browser} from 'puppeteer';
-import puppeteer, {Locator} from 'puppeteer';
-
-import type {
-  Frame,
-  HTTPRequest,
-  HTTPResponse,
-  LaunchOptions,
-  Page,
-  Protocol,
-  Target,
-} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
@@ -36,7 +24,24 @@ import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type CallToolResult} from '../src/third_party/index.js';
+import type {CallToolResult} from '../src/third_party/index.js';
+import {
+  BrowserEnum,
+  computeExecutablePath,
+  DevTools,
+  Locator,
+  puppeteer,
+  PUPPETEER_REVISIONS,
+  type Browser,
+  type Frame,
+  type HTTPRequest,
+  type HTTPResponse,
+  type LaunchOptions,
+  type Page,
+  type Protocol,
+  type Target,
+} from '../src/third_party/browser.js';
+import {getTempFilePath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
@@ -92,6 +97,38 @@ export async function settle(): Promise<void> {
 const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
+async function closeBrowserSafely(browser: Browser): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      browser.close(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('browser.close timeout')),
+          2000,
+        );
+      }),
+    ]);
+  } catch {
+    browser.process()?.kill('SIGKILL');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function closeAllBrowsers(): Promise<void> {
+  if (browsers.size === 0) {
+    return;
+  }
+  const openBrowsers = Array.from(browsers.values());
+  browsers.clear();
+  await Promise.all(openBrowsers.map(browser => closeBrowserSafely(browser)));
+}
+
+after(async () => {
+  await closeAllBrowsers();
+});
+
 export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
   options: {
@@ -106,8 +143,7 @@ export async function withBrowser(
   let attempt = 1;
   while (attempt <= 3) {
     const launchOptions: LaunchOptions = {
-      executablePath:
-        options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+      executablePath: options.executablePath ?? (await getExecutablePath()),
       headless: !options.debug,
       defaultViewport: null,
       devtools: options.autoOpenDevTools ?? false,
@@ -126,6 +162,7 @@ export async function withBrowser(
       browsers.set(key, browser);
     }
 
+    let runTimeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         (async () => {
@@ -141,26 +178,17 @@ export async function withBrowser(
 
           await cb(browser, newPage);
         })(),
-        new Promise((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          runTimeoutId = setTimeout(
             () => reject(new Error('withBrowser timeout exceeded')),
             60000,
-          ),
-        ),
+          );
+        }),
       ]);
       return;
     } catch (error) {
       browsers.delete(key);
-      try {
-        await Promise.race([
-          browser.close(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('browser.close timeout')), 2000),
-          ),
-        ]);
-      } catch {
-        browser.process()?.kill('SIGKILL');
-      }
+      await closeBrowserSafely(browser);
 
       const isRetryable =
         error instanceof Error &&
@@ -176,6 +204,8 @@ export async function withBrowser(
       }
       attempt++;
       await new Promise(r => setTimeout(r, 1000));
+    } finally {
+      clearTimeout(runTimeoutId);
     }
   }
 }
@@ -458,6 +488,19 @@ export function getMockBrowser(options?: {
   return browser;
 }
 
+export async function getExecutablePath(): Promise<string> {
+  return (
+    process.env['PUPPETEER_EXECUTABLE_PATH'] ||
+    computeExecutablePath({
+      cacheDir:
+        process.env['PUPPETEER_CACHE_DIR'] ||
+        path.join(os.homedir(), '.cache', 'puppeteer'),
+      browser: BrowserEnum.CHROME,
+      buildId: PUPPETEER_REVISIONS.chrome,
+    })
+  );
+}
+
 export const CLI_PATH: string = path.resolve(
   import.meta.dirname,
   '../src/bin/chrome-devtools.js',
@@ -491,6 +534,20 @@ export async function runCli(
     child.on('close', status => resolve({status, stdout, stderr}));
     child.on('error', reject);
   });
+}
+
+/**
+ * Runs `chrome-devtools start` for tests that use the browser. Passes
+ * `PUPPETEER_EXECUTABLE_PATH` as `--executablePath` when it is set.
+ */
+export async function startCli(
+  sessionId: string,
+  args: string[] = [],
+  options?: {cwd?: string},
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  const chromePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+  const pathArgs = chromePath ? [`--executablePath=${chromePath}`] : [];
+  return await runCli(['start', ...args, ...pathArgs], sessionId, options);
 }
 
 export async function assertDaemonIsNotRunning(
@@ -590,6 +647,19 @@ export function createTempFile(
       } catch {
         // ignore
       }
+    },
+  };
+}
+
+export async function createDisposableTempFile(filename: string): Promise<{
+  path: string;
+  [Symbol.dispose]: () => void;
+}> {
+  const filepath = await getTempFilePath(filename);
+  return {
+    path: filepath,
+    [Symbol.dispose](): void {
+      fs.rmSync(path.dirname(filepath), {recursive: true, force: true});
     },
   };
 }

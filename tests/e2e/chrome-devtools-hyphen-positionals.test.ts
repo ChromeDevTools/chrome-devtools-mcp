@@ -8,12 +8,13 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import {describe, it, after, before} from 'node:test';
 
-import {runCli, stopDaemonForCleanup} from '../utils.js';
+import {runCli, startCli, stopDaemonForCleanup} from '../utils.js';
 
-describe('chrome-devtools positional values starting with a hyphen', () => {
+describe('chrome-devtools values starting with a hyphen', () => {
   const fillCases: Array<{value: string[]; expected: string}> = [
     {value: ['-'], expected: '-'},
     {value: ['-5'], expected: '-5'},
+    {value: ['-1e5'], expected: '-1e5'},
     {value: ['a-b'], expected: 'a-b'},
     {value: ['--weird'], expected: '--weird'},
     {value: ['- item'], expected: '- item'},
@@ -30,7 +31,7 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   before(async () => {
     sessionId = crypto.randomUUID();
 
-    const startResult = await runCli(['start'], sessionId);
+    const startResult = await startCli(sessionId);
     assert.strictEqual(
       startResult.status,
       0,
@@ -126,6 +127,22 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
       `press_key command failed: ${result.stderr}`,
     );
     assert.match(result.stdout, /Successfully pressed key: -/);
+  });
+
+  it('emulate accepts a geolocation with a negative latitude', async () => {
+    const result = await runCli(
+      ['emulate', '1', '--geolocation', '-33.86,151.2'],
+      sessionId,
+    );
+    assert.strictEqual(
+      result.status,
+      0,
+      `emulate command failed: ${result.stderr}`,
+    );
+    assert.match(
+      result.stdout,
+      /Emulating geolocation: latitude=-33\.86, longitude=151\.2/,
+    );
   });
 
   it('rejects unknown flags that are not preceded by --', async () => {
