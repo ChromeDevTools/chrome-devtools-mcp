@@ -7,6 +7,7 @@
 import checkLicenseRule from './check-license-rule.js';
 import enforceUsingRule from './enforce-using-rule.js';
 import enforceZodSchemaRule from './enforce-zod-schema-rule.js';
+import maxToolNameLengthRule from './max-tool-name-length-rule.js';
 import requireParsedArgumentsRule from './require-parsed-arguments-rule.js';
 import noDirectThirdPartyImportsRule from './no-direct-third-party-imports-rule.js';
 import noSinonRestoreInHooksRule from './no-sinon-restore-in-hooks-rule.js';
@@ -18,6 +19,7 @@ export default {
     'enforce-using': enforceUsingRule,
     'no-direct-third-party-imports': noDirectThirdPartyImportsRule,
     'enforce-zod-schema': enforceZodSchemaRule,
+    'max-tool-name-length': maxToolNameLengthRule,
     'require-parsed-arguments': requireParsedArgumentsRule,
     'no-sinon-restore-in-hooks': noSinonRestoreInHooksRule,
     'require-explicit-fake-timers': requireExplicitFakeTimersRule,

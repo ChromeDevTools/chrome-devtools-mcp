@@ -209,6 +209,7 @@ export const stopTrace: PageToolFactory = definePageTool(
 );
 
 export const analyzeInsight: PageToolFactory = definePageTool(() => ({
+  // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
   name: 'performance_analyze_insight',
   description:
     'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',

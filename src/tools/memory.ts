@@ -180,6 +180,7 @@ export const getHeapSnapshotDetails: BrowserlessToolFactory =
 
 export const getHeapSnapshotClassNodes: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'get_heapsnapshot_class_nodes',
     description:
       'Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs.',
@@ -299,6 +300,7 @@ export const closeHeapSnapshot: BrowserlessToolFactory = defineBrowserlessTool(
 
 export const getHeapSnapshotRetainingPaths: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'get_heapsnapshot_retaining_paths',
     description:
       'Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected.',
@@ -403,6 +405,7 @@ export const getHeapSnapshotEdges: BrowserlessToolFactory =
 
 export const getHeapSnapshotDominators: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'get_heapsnapshot_dominators',
     description:
       'Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive.',
@@ -496,6 +499,7 @@ export const compareHeapSnapshots: BrowserlessToolFactory =
 
 export const getHeapSnapshotDuplicateStrings: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'get_heapsnapshot_duplicate_strings',
     description:
       'Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value.',
@@ -531,6 +535,7 @@ export const getHeapSnapshotDuplicateStrings: BrowserlessToolFactory =
 
 export const getHeapSnapshotObjectDetails: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'get_heapsnapshot_object_details',
     description:
       'Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness.',
@@ -640,6 +645,7 @@ export const queryHeapSnapshotObjects: BrowserlessToolFactory =
 
 export const analyzeHeapSnapshotContexts: BrowserlessToolFactory =
   defineBrowserlessTool(() => ({
+    // eslint-disable-next-line @local/max-tool-name-length -- Renaming a published tool breaks existing clients.
     name: 'analyze_heapsnapshot_contexts',
     description:
       'Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes.',
