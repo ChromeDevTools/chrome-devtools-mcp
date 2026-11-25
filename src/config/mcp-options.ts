@@ -282,7 +282,7 @@ export const mcpOptions: McpOptions = {
   idleTimeout: {
     type: 'string',
     describe:
-      'Close or disconnect an idle browser after this duration without a tool call, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). Closes a launched browser (closing all open pages), or disconnects when using `--browserUrl`, `--wsEndpoint` or `--autoConnect` while leaving that browser open; the next tool call relaunches or reconnects automatically. Disabled by default.',
+      'Close or disconnect an idle browser after this duration without a tool call, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). Closes a launched browser (closing all open pages), or disconnects when using `--browserUrl`, `--wsEndpoint` or `--autoConnect` while leaving that browser open; the next tool call relaunches or reconnects automatically. In the `chrome-devtools` CLI, the background daemon also exits shortly afterwards. Disabled by default.',
     coerce: (value: string | undefined): string | undefined => {
       if (value === undefined) {
         return;
