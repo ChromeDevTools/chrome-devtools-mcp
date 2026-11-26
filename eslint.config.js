@@ -590,6 +590,7 @@ export default defineConfig([
     files: ['src/tools/**/*.ts'],
     rules: {
       '@local/enforce-zod-schema': 'error',
+      '@local/max-tool-name-length': 'error',
       '@local/require-parsed-arguments': 'error',
     },
   },
