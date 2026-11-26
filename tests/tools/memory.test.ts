@@ -764,11 +764,13 @@ describe('memory', () => {
           isDetached: undefined,
           sortBy: undefined,
         },
+        {pageIdx: 0, pageSize: 50},
       );
       sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, range, {
         pageIdx: 0,
         pageSize: 50,
         maxNameLength: undefined,
+        pageFromWorker: true,
       });
     });
 
@@ -811,11 +813,13 @@ describe('memory', () => {
           isDetached: true,
           sortBy: 'selfSize',
         },
+        {pageIdx: 1, pageSize: 10},
       );
       sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, range, {
         pageIdx: 1,
         pageSize: 10,
         maxNameLength: 500,
+        pageFromWorker: true,
       });
     });
   });

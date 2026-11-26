@@ -15,6 +15,7 @@ import {
 } from '../../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {DevTools} from '../../src/third_party/browser.js';
+import {createMockHeapSnapshotNode} from '../mocks.js';
 
 describe('HeapSnapshotManager', () => {
   it('rejects when a file without .heapsnapshot or .heaptimeline extension is passed', async () => {
@@ -92,6 +93,115 @@ describe('HeapSnapshotManager', () => {
         className: '',
         propertyName: '',
       });
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('serializes only the requested page of heap objects', async () => {
+    const manager = new HeapSnapshotManager(new TaskRunner());
+    const snapshot = sinon.createStubInstance(HeapSnapshot);
+    const proxy = sinon.createStubInstance(
+      DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
+    );
+    const provider = sinon.createStubInstance(
+      DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProviderProxy,
+    );
+    const count = new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+      0,
+      0,
+      5,
+      [],
+    );
+    const page = new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+      2,
+      4,
+      5,
+      [
+        createMockHeapSnapshotNode({id: 3}),
+        createMockHeapSnapshotNode({id: 4}),
+      ],
+    );
+    const firstPage =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(0, 2, 5, [
+        createMockHeapSnapshotNode({id: 1}),
+        createMockHeapSnapshotNode({id: 2}),
+      ]);
+    snapshot.proxy = proxy;
+    sinon.stub(manager, 'getSnapshot').resolves(snapshot);
+    proxy.queryObjects.returns(provider);
+    provider.serializeItemsRange.withArgs(0, 0).resolves(count);
+    provider.serializeItemsRange.withArgs(2, 4).resolves(page);
+    provider.serializeItemsRange.withArgs(0, 2).resolves(firstPage);
+
+    try {
+      const result = await manager.queryObjects(
+        'tests/fixtures/example.heapsnapshot',
+        {},
+        {pageIdx: 1, pageSize: 2},
+      );
+      assert.strictEqual(result, page);
+      sinon.assert.calledTwice(provider.serializeItemsRange);
+      sinon.assert.calledWithExactly(
+        provider.serializeItemsRange.firstCall,
+        0,
+        0,
+      );
+      sinon.assert.calledWithExactly(
+        provider.serializeItemsRange.secondCall,
+        2,
+        4,
+      );
+      const invalidPage = await manager.queryObjects(
+        'tests/fixtures/example.heapsnapshot',
+        {},
+        {pageIdx: 99, pageSize: 2},
+      );
+      assert.strictEqual(invalidPage, firstPage);
+      sinon.assert.calledOnceWithExactly(proxy.queryObjects, {});
+      sinon.assert.calledWithExactly(
+        provider.serializeItemsRange.thirdCall,
+        0,
+        2,
+      );
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('keeps an empty heap query at the zero range', async () => {
+    const manager = new HeapSnapshotManager(new TaskRunner());
+    const snapshot = sinon.createStubInstance(HeapSnapshot);
+    const proxy = sinon.createStubInstance(
+      DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
+    );
+    const provider = sinon.createStubInstance(
+      DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProviderProxy,
+    );
+    const empty = new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+      0,
+      0,
+      0,
+      [],
+    );
+    snapshot.proxy = proxy;
+    sinon.stub(manager, 'getSnapshot').resolves(snapshot);
+    proxy.queryObjects.returns(provider);
+    provider.serializeItemsRange.withArgs(0, 0).resolves(empty);
+
+    try {
+      const result = await manager.queryObjects(
+        'tests/fixtures/example.heapsnapshot',
+        {},
+        {pageIdx: 8, pageSize: 50},
+      );
+      assert.deepStrictEqual(result, empty);
+      sinon.assert.calledTwice(provider.serializeItemsRange);
+      sinon.assert.calledWithExactly(
+        provider.serializeItemsRange.secondCall,
+        0,
+        0,
+      );
     } finally {
       manager.dispose();
     }

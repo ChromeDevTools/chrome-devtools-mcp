@@ -9,6 +9,7 @@ import path from 'node:path';
 
 import type {DevTools} from '../third_party/browser.js';
 import {loadBrowser} from '../third_party/index.js';
+import type {PaginationOptions} from '../types.js';
 import {createIdGenerator} from '../utils/id.js';
 import type {TaskQueue, TaskRunner} from '../utils/TaskRunner.js';
 
@@ -91,6 +92,11 @@ function toClassDiff(
 export class HeapSnapshot {
   proxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
   worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+  queryPageCache?: {
+    key: string;
+    provider: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProviderProxy;
+    totalLength: number;
+  };
   // 1-indexed array where index is the class ID.
   #idToClassKey: string[] = [''];
   #classKeyToId = new Map<string, number>();
@@ -542,6 +548,7 @@ export class HeapSnapshotManager {
   async queryObjects(
     filePath: string,
     options: HeapQueryOptions,
+    pagination?: PaginationOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const compiledOptions = {...options};
     const parameters: Array<'className' | 'propertyName'> = [
@@ -566,6 +573,45 @@ export class HeapSnapshotManager {
     }
     using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
+    if (pagination?.pageSize !== undefined) {
+      const key = JSON.stringify(options, (_name, value) =>
+        value instanceof RegExp
+          ? {pattern: value.source, flags: value.flags}
+          : value,
+      );
+      let cached = snapshot.queryPageCache;
+      if (!cached || cached.key !== key) {
+        const provider = snapshot.proxy.queryObjects(compiledOptions);
+        let count;
+        try {
+          count = await provider.serializeItemsRange(0, 0);
+        } catch (error) {
+          provider.dispose();
+          throw error;
+        }
+        cached?.provider.dispose();
+        cached = {key, provider, totalLength: count.totalLength};
+        snapshot.queryPageCache = cached;
+      }
+      try {
+        const {provider, totalLength} = cached;
+        const pageSize = pagination.pageSize;
+        const totalPages = Math.max(1, Math.ceil(totalLength / pageSize));
+        const pageIdx =
+          pagination.pageIdx !== undefined && pagination.pageIdx < totalPages
+            ? pagination.pageIdx
+            : 0;
+        const start = pageIdx * pageSize;
+        return await provider.serializeItemsRange(
+          start,
+          Math.min(start + pageSize, totalLength),
+        );
+      } catch (error) {
+        cached.provider.dispose();
+        snapshot.queryPageCache = undefined;
+        throw error;
+      }
+    }
     const provider = snapshot.proxy.queryObjects(compiledOptions);
     return await provider.serializeItemsRange(0, Infinity);
   }
