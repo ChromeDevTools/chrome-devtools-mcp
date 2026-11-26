@@ -52,6 +52,7 @@ ts_library("tests") {
     "e2e/chrome-devtools-status.test.ts",
     "e2e/telemetry.test.ts",
     "formatters/CommentFormatter.test.ts",
+    "formatters/ConsoleFormat.test.ts",
     "formatters/ConsoleFormatter.test.ts",
     "formatters/ConsoleFormatterGrouping.test.ts",
     "formatters/CssFormatter.test.ts",
