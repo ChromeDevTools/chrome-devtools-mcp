@@ -351,6 +351,29 @@ describe('chrome-devtools CLI', () => {
       );
     });
 
+    it('preserves security flags when start options precede the start command', async () => {
+      const mocks = createCliMocks();
+
+      const exitCode = await runCli(
+        [
+          '--workspace',
+          'click',
+          '--no-javascript-evaluation',
+          'start',
+          '--sessionId',
+          SESSION_ID,
+        ],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.calledOnceWithExactly(
+        mocks.startDaemon,
+        ['--viaCli', '--no-javascript-evaluation', '--filesystem-root=click'],
+        SESSION_ID,
+      );
+    });
+
     it('rejects prototype property names as unknown commands without crashing', async () => {
       const mocks = createCliMocks();
 

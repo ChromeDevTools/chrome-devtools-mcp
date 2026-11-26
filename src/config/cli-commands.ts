@@ -177,6 +177,36 @@ function optionName(token: string): string {
   return name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
+function findCommandIndex(argv: readonly string[]): number {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (!token.startsWith('-')) {
+      return i;
+    }
+    if (!token.startsWith('--')) {
+      return -1;
+    }
+    const kind = GLOBAL_CLI_OPTIONS.get(optionName(token));
+    if (kind === undefined) {
+      return -1;
+    }
+    if (token.includes('=') || token.startsWith('--no-')) {
+      continue;
+    }
+    if (kind === 'boolean') {
+      if (/^(true|false)$/.test(argv[i + 1] ?? '')) {
+        i++;
+      }
+    } else if (
+      i + 1 < argv.length &&
+      (!argv[i + 1].startsWith('-') || NEGATIVE_NUMBER.test(argv[i + 1]))
+    ) {
+      i++;
+    }
+  }
+  return -1;
+}
+
 /**
  * Shields values that yargs cannot carry through its parsing.
  *
@@ -189,7 +219,10 @@ function optionName(token: string): string {
  * https://github.com/yargs/yargs/issues/1821.
  *
  * Shielded tokens are replaced by opaque placeholders that `restore` maps back
- * to the original values. A token is shielded when:
+ * to the original values. Shielding only applies once the command token
+ * (following any leading global options) resolves to a `CommandArgSpec`;
+ * otherwise `argv` is returned unchanged. After a command spec is resolved, a
+ * token is shielded when:
  *
  * - it is a lone `-`, which can never be an option;
  * - it follows the first `--`, which is dropped so the tokens populate
@@ -206,7 +239,7 @@ function optionName(token: string): string {
  *   it.
  *
  * `getSpec` resolves the spec of a command by name and returns `undefined`
- * for tokens that are not a command.
+ * for tokens that are not a tool command.
  */
 export function shieldLiteralArgs(
   argv: readonly string[],
@@ -215,16 +248,20 @@ export function shieldLiteralArgs(
   argv: string[];
   restore: (value: unknown) => unknown;
 } {
+  const commandIndex = findCommandIndex(argv);
+  const spec = commandIndex === -1 ? undefined : getSpec(argv[commandIndex]);
+  if (!spec) {
+    return {argv: [...argv], restore: value => value};
+  }
+
   const literals = new Map<string, string>();
-  const result: string[] = [];
+  const result = argv.slice(0, commandIndex + 1);
   const shield = (token: string): void => {
     const placeholder = `${LITERAL_ARG_PREFIX}${literals.size}`;
     literals.set(placeholder, token);
     result.push(placeholder);
   };
 
-  let commandSeen = false;
-  let spec: CommandArgSpec | undefined;
   let filled = 0;
   let afterDoubleDash = false;
   const isLiteralOptionValue = (token: string): boolean => {
@@ -232,10 +269,10 @@ export function shieldLiteralArgs(
       token.startsWith('-') &&
       token !== '--' &&
       !NEGATIVE_NUMBER.test(token) &&
-      spec?.options.get(optionName(token)) === undefined
+      spec.options.get(optionName(token)) === undefined
     );
   };
-  for (let i = 0; i < argv.length; i++) {
+  for (let i = commandIndex + 1; i < argv.length; i++) {
     const token = argv[i];
     if (afterDoubleDash) {
       shield(token);
@@ -246,28 +283,17 @@ export function shieldLiteralArgs(
       continue;
     }
     if (token === '-') {
-      if (spec) {
-        shield(token);
-        filled++;
-      } else {
-        result.push(token);
-      }
+      shield(token);
+      filled++;
       continue;
     }
     if (!token.startsWith('-') || NEGATIVE_NUMBER.test(token)) {
       result.push(token);
-      if (!commandSeen) {
-        commandSeen = true;
-        spec = getSpec(token);
-      } else if (spec) {
-        filled++;
-      }
+      filled++;
       continue;
     }
 
-    const kind = (
-      spec?.options ?? (commandSeen ? undefined : GLOBAL_CLI_OPTIONS)
-    )?.get(optionName(token));
+    const kind = spec.options.get(optionName(token));
     if (kind !== undefined) {
       result.push(token);
       if (token.includes('=')) {
@@ -293,9 +319,8 @@ export function shieldLiteralArgs(
     }
 
     const hasUnfilledPositional =
-      spec !== undefined &&
-      (filled < spec.positionalCount ||
-        (spec.variadic && spec.positionalCount > 0));
+      filled < spec.positionalCount ||
+      (spec.variadic && spec.positionalCount > 0);
     if (hasUnfilledPositional) {
       shield(token);
       filled++;
