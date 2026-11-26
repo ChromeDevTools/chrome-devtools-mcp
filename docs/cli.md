@@ -152,3 +152,17 @@ generation such as `wait_for` and `fill_form`.
 
 `chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
 because not all args make sense in a CLI interface.
+
+## Sessions
+
+By default, all commands share one daemon and browser. Pass `--sessionId=<id>`
+or set `CHROME_DEVTOOLS_SESSION_ID` to scope `start`, `status`, `stop`, and
+tool calls to an isolated daemon and browser. Session IDs use hex digits and
+dashes (such as a UUID); `--sessionId` overrides `CHROME_DEVTOOLS_SESSION_ID`.
+
+```sh
+SESSION_ID=$(uuidgen)
+chrome-devtools start --sessionId="$SESSION_ID"
+chrome-devtools list_pages --sessionId="$SESSION_ID"
+chrome-devtools stop --sessionId="$SESSION_ID"
+```

@@ -20,6 +20,7 @@ import {
   DAEMON_SCRIPT_PATH,
   serializeArgs,
   assertValidSessionId,
+  getDefaultSessionId,
   getSocketPath,
   getRuntimeHome,
   getPidFilePath,
@@ -59,6 +60,46 @@ describe('assertValidSessionId', () => {
     assert.throws(
       () => assertValidSessionId('session@id'),
       /Invalid sessionId/,
+    );
+  });
+});
+
+describe('getDefaultSessionId', () => {
+  it('returns the default session when no variable is set', () => {
+    assert.strictEqual(getDefaultSessionId({}), '');
+  });
+
+  it('uses CHROME_DEVTOOLS_SESSION_ID', () => {
+    assert.strictEqual(
+      getDefaultSessionId({CHROME_DEVTOOLS_SESSION_ID: SESSION_ID}),
+      SESSION_ID,
+    );
+  });
+
+  it('falls back to CD4A_INTERNAL_DAEMON_SESSION_ID', () => {
+    assert.strictEqual(
+      getDefaultSessionId({CD4A_INTERNAL_DAEMON_SESSION_ID: SESSION_ID}),
+      SESSION_ID,
+    );
+  });
+
+  it('prefers CHROME_DEVTOOLS_SESSION_ID over CD4A_INTERNAL_DAEMON_SESSION_ID', () => {
+    assert.strictEqual(
+      getDefaultSessionId({
+        CHROME_DEVTOOLS_SESSION_ID: SESSION_ID,
+        CD4A_INTERNAL_DAEMON_SESSION_ID: 'aaaa-bbbb',
+      }),
+      SESSION_ID,
+    );
+  });
+
+  it('ignores an empty CHROME_DEVTOOLS_SESSION_ID', () => {
+    assert.strictEqual(
+      getDefaultSessionId({
+        CHROME_DEVTOOLS_SESSION_ID: '',
+        CD4A_INTERNAL_DAEMON_SESSION_ID: SESSION_ID,
+      }),
+      SESSION_ID,
     );
   });
 });
