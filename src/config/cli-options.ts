@@ -446,6 +446,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      backgroundColor: {
+        name: 'backgroundColor',
+        type: 'string',
+        description:
+          'Override the default page background color (for example "#0f172a", "#0f172a80", "rgb(15, 23, 42)", "rgba(15, 23, 42, 0.5)", or "transparent"). Omit or set to "auto" to reset to the default.',
+        required: false,
+        positional: false,
+      },
     },
   },
   evaluate_script: {

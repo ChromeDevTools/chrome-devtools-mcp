@@ -58,6 +58,7 @@ import type {
   WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import type {
+  BackgroundColor,
   EmulationSettings,
   ForcedColors,
   GeolocationOptions,
@@ -910,6 +911,10 @@ export class McpPage implements ContextPage {
     return this.emulationSettings.prefersReducedMotion ?? null;
   }
 
+  get backgroundColor(): BackgroundColor | null {
+    return this.emulationSettings.backgroundColor ?? null;
+  }
+
   // Public for testability: tests spy on this method to verify throttle multipliers.
   createWaitForHelper(
     cpuMultiplier: number,
@@ -1461,6 +1466,7 @@ export class McpPage implements ContextPage {
     prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
     extraHttpHeaders?: Record<string, string> | undefined;
+    backgroundColor?: BackgroundColor;
   }): Promise<void> {
     const page = this.pptrPage;
     const newSettings: EmulationSettings = {...this.emulationSettings};
@@ -1574,6 +1580,22 @@ export class McpPage implements ContextPage {
       if (Object.keys(options.extraHttpHeaders).length === 0) {
         delete newSettings.extraHttpHeaders;
       }
+    }
+
+    if (!options.backgroundColor) {
+      if (this.emulationSettings.backgroundColor) {
+        // @ts-expect-error internal API
+        const client = page._client();
+        await client.send('Emulation.setDefaultBackgroundColorOverride', {});
+      }
+      delete newSettings.backgroundColor;
+    } else {
+      // @ts-expect-error internal API
+      const client = page._client();
+      await client.send('Emulation.setDefaultBackgroundColorOverride', {
+        color: options.backgroundColor,
+      });
+      newSettings.backgroundColor = options.backgroundColor;
     }
 
     const previousViewport = this.emulationSettings.viewport;

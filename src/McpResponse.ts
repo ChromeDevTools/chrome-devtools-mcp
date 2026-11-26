@@ -75,7 +75,11 @@ import {
   getInsightOutput,
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
-import type {CD4ACommentThread, PaginationOptions} from './types.js';
+import type {
+  BackgroundColor,
+  CD4ACommentThread,
+  PaginationOptions,
+} from './types.js';
 import {stableIdSymbol, type WithSymbolId} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import {getFilterableResourceType} from './utils/resourceType.js';
@@ -1012,6 +1016,7 @@ export class McpResponse implements Response {
       forcedColors?: string;
       prefersContrast?: string;
       prefersReducedMotion?: string;
+      backgroundColor?: BackgroundColor;
       dialog?: {
         type: string;
         message: string;
@@ -1181,6 +1186,14 @@ export class McpResponse implements Response {
         `Emulating prefers-reduced-motion: ${prefersReducedMotion}`,
       );
       structuredContent.prefersReducedMotion = prefersReducedMotion;
+    }
+
+    const backgroundColor = this.#page?.backgroundColor;
+    if (backgroundColor) {
+      response.push(
+        `Emulating background color: rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`,
+      );
+      structuredContent.backgroundColor = backgroundColor;
     }
 
     const dialog = this.#page?.getDialog();

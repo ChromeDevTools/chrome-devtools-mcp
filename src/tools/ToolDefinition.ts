@@ -47,6 +47,7 @@ import type {
 } from '../third_party/browser.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
+  BackgroundColor,
   TextSnapshotNode,
   GeolocationOptions,
   CD4ACommentThread,
@@ -585,6 +586,7 @@ export type ContextPage = Readonly<{
     prefersContrast?: PrefersContrast | 'auto';
     prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
+    backgroundColor?: BackgroundColor;
   }): Promise<void>;
   waitForTextOnPage(
     text: string[],
@@ -849,6 +851,82 @@ export function geolocationTransform(
     latitude: parts[0],
     longitude: parts[1],
   });
+}
+
+export function backgroundColorTransform(
+  value: string | undefined,
+): BackgroundColor | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '' || normalized === 'auto') {
+    return undefined;
+  }
+  if (normalized === 'transparent') {
+    return {r: 0, g: 0, b: 0, a: 0};
+  }
+  const hexMatch = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(
+    normalized,
+  );
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    if (hex.length === 3 || hex.length === 4) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      const a =
+        hex.length === 4
+          ? Number((parseInt(hex[3] + hex[3], 16) / 255).toFixed(4))
+          : 1;
+      return {r, g, b, a};
+    }
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const a =
+      hex.length === 8
+        ? Number((parseInt(hex.slice(6, 8), 16) / 255).toFixed(4))
+        : 1;
+    return {r, g, b, a};
+  }
+  const rgbMatch =
+    /^(rgba?)\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/.exec(
+      normalized,
+    );
+  if (rgbMatch) {
+    const [, fn, rStr, gStr, bStr, aStr] = rgbMatch;
+    if (fn === 'rgb' && aStr !== undefined) {
+      throw new Error(
+        `Invalid backgroundColor "${value}". rgb() expects 3 arguments; use rgba() for alpha.`,
+      );
+    }
+    if (fn === 'rgba' && (aStr === undefined || aStr === '' || aStr === '.')) {
+      throw new Error(
+        `Invalid backgroundColor "${value}". rgba() requires an alpha value between 0 and 1.`,
+      );
+    }
+    const r = Number(rStr);
+    const g = Number(gStr);
+    const b = Number(bStr);
+    const a = aStr === undefined ? 1 : Number(aStr);
+    if (
+      r > 255 ||
+      g > 255 ||
+      b > 255 ||
+      !Number.isFinite(a) ||
+      a < 0 ||
+      a > 1
+    ) {
+      throw new Error(
+        `Invalid backgroundColor "${value}". RGB channels must be 0-255 and alpha must be 0-1.`,
+      );
+    }
+    return {r, g, b, a};
+  }
+  throw new Error(
+    `Invalid backgroundColor "${value}". Expected hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA), rgb(r, g, b), rgba(r, g, b, a), "transparent", or "auto".`,
+  );
 }
 
 const jsonObjectSchema = zod.record(zod.string(), zod.unknown());

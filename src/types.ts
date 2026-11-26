@@ -40,6 +40,13 @@ export const PREFERS_REDUCED_MOTION_VALUES = [
 export type PrefersReducedMotion =
   (typeof PREFERS_REDUCED_MOTION_VALUES)[number];
 
+export interface BackgroundColor {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
 export interface EmulationSettings {
   networkConditions?: string;
   cpuThrottlingRate?: number;
@@ -51,6 +58,7 @@ export interface EmulationSettings {
   prefersReducedMotion?: PrefersReducedMotion;
   viewport?: Viewport;
   extraHttpHeaders?: Record<string, string>;
+  backgroundColor?: BackgroundColor;
 }
 
 export type Logger = ((...args: unknown[]) => void) | undefined;

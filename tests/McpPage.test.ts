@@ -1097,6 +1097,37 @@ describe('McpPage', () => {
         {},
       );
     });
+
+    it('sets and clears default background color override', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const cdpSession = (
+        pptrPage as unknown as {_client: () => {send: sinon.SinonStub}}
+      )._client();
+
+      await mcpPage.emulate({
+        backgroundColor: {r: 15, g: 23, b: 42, a: 1},
+      });
+      assert.deepStrictEqual(mcpPage.backgroundColor, {
+        r: 15,
+        g: 23,
+        b: 42,
+        a: 1,
+      });
+      sinon.assert.calledWithExactly(
+        cdpSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {color: {r: 15, g: 23, b: 42, a: 1}},
+      );
+
+      cdpSession.send.resetHistory();
+      await mcpPage.emulate({});
+      assert.strictEqual(mcpPage.backgroundColor, null);
+      sinon.assert.calledOnceWithExactly(
+        cdpSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {},
+      );
+    });
   });
 
   describe('restoreEmulation()', () => {
@@ -1160,6 +1191,26 @@ describe('McpPage', () => {
 
       sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
       sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+    });
+
+    it('re-applies previously configured backgroundColor emulation', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const cdpSession = (
+        pptrPage as unknown as {_client: () => {send: sinon.SinonStub}}
+      )._client();
+
+      await mcpPage.emulate({
+        backgroundColor: {r: 15, g: 23, b: 42, a: 0.5},
+      });
+      cdpSession.send.resetHistory();
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledWithExactly(
+        cdpSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {color: {r: 15, g: 23, b: 42, a: 0.5}},
+      );
     });
   });
 

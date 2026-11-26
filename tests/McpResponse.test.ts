@@ -512,6 +512,29 @@ describe('McpResponse', () => {
     });
   });
 
+  it('adds backgroundColor emulation setting when it is set', async () => {
+    await withMcpContext(async (response, context) => {
+      await context.getSelectedMcpPage().emulate({
+        backgroundColor: {r: 15, g: 23, b: 42, a: 0.5},
+      });
+      const {content, structuredContent} = await response.handle(context);
+      assert.ok(
+        getTextContent(content[0]).includes(
+          'Emulating background color: rgba(15, 23, 42, 0.5)',
+        ),
+      );
+      assert.deepStrictEqual(
+        (structuredContent as {backgroundColor?: unknown}).backgroundColor,
+        {
+          r: 15,
+          g: 23,
+          b: 42,
+          a: 0.5,
+        },
+      );
+    });
+  });
+
   it('adds a prompt dialog', async t => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedMcpPage();

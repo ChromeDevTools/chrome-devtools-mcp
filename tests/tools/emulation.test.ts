@@ -12,6 +12,7 @@ import sinon from 'sinon';
 import {zod} from '../../src/third_party/index.js';
 import {emulate} from '../../src/tools/emulation.js';
 import {
+  backgroundColorTransform,
   geolocationTransform,
   viewportTransform,
 } from '../../src/tools/ToolDefinition.js';
@@ -167,6 +168,83 @@ describe('emulation', () => {
       it('throws on hex coordinates or surrounding whitespace', () => {
         assert.throws(() => geolocationTransform('0x10,0x20'));
         assert.throws(() => geolocationTransform(' 37.77 , -122.42 '));
+      });
+    });
+
+    describe('backgroundColorTransform', () => {
+      it('returns undefined for undefined, empty string, or auto', () => {
+        assert.strictEqual(backgroundColorTransform(undefined), undefined);
+        assert.strictEqual(backgroundColorTransform(''), undefined);
+        assert.strictEqual(backgroundColorTransform('auto'), undefined);
+        assert.strictEqual(backgroundColorTransform('  AUTO  '), undefined);
+      });
+
+      it('parses transparent keyword', () => {
+        assert.deepStrictEqual(backgroundColorTransform('transparent'), {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 0,
+        });
+      });
+
+      it('parses 3, 4, 6, and 8 digit hex colors', () => {
+        assert.deepStrictEqual(backgroundColorTransform('#0f1'), {
+          r: 0,
+          g: 255,
+          b: 17,
+          a: 1,
+        });
+        assert.deepStrictEqual(backgroundColorTransform('#0f18'), {
+          r: 0,
+          g: 255,
+          b: 17,
+          a: 0.5333,
+        });
+        assert.deepStrictEqual(backgroundColorTransform('#0f172a'), {
+          r: 15,
+          g: 23,
+          b: 42,
+          a: 1,
+        });
+        assert.deepStrictEqual(backgroundColorTransform('#0f172a80'), {
+          r: 15,
+          g: 23,
+          b: 42,
+          a: 0.502,
+        });
+      });
+
+      it('parses rgb() and rgba() colors', () => {
+        assert.deepStrictEqual(backgroundColorTransform('rgb(15, 23, 42)'), {
+          r: 15,
+          g: 23,
+          b: 42,
+          a: 1,
+        });
+        assert.deepStrictEqual(
+          backgroundColorTransform('rgba(15, 23, 42, 0.5)'),
+          {
+            r: 15,
+            g: 23,
+            b: 42,
+            a: 0.5,
+          },
+        );
+      });
+
+      it('throws on invalid color values', () => {
+        for (const invalid of [
+          'rgb(256, 0, 0)',
+          'rgba(0, 0, 0, 1.5)',
+          'rgb(0, 0, 0, 0.5)',
+          'rgba(0, 0, 0)',
+          'rgba(0, 0, 0, .)',
+          'red',
+          '#12345',
+        ]) {
+          assert.throws(() => backgroundColorTransform(invalid));
+        }
       });
     });
   });
@@ -811,6 +889,32 @@ describe('emulation', () => {
         schema.safeParse({prefersReducedMotion: 'yes'}).success,
         false,
       );
+    });
+  });
+
+  describe('backgroundColor', () => {
+    it('emulates backgroundColor from schema and clears on auto', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      const parsed = schema.parse({pageId: 1, backgroundColor: '#0f172a'});
+      await emulate(args).handler(
+        {params: {backgroundColor: parsed.backgroundColor}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        backgroundColor: {r: 15, g: 23, b: 42, a: 1},
+      });
+
+      const reset = schema.parse({pageId: 1, backgroundColor: 'auto'});
+      await emulate(args).handler(
+        {params: {backgroundColor: reset.backgroundColor}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledWithExactly(page.emulate.secondCall, {
+        backgroundColor: undefined,
+      });
     });
   });
 });

@@ -14,6 +14,7 @@ import {
 
 import {ToolCategory} from './categories.js';
 import {
+  backgroundColorTransform,
   definePageTool,
   type PageToolFactory,
   geolocationTransform,
@@ -130,6 +131,13 @@ export const emulate: PageToolFactory = definePageTool(() => ({
       .optional()
       .describe(
         'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
+      ),
+    backgroundColor: zod
+      .string()
+      .transform(zodTransform(backgroundColorTransform))
+      .optional()
+      .describe(
+        'Override the default page background color (for example "#0f172a", "#0f172a80", "rgb(15, 23, 42)", "rgba(15, 23, 42, 0.5)", or "transparent"). Omit or set to "auto" to reset to the default.',
       ),
   },
   blockedByDialog: true,
