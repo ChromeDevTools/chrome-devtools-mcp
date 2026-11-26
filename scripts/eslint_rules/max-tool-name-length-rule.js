@@ -9,6 +9,7 @@
 // the model (for example `mcp_<plugin>_<server>_<tool>`). Limiting tool names
 // to 64 characters leaves headroom for those prefixes. See also b/590083070
 // (internal).
+// https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#specifying-client-tools
 const DEFAULT_MAX_LENGTH = 64;
 
 const TOOL_DEFINERS = new Set([
