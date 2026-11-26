@@ -23,8 +23,10 @@ import {
 } from '../../src/daemon/client.js';
 import {
   DAEMON_SCRIPT_PATH,
+  IS_WINDOWS,
   getDaemonPid,
   getPidFilePath,
+  getSocketPath,
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
@@ -71,8 +73,8 @@ function setupStopDaemonSignalFailure(runtimeDir: string) {
   const sessionId = crypto.randomUUID();
   const pid = 1234567895;
   const pidFilePath = getPidFilePath(sessionId);
-  mkdirSync(dirname(pidFilePath), {recursive: true});
-  writeFileSync(pidFilePath, String(pid));
+  mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+  writeFileSync(pidFilePath, String(pid), {mode: 0o600});
   const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
   sinon.stub(fs, 'existsSync').callThrough().withArgs('/proc').returns(false);
   sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
@@ -152,7 +154,10 @@ describe('daemon client', () => {
       try {
         const pidFilePath = getPidFilePath(sessionId);
         mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
-        writeFileSync(pidFilePath, String(child.pid), 'utf-8');
+        writeFileSync(pidFilePath, String(child.pid), {
+          encoding: 'utf-8',
+          mode: 0o600,
+        });
         assert.ok(
           isDaemonRunning(sessionId),
           'Daemon should be detected as running via PID file',
@@ -190,7 +195,10 @@ describe('daemon client', () => {
       try {
         const pidFilePath = getPidFilePath(sessionId);
         mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
-        writeFileSync(pidFilePath, String(childPid), 'utf-8');
+        writeFileSync(pidFilePath, String(childPid), {
+          encoding: 'utf-8',
+          mode: 0o600,
+        });
 
         await stopDaemon(sessionId);
         assert.doesNotThrow(
@@ -385,28 +393,42 @@ describe('daemon client', () => {
 });
 
 describe('daemon response deadline', () => {
-  let socket: net.Socket;
-  let destroy: sinon.SinonStub<Parameters<net.Socket['destroy']>, net.Socket>;
-
-  beforeEach(() => {
+  function setupDeadlineTest(runtimeDir: string) {
+    sinon
+      .stub(process, 'env')
+      .value({...process.env, XDG_RUNTIME_DIR: runtimeDir});
     const pidFile = getPidFilePath('');
-    sinon.stub(fs, 'existsSync').callThrough().withArgs(pidFile).returns(true);
+    mkdirSync(dirname(pidFile), {recursive: true, mode: 0o700});
+    writeFileSync(pidFile, String(process.pid), {mode: 0o600});
+    if (!IS_WINDOWS) {
+      const socketPath = getSocketPath('');
+      const socketStats = sinon.createStubInstance(fs.Stats);
+      socketStats.isSymbolicLink.returns(false);
+      socketStats.isSocket.returns(true);
+      socketStats.uid = process.getuid ? process.getuid() : 0;
+      sinon
+        .stub(fs, 'lstatSync')
+        .callThrough()
+        .withArgs(socketPath)
+        .returns(socketStats);
+    }
     sinon
       .stub(fs, 'readFileSync')
       .callThrough()
-      .withArgs(pidFile, 'utf-8')
-      .returns(String(process.pid))
       .withArgs(`/proc/${process.pid}/cmdline`, 'utf-8')
       .returns(`node\0${DAEMON_SCRIPT_PATH}\0`);
     sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
-    socket = new net.Socket();
+    const socket = new net.Socket();
     sinon.stub(socket, 'write').returns(true);
     sinon.stub(socket, 'end').returns(socket);
-    destroy = sinon.stub(socket, 'destroy').returns(socket);
+    const destroy = sinon.stub(socket, 'destroy').returns(socket);
     sinon.stub(net, 'createConnection').returns(socket);
-  });
+    return {socket, destroy};
+  }
 
   it('receives a tool result after the default socket deadline', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {socket} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'navigate_page', args: {timeout: 120_000}},
@@ -420,6 +442,8 @@ describe('daemon response deadline', () => {
   });
 
   it('still times out when a long-running tool never responds', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 120_000}},
@@ -436,6 +460,8 @@ describe('daemon response deadline', () => {
   });
 
   it('status still times out at exactly 60 seconds', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand({method: 'status'}, ''),
@@ -449,6 +475,8 @@ describe('daemon response deadline', () => {
   });
 
   it('adds the response grace period to a short tool timeout', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand(
@@ -466,6 +494,8 @@ describe('daemon response deadline', () => {
 
   for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
     it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
+      using dir = createTempDir('cdm-deadline-test-');
+      const {destroy} = setupDeadlineTest(dir.path);
       const clock = sinon.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],
       });
@@ -486,6 +516,8 @@ describe('daemon response deadline', () => {
   }
 
   it('does not overflow the timer for an extremely large tool timeout', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 2 ** 31}},
@@ -502,6 +534,8 @@ describe('daemon response deadline', () => {
   });
 
   it('preserves an explicit socket deadline', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand(
