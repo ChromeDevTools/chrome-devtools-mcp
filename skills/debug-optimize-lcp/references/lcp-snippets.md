@@ -34,11 +34,18 @@ Use this snippet to check for common DOM-based LCP issues (lazy loading, priorit
 ```javascript
 () => {
   const issues = [];
+  const intersectsViewport = rect =>
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.right > 0 &&
+    rect.bottom > 0 &&
+    rect.left < window.innerWidth &&
+    rect.top < window.innerHeight;
 
   // Check for lazy-loaded images in viewport
   document.querySelectorAll('img[loading="lazy"]').forEach(img => {
     const rect = img.getBoundingClientRect();
-    if (rect.top < window.innerHeight) {
+    if (intersectsViewport(rect)) {
       issues.push({
         issue: 'lazy-loaded image in viewport',
         element: img.outerHTML.substring(0, 200),
@@ -50,7 +57,7 @@ Use this snippet to check for common DOM-based LCP issues (lazy loading, priorit
   // Check for LCP-candidate images missing fetchpriority
   document.querySelectorAll('img:not([fetchpriority])').forEach(img => {
     const rect = img.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.width * rect.height > 50000) {
+    if (intersectsViewport(rect) && rect.width * rect.height > 50000) {
       issues.push({
         issue: 'large viewport image without fetchpriority',
         element: img.outerHTML.substring(0, 200),
