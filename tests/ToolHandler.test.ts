@@ -45,6 +45,7 @@ import {evaluateScript} from '../src/tools/script.js';
 import {mockNetwork} from '../src/tools/network.js';
 import {selectPage} from '../src/tools/pages.js';
 import {createTools} from '../src/tools/tools.js';
+import {CLI_SCRIPT_NAME_ENV} from '../src/utils/scriptName.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import {createMockMcpContext, createMockMcpPage} from './mocks.js';
 import {getMockBrowser, settle, withMcpContext} from './utils.js';
@@ -1427,6 +1428,59 @@ describe('ToolHandler', () => {
       /is currently disabled/,
     );
     assert.strictEqual(handlerCalled, false);
+  });
+
+  describe('disabled tool script name', () => {
+    async function getDisabledToolMessage(
+      env: NodeJS.ProcessEnv,
+    ): Promise<string> {
+      sinon.stub(process, 'env').value(env);
+      const tool: ToolDefinition = {
+        name: 'disabled_tool',
+        description: 'A disabled tool',
+        annotations: {
+          category: ToolCategory.EMULATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        concurrency: 'exclusive',
+        verifyFilesSchema: {},
+        handler: async () => {},
+      };
+      const config = parseConfig(['--categoryEmulation=false']);
+      const toolHandler = new ToolHandler(
+        tool,
+        config,
+        async () => createMockMcpContext(),
+        sinon.spy(),
+      );
+      const result = await toolHandler.handle({});
+      assert.strictEqual(result.isError, true);
+      return result.content[0].type === 'text' ? result.content[0].text : '';
+    }
+
+    it('uses default chrome-devtools start when unset', async () => {
+      const env = {...process.env};
+      delete env[CLI_SCRIPT_NAME_ENV];
+      const text = await getDisabledToolMessage(env);
+      assert.match(
+        text,
+        /running chrome-devtools start --categoryEmulation=true/,
+      );
+    });
+
+    it('uses CHROME_DEVTOOLS_MCP_CLI_SCRIPT_NAME when set', async () => {
+      const text = await getDisabledToolMessage({
+        ...process.env,
+        [CLI_SCRIPT_NAME_ENV]: '  custom-devtools  ',
+      });
+      assert.match(
+        text,
+        /running custom-devtools start --categoryEmulation=true/,
+      );
+      assert.doesNotMatch(text, /running chrome-devtools start/);
+    });
   });
 
   it('registers evaluate_script by default and disables it when javascriptEvaluation is false', async () => {

@@ -27,6 +27,7 @@ import {
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
+import {MCP_SCRIPT_NAME_ENV} from '../src/utils/scriptName.js';
 
 import {createTempFile} from './utils.js';
 
@@ -1094,6 +1095,31 @@ describe('cli args parsing', () => {
         assert.doesNotMatch(help, /^\s+chrome-devtools-mcp --slim\s/m);
       });
     }
+
+    it('prefers CHROME_DEVTOOLS_MCP_SCRIPT_NAME over npx', async () => {
+      const help = await getHelp(
+        [
+          '/usr/bin/node',
+          '/home/user/.npm/_npx/1234/node_modules/.bin/chrome-devtools-mcp',
+        ],
+        {
+          [MCP_SCRIPT_NAME_ENV]: '  custom-mcp  ',
+          npm_lifecycle_event: 'npx',
+        },
+      );
+      assert.match(help, /^\s+custom-mcp --slim\s/m);
+      assert.doesNotMatch(help, /npx chrome-devtools-mcp@latest/);
+      assert.doesNotMatch(help, /^\s+chrome-devtools-mcp --slim\s/m);
+    });
+
+    it('ignores whitespace-only CHROME_DEVTOOLS_MCP_SCRIPT_NAME', async () => {
+      const help = await getHelp(
+        ['node', '/usr/local/bin/chrome-devtools-mcp'],
+        {[MCP_SCRIPT_NAME_ENV]: '   '},
+      );
+      assert.match(help, /^\s+chrome-devtools-mcp --slim\s/m);
+      assert.doesNotMatch(help, /npx chrome-devtools-mcp@latest/);
+    });
   });
 
   it('clears default values and populates defaultDescription in getCliOptions', () => {

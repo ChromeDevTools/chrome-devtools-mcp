@@ -17,14 +17,13 @@ import {checkForUpdates} from '../utils/check-for-updates.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
 import {logger, saveLogsToFile} from '../utils/logger.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
+import {formatMcpUpdateMessage} from '../utils/scriptName.js';
 import {VERSION} from '../version.js';
 
 import {mcpOptions} from '../config/mcp-options.js';
 import {ConfigParser} from '../config/ConfigParser.js';
 
-await checkForUpdates(
-  'Run `npm install chrome-devtools-mcp@latest` to update.',
-);
+await checkForUpdates(formatMcpUpdateMessage());
 
 const configParser = new ConfigParser(VERSION);
 const serverConfig = configParser.parseConfig();

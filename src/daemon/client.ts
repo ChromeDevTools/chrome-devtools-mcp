@@ -18,6 +18,7 @@ import {
   puppeteerLogger,
   redactDaemonArgsForLogging,
 } from '../utils/logger.js';
+import {resolveCliScriptName} from '../utils/scriptName.js';
 
 import type {
   DaemonMessage,
@@ -275,6 +276,19 @@ export async function stopDaemon(sessionId: string): Promise<void> {
   }
 }
 
+export function formatDaemonVersionMismatchWarning(
+  daemonVersion: string,
+  cliVersion: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const cliScriptName = resolveCliScriptName(env);
+  return (
+    `Warning: Daemon server version (${daemonVersion}) does not match CLI ` +
+    `version (${cliVersion}). Run '${cliScriptName} start' to update and ` +
+    'restart the daemon.'
+  );
+}
+
 export async function verifyDaemonVersion(
   sessionId: string,
   cliVersion: string,
@@ -287,7 +301,7 @@ export async function verifyDaemonVersion(
     if (response.success) {
       const data: DaemonStatusResult = JSON.parse(response.result);
       if (data?.version && data.version !== cliVersion) {
-        return `Warning: Daemon server version (${data.version}) does not match CLI version (${cliVersion}). Run 'chrome-devtools start' to update and restart the daemon.`;
+        return formatDaemonVersionMismatchWarning(data.version, cliVersion);
       }
     }
   } catch {

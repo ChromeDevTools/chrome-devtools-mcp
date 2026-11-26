@@ -273,6 +273,7 @@ ts_library("mcp_lib") {
     "utils/polyfill.ts",
     "utils/raceWithSignal.ts",
     "utils/resourceType.ts",
+    "utils/scriptName.ts",
     "utils/text.ts",
     "utils/timeout.ts",
     "utils/url.ts",

@@ -11,6 +11,7 @@ import process from 'node:process';
 import type {Options, PositionalOptions} from 'yargs';
 
 import {
+  formatDaemonVersionMismatchWarning,
   startDaemon,
   stopDaemon,
   sendCommand,
@@ -28,6 +29,10 @@ import {stripTerminalEscapes} from '../utils/logger.js';
 import {hideBin, yargs} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
+import {
+  formatCliUpdateMessage,
+  resolveCliScriptName,
+} from '../utils/scriptName.js';
 import {VERSION} from '../version.js';
 
 import {
@@ -42,9 +47,9 @@ import {ConfigParser} from '../config/ConfigParser.js';
 
 process.title = 'chrome-devtools';
 
-await checkForUpdates(
-  'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
-);
+const cliScriptName = resolveCliScriptName();
+
+await checkForUpdates(formatCliUpdateMessage());
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
 
@@ -77,11 +82,11 @@ const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
 
 const y = yargs(cliArgs)
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
-  .scriptName('chrome-devtools')
+  .scriptName(cliScriptName)
   .showHelpOnFail(true)
-  .usage('chrome-devtools <command> [...args] --flags')
+  .usage(`${cliScriptName} <command> [...args] --flags`)
   .usage(
-    `Run 'chrome-devtools <command> --help' for help on the specific command.`,
+    `Run '${cliScriptName} <command> --help' for help on the specific command.`,
   )
   .option('sessionId', {
     type: 'string',
@@ -108,16 +113,17 @@ const y = yargs(cliArgs)
       ) {
         console.error('\n=========================================');
         console.error('💡 TIP FOR AI AGENT / DEVELOPER:');
-        console.error('In the `chrome-devtools` CLI:');
+        console.error(`In the \`${cliScriptName}\` CLI:`);
         console.error(
           '1. Required parameters MUST be passed as positional arguments (without flags).',
         );
         console.error(
-          '   - INCORRECT: chrome-devtools click --pageId 1 --uid "1_2"',
+          `   - INCORRECT: ${cliScriptName} click --pageId 1 --uid "1_2"`,
         );
-        console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
+        console.error(`   - CORRECT:   ${cliScriptName} click 1 "1_2"`);
         console.error(
-          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1',
+          `   - CORRECT:   ${cliScriptName} evaluate_script ` +
+            '"() => document.title" --pageId 1',
         );
         console.error(
           '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.',
@@ -126,7 +132,8 @@ const y = yargs(cliArgs)
           '3. Make sure to escape quotes properly for your shell environment.',
         );
         console.error(
-          'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',
+          `Run \`${cliScriptName} <command> --help\` to see exact ` +
+            'positional and optional parameters.',
         );
         console.error('=========================================');
       }
@@ -175,7 +182,7 @@ y.command(
         console.log(`args=${JSON.stringify(data.args)}`);
         if (data.version !== VERSION) {
           console.warn(
-            `Warning: Daemon server version (${data.version}) does not match CLI version (${VERSION}). Run 'chrome-devtools start' to update and restart the daemon.`,
+            formatDaemonVersionMismatchWarning(data.version, VERSION),
           );
         }
       } else {

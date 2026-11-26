@@ -79,6 +79,7 @@ import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import {stableIdSymbol, type WithSymbolId} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import {getFilterableResourceType} from './utils/resourceType.js';
+import {formatMissingPeerDependencyError} from './utils/scriptName.js';
 import {truncateText} from './utils/text.js';
 import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
@@ -1027,10 +1028,7 @@ export class McpResponse implements Response {
         compactEncode = await getToonEncode();
       } catch {
         throw new Error(
-          'The `@toon-format/toon` package is required to use --experimentalDataFormat=toon. ' +
-            'Make sure the peer dependency is installed:\n' +
-            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalDataFormat=toon\n' +
-            '- For npm: npm install @toon-format/toon (add -g if installed globally)',
+          formatMissingPeerDependencyError('toon', '@toon-format/toon'),
         );
       }
     } else if (dataFormat === 'gcf') {
@@ -1038,10 +1036,7 @@ export class McpResponse implements Response {
         compactEncode = await getGcfEncode();
       } catch {
         throw new Error(
-          'The `@blackwell-systems/gcf` package is required to use --experimentalDataFormat=gcf. ' +
-            'Make sure the peer dependency is installed:\n' +
-            '- For npx: npx --package chrome-devtools-mcp@latest --package @blackwell-systems/gcf@latest chrome-devtools-mcp --experimentalDataFormat=gcf\n' +
-            '- For npm: npm install @blackwell-systems/gcf (add -g if installed globally)',
+          formatMissingPeerDependencyError('gcf', '@blackwell-systems/gcf'),
         );
       }
     }
