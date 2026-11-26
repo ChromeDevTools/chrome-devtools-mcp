@@ -17,7 +17,7 @@ import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/index.js';
+import {DevTools} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {
@@ -49,6 +49,7 @@ import {
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDiffObject,
+  createMockExtension,
   createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
@@ -295,71 +296,18 @@ describe('McpResponse', () => {
     t.assert.snapshot(stabilizeResponseOutput(content));
   });
 
-  it('scopes snapshots and files while keeping UIDs usable across full-page snapshots', async () => {
-    using tmpDir = createTempDir();
-    const filePath = join(tmpDir.path, 'subtree.txt');
-    await withMcpContext(async (response, context) => {
-      const page = context.getSelectedMcpPage();
-      await page.pptrPage.setContent(html`
-        <button>Outside</button>
-        <div id="component">
-          <button onclick="this.textContent = 'Clicked'">First</button>
-          <button>Second</button>
-          <iframe srcdoc="<button>Inside frame</button>"></iframe>
-        </div>
-      `);
-      response.includeSnapshot();
-      await response.handle(context);
-      assert.ok(page.textSnapshot);
-      const first = [...page.textSnapshot.idToNode.values()].find(
-        node => node.name === 'First',
-      );
-      const outside = [...page.textSnapshot.idToNode.values()].find(
-        node => node.name === 'Outside',
-      );
-      assert.ok(first);
-      assert.ok(outside);
-
-      response.includeSnapshot({selector: '#component'});
-      const scoped = await response.handle(context);
-      const text = getTextContent(scoped.content[0]);
-      assert.match(text, /First/);
-      assert.match(text, /Second/);
-      assert.doesNotMatch(text, /Outside|Inside frame/);
-      assert.doesNotMatch(
-        JSON.stringify(scoped.structuredContent),
-        /Outside|Inside frame/,
-      );
-      assert.strictEqual(page.getAXNodeByUid(first.id)?.name, 'First');
-      await using button = await page.getElementByUid(first.id);
-      await button.click();
-      assert.strictEqual(
-        await button.evaluate(el => el.textContent),
-        'Clicked',
-      );
-
-      response.includeSnapshot({
-        selector: '#component',
-        verbose: true,
-        filePath,
-      });
-      await response.handle(context);
-      const saved = await readFile(filePath, 'utf-8');
-      assert.match(saved, /Clicked/);
-      assert.match(saved, /Second/);
-      assert.doesNotMatch(saved, /Outside|Inside frame/);
-
-      const scopedSnapshot = page.textSnapshot;
-      response.includeSnapshot({selector: '#missing'});
-      await assert.rejects(response.handle(context), /No element matches/);
-      assert.strictEqual(page.textSnapshot, scopedSnapshot);
-
-      response.includeSnapshot();
-      const full = await response.handle(context);
-      assert.match(getTextContent(full.content[0]), /Outside/);
-      assert.match(getTextContent(full.content[0]), /Inside frame/);
-      assert.strictEqual(page.getAXNodeByUid(first.id)?.name, 'Clicked');
-      assert.strictEqual(page.getAXNodeByUid(outside.id)?.name, 'Outside');
+  it('forwards the snapshot selector and verbosity to TextSnapshot.create', async () => {
+    const page = createMockMcpPage();
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.includeSnapshot({selector: '#component', verbose: true});
+    const error = new Error('snapshot failed');
+    const create = sinon.stub(TextSnapshot, 'create').rejects(error);
+    await assert.rejects(response.handle(createMockMcpContext()), error);
+    sinon.assert.calledOnceWithExactly(create, page, {
+      selector: '#component',
+      verbose: true,
+      devtoolsData: undefined,
     });
   });
 
@@ -964,6 +912,76 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reads an attached message from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const message = createMockConsoleMessage({
+      type: 'log',
+      text: 'logged by the service worker',
+    });
+    context.getServiceWorkerConsoleMessageById.returns(message);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachConsoleMessage(2, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleMessageById,
+      'sw-1',
+      2,
+    );
+    sinon.assert.notCalled(page.getConsoleMessageById);
+    assert.ok(
+      getTextContent(content[0]).includes('logged by the service worker'),
+    );
+  });
+
+  it('reads an attached network request from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    context.getServiceWorkerNetworkRequestById.returns(
+      getMockRequest({url: 'https://sw.example/data.json', stableId: 3}),
+    );
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachNetworkRequest(3, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerNetworkRequestById,
+      'sw-1',
+      3,
+    );
+    sinon.assert.notCalled(page.getNetworkRequestById);
+    assert.ok(
+      getTextContent(content[0]).includes('https://sw.example/data.json'),
+    );
+  });
+
+  it('lists network requests from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    context.getServiceWorkerNetworkData.returns([
+      getMockRequest({url: 'https://sw.example/data.json', stableId: 1}),
+    ]);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.setIncludeNetworkRequests(true, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerNetworkData,
+      'sw-1',
+    );
+    sinon.assert.notCalled(page.getNetworkRequests);
+    assert.ok(
+      getTextContent(content[0]).includes('https://sw.example/data.json'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
@@ -1337,48 +1355,69 @@ describe('McpResponse network pagination', () => {
 
 describe('extensions', () => {
   it('lists extensions', async t => {
-    await withMcpContext(async (response, context) => {
-      response.setListExtensions();
-      // Empty state testing
-      const emptyResult = await response.handle(context);
-      const emptyText = getTextContent(emptyResult.content[0]);
-      assert.ok(
-        emptyText.includes('No unpacked extensions found.'),
-        'Should show message for empty extensions',
-      );
+    const context = createMockMcpContext();
+    context.listExtensions.resolves(new Map());
 
-      response.resetResponseLineForTesting();
-      // Testing with extensions
-      context.listExtensions = async () =>
-        await Promise.resolve(
-          new Map<string, Extension>([
-            [
-              'id1',
-              {
-                id: 'id1',
-                name: 'Extension 1',
-                version: '1.0',
-                enabled: true,
-                path: '/path/to/ext1',
-              } as Extension,
-            ],
-            [
-              'id2',
-              {
-                id: 'id2',
-                name: 'Extension 2',
-                version: '2.0',
-                enabled: false,
-                path: '/path/to/ext2',
-              } as Extension,
-            ],
-          ]),
-        );
-      response.setListExtensions();
-      const {content, structuredContent} = await response.handle(context);
+    const emptyResponse = new McpResponse(createMockServerConfig());
+    emptyResponse.setListExtensions();
+    const emptyResult = await emptyResponse.handle(context);
+    const emptyText = getTextContent(emptyResult.content[0]);
+    assert.ok(
+      emptyText.includes('No unpacked extensions found.'),
+      'Should show message for empty extensions',
+    );
+    assert.deepStrictEqual(
+      JSON.parse(JSON.stringify(emptyResult.structuredContent)),
+      {extensions: []},
+    );
 
-      t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    context.listExtensions.resolves(
+      new Map([
+        [
+          'id1',
+          createMockExtension({
+            id: 'id1',
+            name: 'Extension 1',
+            version: '1.0',
+            enabled: true,
+            path: '/path/to/ext1',
+          }),
+        ],
+        [
+          'id2',
+          createMockExtension({
+            id: 'id2',
+            name: 'Extension 2',
+            version: '2.0',
+            enabled: false,
+            path: '/path/to/ext2',
+          }),
+        ],
+      ]),
+    );
+    const response = new McpResponse(createMockServerConfig());
+    response.setListExtensions();
+    const {content, structuredContent} = await response.handle(context);
+
+    t.assert.snapshot(getTextContent(content[0]));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(structuredContent)), {
+      extensions: [
+        {
+          id: 'id1',
+          name: 'Extension 1',
+          version: '1.0',
+          enabled: true,
+          path: '/path/to/ext1',
+        },
+        {
+          id: 'id2',
+          name: 'Extension 2',
+          version: '2.0',
+          enabled: false,
+          path: '/path/to/ext2',
+        },
+      ],
     });
   });
 });
@@ -1808,15 +1847,75 @@ describe('webmcp', () => {
           ),
         ),
       });
-      response.setIncludeCssStyles(mockStyles, {
-        uid: '1_1',
-        pageSize: 2,
-        pageIdx: 0,
-      });
+      response.setIncludeCssStyles(
+        {matchedStyles: mockStyles},
+        {
+          uid: '1_1',
+          pageSize: 2,
+          pageIdx: 0,
+        },
+      );
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-2 of 5'));
     });
+  });
+
+  it('includes computed styles only on the first page of css styles', async () => {
+    const context = createMockMcpContext();
+    const mockStyles = createMockCSSMatchedStyles({
+      node: 'button#btn',
+      nodeStyles: Array.from({length: 4}, (_, idx) =>
+        createMockCSSStyleDeclaration(
+          [createMockCSSProperty('color', `color-${idx}`)],
+          {rule: createMockCSSStyleRule(`.rule-${idx}`)},
+        ),
+      ),
+    });
+    const computedStyles = new Map([
+      ['color', 'rgb(0, 0, 0)'],
+      ['display', 'inline-block'],
+      ['height', '32px'],
+      ['width', '80px'],
+    ]);
+    const styles = {matchedStyles: mockStyles, computedStyles};
+
+    const pageZeroResponse = new McpResponse(createMockServerConfig());
+    pageZeroResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 0,
+    });
+    const pageZeroResult = await pageZeroResponse.handle(context);
+    const pageZeroText = getTextContent(pageZeroResult.content[0]);
+    assert.ok(pageZeroText.includes('Showing 1-2 of 5 (Page 1 of 3).'));
+    assert.ok(pageZeroText.includes('Computed styles:'));
+    assert.ok(pageZeroText.includes('.rule-0'));
+    assert.ok(!pageZeroText.includes('.rule-1'));
+
+    const pageOneResponse = new McpResponse(createMockServerConfig());
+    pageOneResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 1,
+    });
+    const pageOneResult = await pageOneResponse.handle(context);
+    const pageOneText = getTextContent(pageOneResult.content[0]);
+    assert.ok(pageOneText.includes('Showing 3-4 of 5 (Page 2 of 3).'));
+    assert.ok(!pageOneText.includes('Computed styles:'));
+    assert.ok(pageOneText.includes('.rule-1'));
+    assert.ok(pageOneText.includes('.rule-2'));
+
+    const fallbackResponse = new McpResponse(createMockServerConfig());
+    fallbackResponse.setIncludeCssStyles(styles, {
+      uid: '1_1',
+      pageSize: 2,
+      pageIdx: 99,
+    });
+    const fallbackResult = await fallbackResponse.handle(context);
+    assert.ok(
+      getTextContent(fallbackResult.content[0]).includes('Computed styles:'),
+    );
   });
 });
 

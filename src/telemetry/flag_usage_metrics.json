@@ -498,5 +498,17 @@
   {
     "name": "category_network_mocks",
     "flagType": "boolean"
+  },
+  {
+    "name": "background_new_pages_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "background_new_pages",
+    "flagType": "boolean"
+  },
+  {
+    "name": "idle_timeout_present",
+    "flagType": "boolean"
   }
 ]

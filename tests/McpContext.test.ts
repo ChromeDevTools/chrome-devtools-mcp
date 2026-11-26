@@ -14,7 +14,7 @@ import {pathToFileURL} from 'node:url';
 import sinon from 'sinon';
 
 import {UncaughtError} from '../src/collectors/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from '../src/collectors/ServiceWorkerCollector.js';
+import {ExtensionItemStore} from '../src/collectors/ServiceWorkerCollector.js';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
@@ -28,7 +28,7 @@ import {
   ScreenRecorder,
   type Target,
   TargetType,
-} from '../src/third_party/index.js';
+} from '../src/third_party/browser.js';
 import {
   parseRawTraceBuffer,
   type TraceResult,
@@ -39,10 +39,12 @@ import {stableIdSymbol} from '../src/utils/id.js';
 
 import type {ServerConfig} from '../src/config/ServerConfig.js';
 import {
+  createMockHTTPRequest,
   createMockMcpWorker,
   createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
+  createMockWebWorker,
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks, TestServer} from './server.js';
@@ -159,7 +161,7 @@ describe('McpContext', () => {
         ),
       ];
       const getData = sinon
-        .stub(ServiceWorkerConsoleCollector.prototype, 'getData')
+        .stub(ExtensionItemStore.prototype, 'getData')
         .returns(messages);
 
       const result = context.getServiceWorkerConsoleData('sw-3');
@@ -191,14 +193,13 @@ describe('McpContext', () => {
         getWorkerById
           .withArgs('shw-2')
           .returns(createMockMcpWorker({id: 'shw-2', type: 'shared_worker'}));
-        const getData = sinon.stub(
-          ServiceWorkerConsoleCollector.prototype,
-          'getData',
-        );
+        const getData = sinon.stub(ExtensionItemStore.prototype, 'getData');
 
         assert.throws(
           () => context.getServiceWorkerConsoleData(serviceWorkerId),
-          /Service worker not found\./,
+          new RegExp(
+            `Service worker ${serviceWorkerId} not found\\. Call list_pages to get the current sw-N IDs\\.`,
+          ),
         );
 
         sinon.assert.calledOnceWithExactly(getWorkerById, serviceWorkerId);
@@ -206,6 +207,91 @@ describe('McpContext', () => {
         context.dispose();
       });
     }
+  });
+
+  describe('getServiceWorkerConsoleMessageById', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      const worker = createMockMcpWorker({
+        id: 'sw-3',
+        url: 'chrome-extension://extension-id/background.js',
+      });
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(worker);
+      const message = Object.assign(
+        new UncaughtError(
+          {
+            exceptionId: 1,
+            text: 'Service worker error',
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          'extension-id',
+        ),
+        {[stableIdSymbol]: 2},
+      );
+      const getById = sinon
+        .stub(ExtensionItemStore.prototype, 'getById')
+        .returns(message);
+
+      const result = context.getServiceWorkerConsoleMessageById('sw-3', 2);
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getById, 'extension-id', 2);
+      assert.strictEqual(result, message);
+      context.dispose();
+    });
+  });
+
+  describe('service worker network data', () => {
+    it('returns requests emitted by the service worker', async () => {
+      const worker = createMockWebWorker();
+      const target = createMockPuppeteerTarget({
+        url: 'chrome-extension://extension-id/background.js',
+        type: TargetType.SERVICE_WORKER,
+      });
+      target.worker.resolves(worker);
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([target]);
+      const context = await createConnectedMcpContext(
+        browser,
+        {
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
+        },
+        Locator,
+      );
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const [serviceWorker] = context.getWorkers();
+      assert.ok(serviceWorker);
+      const request = createMockHTTPRequest();
+
+      worker.emit('request', request);
+
+      assert.deepStrictEqual(
+        context.getServiceWorkerNetworkData(serviceWorker.id),
+        [request],
+      );
+      assert.strictEqual(
+        context.getServiceWorkerNetworkRequestById(serviceWorker.id, 1),
+        request,
+      );
+      context.dispose();
+    });
   });
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
@@ -851,12 +937,38 @@ describe('McpContext', () => {
     });
 
     it('returns one page task queue per page id', async () => {
-      const context = createLazyContext(async () => createBrowser());
-      const queue = context.pageTaskQueue(1);
-      assert.strictEqual(context.pageTaskQueue(1), queue);
-      assert.notStrictEqual(context.pageTaskQueue(2), queue);
+      const browser = createBrowser();
+      browser.targets.returns([
+        createMockPuppeteerTarget(),
+        createMockPuppeteerTarget(),
+      ]);
+      sinon.stub(McpPage.prototype, 'init').resolves();
+      const context = createLazyContext(async () => browser);
+      await context.ensureBrowser();
+      const [first, second] = context.getPages();
+      const queue = context.pageTaskQueue(first.id);
+      assert.strictEqual(context.pageTaskQueue(first.id), queue);
+      assert.notStrictEqual(context.pageTaskQueue(second.id), queue);
       assert.strictEqual(queue.parent, context.taskQueue);
       context.dispose();
+    });
+
+    it('returns the context task queue for a page id without a page', async () => {
+      const browser = createBrowser();
+      browser.targets.returns([createMockPuppeteerTarget()]);
+      sinon.stub(McpPage.prototype, 'init').resolves();
+      const context = createLazyContext(async () => browser);
+      assert.strictEqual(context.pageTaskQueue(1), context.taskQueue);
+
+      await context.ensureBrowser();
+      const page = context.getSelectedMcpPage();
+      assert.strictEqual(
+        context.pageTaskQueue(page.id + 1000),
+        context.taskQueue,
+      );
+
+      context.dispose();
+      assert.strictEqual(context.pageTaskQueue(page.id), context.taskQueue);
     });
 
     it('disposes the page task queue with the page', async () => {
@@ -2060,6 +2172,71 @@ describe('McpContext', () => {
       context.releaseDevToolsComments();
 
       sinon.assert.calledOnceWithExactly(disposeCommentBridgeSpy);
+    });
+  });
+
+  describe('onBrowserClosed', () => {
+    it('disposes browser state and surfaces a reconnect notice on the next connection', async () => {
+      const browser1 = createMockPuppeteerBrowser();
+      browser1.targets.returns([createPageTarget().target]);
+      const browser2 = createMockPuppeteerBrowser();
+      browser2.targets.returns([createPageTarget().target]);
+      const getBrowser = sinon
+        .stub<[], Promise<Browser>>()
+        .onFirstCall()
+        .resolves(browser1)
+        .onSecondCall()
+        .resolves(browser2);
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config: createMockServerConfig(),
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      await context.ensureBrowser();
+      assert.strictEqual(context.consumeReconnectNotice(), false);
+      const [firstPage] = context.getPages();
+      assert.ok(firstPage);
+      const disposeSpy = sinon.spy(firstPage, 'dispose');
+
+      context.onBrowserClosed();
+
+      sinon.assert.calledOnceWithExactly(disposeSpy);
+      assert.deepStrictEqual(context.getPages(), []);
+      assert.throws(() => context.browser, /Not connected to a browser/);
+
+      await context.ensureBrowser();
+      assert.strictEqual(context.consumeReconnectNotice(), true);
+      context.dispose();
+    });
+
+    it('is a no-op before a browser connects', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([createPageTarget().target]);
+      const getBrowser = sinon.stub<[], Promise<Browser>>().resolves(browser);
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config: createMockServerConfig(),
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      context.onBrowserClosed();
+      await context.ensureBrowser();
+
+      assert.strictEqual(context.consumeReconnectNotice(), false);
+      context.dispose();
     });
   });
 

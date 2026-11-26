@@ -88,6 +88,76 @@ describe('ServerConfig', () => {
     });
   });
 
+  describe('idleTimeout', () => {
+    it('accepts idleTimeout for the MCP server', () => {
+      assert.strictEqual(
+        parseConfig(['--idleTimeout=30m']).resolved.idleTimeout,
+        '30m',
+      );
+    });
+
+    it('accepts idleTimeout via the CLI', () => {
+      const config = parseConfig(['--viaCli', '--idleTimeout=30m']);
+      assert.strictEqual(config.resolved.idleTimeout, '30m');
+    });
+
+    it('leaves idleTimeout unset by default', () => {
+      assert.strictEqual(parseConfig().resolved.idleTimeout, undefined);
+      assert.strictEqual(
+        parseConfig(['--viaCli']).resolved.idleTimeout,
+        undefined,
+      );
+    });
+
+    it('accepts idleTimeout in a config file', () => {
+      assert.strictEqual(
+        ConfigParser.parseConfigFile(
+          'config.json',
+          JSON.stringify({idleTimeout: '2h'}),
+        ).idleTimeout,
+        '2h',
+      );
+    });
+
+    for (const value of [30, ['30s']]) {
+      it(`rejects non-string idleTimeout ${JSON.stringify(value)} in a config file`, () => {
+        assert.throws(
+          () =>
+            ConfigParser.parseConfigFile(
+              'config.json',
+              JSON.stringify({idleTimeout: value}),
+            ),
+          /Invalid idleTimeout .*\. Expected a positive integer followed by s, m or h/,
+        );
+      });
+    }
+
+    for (const [value, message] of [
+      ['30', 'Expected a positive integer followed by s, m or h'],
+      ['0s', 'Expected a positive integer followed by s, m or h'],
+      ['597h', 'Expected at most 2147483647 ms'],
+    ]) {
+      it(`rejects idleTimeout ${value}`, () => {
+        assert.throws(
+          () => parseConfig([`--idleTimeout=${value}`]),
+          new RegExp(`Invalid idleTimeout "${value}"\\. ${message}`),
+        );
+      });
+    }
+
+    it('treats idleTimeout as restart-required', () => {
+      const previous = parseConfig();
+      const next = parseConfig(['--idleTimeout=30m']);
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(next), [
+        'idleTimeout',
+      ]);
+      assert.strictEqual(
+        previous.mergeReloadable(next).resolved.idleTimeout,
+        undefined,
+      );
+    });
+  });
+
   describe('applyDefaults', () => {
     it('keeps explicit values and fills in defaults', () => {
       const args = ServerConfig.applyDefaults({headless: true}, {env: {}});
@@ -127,6 +197,11 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.isolated, true);
       assert.strictEqual(args.categoryExtensions, true);
+      assert.strictEqual(args.categoryNetworkMocks, true);
+      assert.strictEqual(args.categoryPwa, undefined);
+      assert.strictEqual(args.categoryWebauthn, true);
+      assert.strictEqual(args.categoryExperimentalWebmcp, true);
+      assert.strictEqual(args.categoryExperimentalThirdParty, true);
       assert.strictEqual(args.allowUnrestrictedPaths, true);
       assert.strictEqual(args.filesystemRoot, undefined);
     });
@@ -143,7 +218,7 @@ describe('ServerConfig', () => {
       assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
 
-    it('does not enable isolated or extensions for viaCli with browserUrl', () => {
+    it('does not enable isolated for viaCli with browserUrl but enables all categories except PWA', () => {
       const args = ServerConfig.applyDefaults(
         {
           viaCli: true,
@@ -152,7 +227,12 @@ describe('ServerConfig', () => {
         {env: {}},
       );
       assert.strictEqual(args.isolated, false);
-      assert.strictEqual(args.categoryExtensions, undefined);
+      assert.strictEqual(args.categoryExtensions, true);
+      assert.strictEqual(args.categoryPwa, undefined);
+      assert.strictEqual(args.categoryNetworkMocks, true);
+      assert.strictEqual(args.categoryWebauthn, true);
+      assert.strictEqual(args.categoryExperimentalWebmcp, true);
+      assert.strictEqual(args.categoryExperimentalThirdParty, true);
     });
 
     it('locks slim=false and pageIdRouting=true for viaCli even when set in explicitArgs', () => {
@@ -449,8 +529,6 @@ describe('ServerConfig', () => {
         '--browserUrl=http://127.0.0.1:9222',
       ]);
 
-      assert.strictEqual(previous.resolved.categoryExtensions, true);
-      assert.strictEqual(next.resolved.categoryExtensions, undefined);
       assert.strictEqual(previous.resolved.isolated, true);
       assert.strictEqual(next.resolved.isolated, false);
       assert.strictEqual(previous.resolved.channel, 'stable');

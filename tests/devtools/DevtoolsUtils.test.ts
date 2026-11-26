@@ -13,7 +13,7 @@ import {
   createTargetUniverse,
   SymbolizedError,
 } from '../../src/devtools/DevtoolsUtils.js';
-import {DevTools, type Protocol} from '../../src/third_party/index.js';
+import {DevTools, type Protocol} from '../../src/third_party/browser.js';
 import {createMockCDPSession} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
@@ -209,6 +209,65 @@ describe('SymbolizedError', () => {
   }
 
   describe('fromDetails', () => {
+    it('builds a raw stack trace when there is no DevTools universe', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          stackTrace: {
+            callFrames: [
+              {
+                functionName: 'throwIt',
+                scriptId: '1',
+                url: 'chrome-extension://ext/background.js',
+                lineNumber: 4,
+                columnNumber: 10,
+              },
+            ],
+            parent: {
+              description: 'setTimeout',
+              callFrames: [
+                {
+                  functionName: '',
+                  scriptId: '1',
+                  url: 'chrome-extension://ext/background.js',
+                  lineNumber: 1,
+                  columnNumber: 2,
+                },
+              ],
+            },
+          },
+        }),
+        targetId: 'ext',
+        session: createMockCDPSession(),
+        includeStackAndCause: true,
+      });
+
+      assert.deepStrictEqual(error.stackTrace, {
+        syncFragment: {
+          frames: [
+            {
+              url: 'chrome-extension://ext/background.js',
+              name: 'throwIt',
+              line: 4,
+              column: 10,
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                url: 'chrome-extension://ext/background.js',
+                name: undefined,
+                line: 1,
+                column: 2,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
     it('extracts the message from the exception description', async () => {
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({

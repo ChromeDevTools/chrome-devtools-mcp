@@ -9,7 +9,7 @@ import type {
   Protocol,
   SerializedAXNode,
   ElementHandle,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
@@ -24,6 +24,48 @@ const ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS = 10_000;
  */
 function isLayoutOnlyNode(node: SerializedAXNode): boolean {
   return node.role === 'InlineTextBox';
+}
+
+async function findDescendantNodes(
+  page: McpPage,
+  backendNodeId?: number,
+): Promise<Set<number>> {
+  const descendantIds = new Set<number>();
+  if (!backendNodeId) {
+    return descendantIds;
+  }
+  try {
+    // @ts-expect-error internal API
+    const client = page.pptrPage._client();
+    if (client) {
+      const {node}: {node: Protocol.DOM.Node} = await client.send(
+        'DOM.describeNode',
+        {
+          backendNodeId,
+          depth: -1,
+          pierce: true,
+        },
+      );
+      const collect = (node: Protocol.DOM.Node): void => {
+        if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
+          descendantIds.add(node.backendNodeId);
+        }
+        for (const child of node.children ?? []) {
+          collect(child);
+        }
+        for (const shadow of node.shadowRoots ?? []) {
+          collect(shadow);
+        }
+      };
+      collect(node);
+    }
+  } catch (e) {
+    logger?.(
+      `Failed to collect descendants for backend node ${backendNodeId}`,
+      e,
+    );
+  }
+  return descendantIds;
 }
 
 export class TextSnapshot {
@@ -74,9 +116,8 @@ export class TextSnapshot {
     }
     const rootNode = await withTimeout(
       page.pptrPage.accessibility.snapshot({
-        ...(root ? {root} : {}),
-        includeIframes: !root,
-        interestingOnly: !root && !verbose,
+        includeIframes: true,
+        interestingOnly: !verbose,
       }),
       {
         timeout: ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS,
@@ -84,11 +125,7 @@ export class TextSnapshot {
       },
     );
     if (!rootNode) {
-      throw new Error(
-        options.selector
-          ? `No accessibility node for selector "${options.selector}".`
-          : 'Failed to create accessibility snapshot',
-      );
+      throw new Error('Failed to create accessibility snapshot');
     }
 
     const {uniqueBackendNodeIdToMcpId} = page;
@@ -156,11 +193,53 @@ export class TextSnapshot {
       rootNodeWithId,
       seenBackendNodeIds,
       options.extraHandles ?? [],
-      Boolean(root),
     );
 
+    let outputRoot = rootNodeWithId;
+    if (root) {
+      const backendNodeId = await root.backendNodeId();
+      const selected = idToNode
+        .values()
+        .find(
+          node =>
+            node.backendNodeId === backendNodeId &&
+            (node.loaderId === rootNodeWithId.loaderId ||
+              node.loaderId === undefined),
+        );
+      if (selected) {
+        outputRoot = selected;
+      } else {
+        // Compact trees can promote several children past an uninteresting container.
+        const descendants = await findDescendantNodes(page, backendNodeId);
+        const children: TextSnapshotNode[] = [];
+        const collect = (node: TextSnapshotNode): void => {
+          if (node !== rootNodeWithId && node.role === 'RootWebArea') {
+            return;
+          }
+          if (node.backendNodeId && descendants.has(node.backendNodeId)) {
+            children.push(node);
+            return;
+          }
+          for (const child of node.children) {
+            collect(child);
+          }
+        };
+        collect(rootNodeWithId);
+        if (!children.length) {
+          throw new Error(
+            `No accessibility nodes for selector "${options.selector}".`,
+          );
+        }
+        outputRoot = {
+          id: '',
+          role: 'generic',
+          children,
+          elementHandle: async () => null,
+        };
+      }
+    }
     const snapshot = new TextSnapshot({
-      root: rootNodeWithId,
+      root: outputRoot,
       snapshotId: String(snapshotId),
       idToNode,
       hasSelectedElement: false,
@@ -176,12 +255,10 @@ export class TextSnapshot {
         !root || Boolean(snapshot.selectedElementUid);
     }
 
-    // Only a full-page snapshot can establish that an old node is gone.
-    if (!root) {
-      for (const key of uniqueBackendNodeIdToMcpId.keys()) {
-        if (!seenUniqueIds.has(key)) {
-          uniqueBackendNodeIdToMcpId.delete(key);
-        }
+    // Clean up unique IDs that we did not see anymore.
+    for (const key of uniqueBackendNodeIdToMcpId.keys()) {
+      if (!seenUniqueIds.has(key)) {
+        uniqueBackendNodeIdToMcpId.delete(key);
       }
     }
 
@@ -220,7 +297,6 @@ export class TextSnapshot {
     rootNodeWithId: TextSnapshotNode,
     seenBackendNodeIds: Set<number>,
     extraHandles: ElementHandle[],
-    scoped: boolean,
   ): Promise<void> {
     const {uniqueBackendNodeIdToMcpId} = page;
 
@@ -254,7 +330,8 @@ export class TextSnapshot {
         id,
         backendNodeId,
         children: [],
-        elementHandle: async () => handle,
+        // Callers dispose their handle, so keep the page-owned one alive.
+        elementHandle: () => handle.evaluateHandle(element => element),
       };
       return extraNode;
     };
@@ -289,46 +366,6 @@ export class TextSnapshot {
         ancestorHandle = nextHandle;
       }
       return null;
-    };
-
-    const findDescendantNodes = async (
-      backendNodeId?: number,
-    ): Promise<Set<number>> => {
-      const descendantIds = new Set<number>();
-      if (!backendNodeId) {
-        return descendantIds;
-      }
-      try {
-        // @ts-expect-error internal API
-        const client = page.pptrPage._client();
-        if (client) {
-          const {node}: {node: Protocol.DOM.Node} = await client.send(
-            'DOM.describeNode',
-            {
-              backendNodeId,
-              depth: -1,
-              pierce: true,
-            },
-          );
-          const collect = (node: Protocol.DOM.Node): void => {
-            if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
-              descendantIds.add(node.backendNodeId);
-            }
-            if (node.children) {
-              for (const child of node.children) {
-                collect(child);
-              }
-            }
-          };
-          collect(node);
-        }
-      } catch (e) {
-        logger?.(
-          `Failed to collect descendants for backend node ${backendNodeId}`,
-          e,
-        );
-      }
-      return descendantIds;
     };
 
     const moveChildNodes = (
@@ -368,18 +405,16 @@ export class TextSnapshot {
     }> = [];
 
     for (const handle of page.extraHandles) {
-      const ancestor = scoped ? await findAncestorNode(handle) : null;
-      if (scoped && !ancestor) {
-        continue;
-      }
       const extraNode = await createExtraNode(handle);
       if (!extraNode) {
         continue;
       }
       idToNode.set(extraNode.id, extraNode);
-      const attachTarget =
-        ancestor || (await findAncestorNode(handle)) || rootNodeWithId;
-      const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
+      const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
+      const descendantIds = await findDescendantNodes(
+        page,
+        extraNode.backendNodeId,
+      );
       reorgInfo.push({extraNode, attachTarget, descendantIds});
     }
 

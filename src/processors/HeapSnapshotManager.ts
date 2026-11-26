@@ -7,7 +7,8 @@
 import fsSync from 'node:fs';
 import path from 'node:path';
 
-import {DevTools} from '../third_party/index.js';
+import type {DevTools} from '../third_party/browser.js';
+import {loadBrowser} from '../third_party/index.js';
 import {createIdGenerator} from '../utils/id.js';
 import type {TaskQueue, TaskRunner} from '../utils/TaskRunner.js';
 
@@ -209,6 +210,7 @@ export class HeapSnapshotManager {
   ): Promise<HeapSnapshotAggregateData> {
     using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
+    const {DevTools} = await loadBrowser();
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot.proxy, filter, filterName, objectId);
@@ -282,6 +284,7 @@ export class HeapSnapshotManager {
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
+    const {DevTools} = await loadBrowser();
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot.proxy, filter, filterName, objectId);
@@ -479,16 +482,21 @@ export class HeapSnapshotManager {
     absolutePath: string,
     uid: number,
   ): Promise<HeapSnapshot> {
-    const workerProxy =
-      new DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy(
-        () => {
-          /* noop */
-        },
-        DevTools.Common.Console.Console.instance(),
-        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
-      );
-
+    let workerProxy:
+      | DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy
+      | undefined;
     try {
+      const {DevTools} = await loadBrowser();
+      workerProxy =
+        new DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy(
+          () => {
+            /* noop */
+          },
+          DevTools.Common.Console.Console.instance(),
+          import.meta
+            .resolve('../third_party/devtools-heap-snapshot-worker.js'),
+        );
+
       const {promise: snapshotPromise, resolve: resolveSnapshot} =
         Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
 
@@ -520,7 +528,7 @@ export class HeapSnapshotManager {
       // avoid leaking it on a failed load (e.g. a missing or invalid
       // .heapsnapshot path).
       this.#snapshots.delete(absolutePath);
-      workerProxy.dispose();
+      workerProxy?.dispose();
       throw error;
     }
   }
@@ -535,9 +543,30 @@ export class HeapSnapshotManager {
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const compiledOptions = {...options};
+    const parameters: Array<'className' | 'propertyName'> = [
+      'className',
+      'propertyName',
+    ];
+    for (const parameter of parameters) {
+      const pattern = options[parameter];
+      if (!pattern || pattern instanceof RegExp) {
+        continue;
+      }
+      try {
+        compiledOptions[parameter] = new RegExp(pattern, 'i');
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw new Error(
+            `Invalid ${parameter} regular expression: ${error.message}. Escape special characters to match them literally.`,
+          );
+        }
+        throw error;
+      }
+    }
     using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
-    const provider = snapshot.proxy.queryObjects(options);
+    const provider = snapshot.proxy.queryObjects(compiledOptions);
     return await provider.serializeItemsRange(0, Infinity);
   }
 

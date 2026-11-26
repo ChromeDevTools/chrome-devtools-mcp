@@ -18,6 +18,7 @@ import {ConfigParser} from '../src/config/ConfigParser.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
+import {SlimMcpResponse} from '../src/SlimMcpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {FilePersistence} from '../src/telemetry/persistence.js';
 import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
@@ -1263,7 +1264,7 @@ describe('ToolHandler', () => {
     ClearcutLogger.initialize({
       persistence: mockPersistence,
       appVersion: '1.0.0',
-      watchdogClient: mockWatchdogClient,
+      createWatchdogClient: () => mockWatchdogClient,
     });
     await Promise.resolve();
 
@@ -1612,6 +1613,67 @@ describe('ToolHandler', () => {
       ]);
     });
 
+    function createResponseRecordingHandler(slim: boolean) {
+      const config = parseConfig(slim ? ['--slim'] : []);
+      const toolHandler = sinon.stub().resolves();
+      const tool = defineBrowserlessTool(() => ({
+        name: 'response_tool',
+        description: 'A tool that records the response it gets',
+        annotations: {
+          category: ToolCategory.MEMORY,
+          readOnlyHint: true,
+          conditions: slim ? ['slim'] : [],
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: toolHandler,
+      }))(config.resolved);
+      const context = createMockMcpContext();
+      const handler = new ToolHandler(
+        tool,
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      return {handler, toolHandler, context};
+    }
+
+    it('creates a SlimMcpResponse for slim tools', async () => {
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(true);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match.instanceOf(SlimMcpResponse),
+        context,
+      );
+    });
+
+    it('creates an McpResponse that is not a SlimMcpResponse for other tools', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(false);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match(
+          response =>
+            response instanceof McpResponse &&
+            !(response instanceof SlimMcpResponse),
+        ),
+        context,
+      );
+    });
+
     it('enables slim tools with --slim', () => {
       assert.strictEqual(createHandler('navigate', ['--slim']).disabled, false);
     });
@@ -1707,6 +1769,54 @@ describe('ToolHandler', () => {
         path.resolve('/canonical/list2.txt'),
         'https://example.com/remote.txt',
       ],
+    });
+  });
+
+  it('validates a POSIX file URL argument without a drive letter', async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const tool: ToolDefinition = {
+      name: 'file_tool',
+      description: 'A tool requiring file validation',
+      annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: true,
+      },
+      schema: {
+        filePath: zod.string(),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePath: true,
+      },
+      handler: async request => {
+        receivedParams = request.params;
+      },
+    };
+
+    const mockContext = createMockMcpContext();
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
+    mockContext.validatePath.callsFake(async p => path.resolve(p ?? ''));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePath: 'file:///home/user/project/shot.png',
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.calledOnceWithExactly(
+      mockContext.validatePath,
+      '/home/user/project/shot.png',
+    );
+    assert.deepStrictEqual(receivedParams, {
+      filePath: pathToFileURL(path.resolve('/home/user/project/shot.png')).href,
     });
   });
 

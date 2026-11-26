@@ -330,7 +330,8 @@
       },
       {
         "name": "service_worker_id_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "include_stack_traces",
@@ -1287,6 +1288,10 @@
       },
       {
         "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "computed_properties_count",
         "argType": "number"
       }
     ]

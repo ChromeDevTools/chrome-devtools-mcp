@@ -10,13 +10,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
-import {
-  Mutex,
-  puppeteer,
-  type Browser,
-  type ChromeReleaseChannel,
-  type LaunchOptions,
-} from './third_party/index.js';
+import type {
+  Browser,
+  ChromeReleaseChannel,
+  ConnectOptions,
+  LaunchOptions,
+  PuppeteerNode,
+} from './third_party/browser.js';
+import {loadBrowser, Mutex} from './third_party/index.js';
+import {devToolsActivePortPermissionError} from './utils/errorHandling.js';
 import {
   logger,
   puppeteerLogger,
@@ -34,6 +36,16 @@ export interface BrowserManagerOptions {
  * reference (`!==`) — see BrowserManager#abandonPendingAttempt().
  */
 class BrowserAttempt {}
+
+/**
+ * Loads Puppeteer and stops it from following symlinks when it reads or
+ * writes files, before each launch or connect.
+ */
+async function loadPuppeteer(): Promise<PuppeteerNode> {
+  const {puppeteer} = await loadBrowser();
+  puppeteer.setFollowSymlinks(false);
+  return puppeteer;
+}
 
 export class BrowserManager {
   #browser?: Browser;
@@ -295,6 +307,7 @@ export class BrowserManager {
       BrowserManager.detectDisplay();
     }
 
+    const puppeteer = await loadPuppeteer();
     let browser: Browser | undefined;
     try {
       browser = await puppeteer.launch({
@@ -385,7 +398,7 @@ export class BrowserManager {
     // Important: only pass channel, if autoConnect is true.
     const channel = isAutoConnect ? this.#config.resolved.channel : undefined;
 
-    const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
+    const connectOptions: ConnectOptions = {
       targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
       defaultViewport: null,
       handleDevToolsAsPage: true,
@@ -436,6 +449,13 @@ export class BrowserManager {
           const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
           connectOptions.browserWSEndpoint = browserWSEndpoint;
         } catch (error) {
+          const permissionError = devToolsActivePortPermissionError(
+            error,
+            userDataDir,
+          );
+          if (permissionError) {
+            throw permissionError;
+          }
           throw new Error(
             `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
             {
@@ -460,6 +480,7 @@ export class BrowserManager {
       'Connecting Puppeteer to ',
       JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
     );
+    const puppeteer = await loadPuppeteer();
     try {
       const connected = await puppeteer.connect(connectOptions);
       logger?.('Connected Puppeteer');
@@ -468,6 +489,10 @@ export class BrowserManager {
       connected.once('disconnected', () => this.#evictIfCurrent(connected));
       return connected;
     } catch (err) {
+      const permissionError = devToolsActivePortPermissionError(err);
+      if (permissionError) {
+        throw permissionError;
+      }
       throw new Error(
         `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
         {

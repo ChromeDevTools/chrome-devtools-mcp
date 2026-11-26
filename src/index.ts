@@ -17,7 +17,7 @@ import {
 } from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import type {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
@@ -29,18 +29,17 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
+import {parseDurationMs} from './utils/duration.js';
 import {getErrorMessage} from './utils/errorHandling.js';
+import {IdleTimer} from './utils/IdleTimer.js';
 import {logger} from './utils/logger.js';
 import {TaskRunner} from './utils/TaskRunner.js';
 import {VERSION} from './version.js';
-
-puppeteer.setFollowSymlinks(false);
 
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
@@ -66,7 +65,9 @@ export class McpServer {
   readonly server: SdkMcpServer;
   #config: ServerConfig;
   #browserManager: BrowserManager;
-  #context: McpContext;
+  #context?: McpContext;
+  #contextPromise?: Promise<McpContext>;
+  #closed = false;
   /** Runs every tool call and config reload. */
   #taskRunner = new TaskRunner();
   #heapSnapshotManager = new HeapSnapshotManager(this.#taskRunner);
@@ -84,12 +85,22 @@ export class McpServer {
    */
   #initialRoots?: Promise<void>;
   #configWatcher?: ConfigWatcher;
+  #idleTimer?: IdleTimer;
+  #idleCloseAbortController?: AbortController;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
     this.#config = config;
     this.#browserManager = options.browserManager;
     const serverArgs = this.#config.resolved;
+    if (serverArgs.idleTimeout !== undefined) {
+      this.#idleTimer = new IdleTimer({
+        timeoutMs: parseDurationMs('idleTimeout', serverArgs.idleTimeout),
+        onIdle: () => {
+          void this.#closeIdleBrowser();
+        },
+      });
+    }
 
     if (serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -114,14 +125,6 @@ export class McpServer {
         debouncedNotificationMethods: ['notifications/tools/list_changed'],
       },
     );
-
-    this.#context = McpContext.create(logger, {
-      config: this.#config,
-      heapSnapshotManager: this.#heapSnapshotManager,
-      taskRunner: this.#taskRunner,
-      getBrowser: () => this.#browserManager.ensureBrowser(),
-    });
-    this.#context.setRoots(this.#combinedRoots());
 
     this.server.server.setRequestHandler('logging/setLevel', () => {
       return {};
@@ -178,7 +181,7 @@ export class McpServer {
         isError: true,
       };
     }
-    return await toolHandler.handle(args);
+    return await this.#handleToolCall(toolHandler, args);
   }
 
   /**
@@ -227,8 +230,10 @@ export class McpServer {
       logCruxDisclaimer(nextArgs);
     }
 
-    this.#context.setRoots(this.#combinedRoots());
-    await this.#context.onConfigChanged(previousArgs);
+    if (this.#context) {
+      this.#context.setRoots(this.#combinedRoots());
+      await this.#context.onConfigChanged(previousArgs);
+    }
   }
 
   /**
@@ -292,10 +297,13 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
+    this.#closed = true;
+    this.#idleCloseAbortController?.abort();
+    this.#idleTimer?.dispose();
     this.#configWatcher?.dispose();
     this.#configWatcher = undefined;
     try {
-      this.#context.dispose();
+      this.#context?.dispose();
     } catch (err) {
       logger?.('Failed to dispose context', err);
     }
@@ -321,17 +329,16 @@ export class McpServer {
     options: McpServerOptions,
   ): Promise<McpServer> {
     const server = new McpServer(config, options);
-    await server.#init();
+    server.#init();
     return server;
   }
 
-  async #init(): Promise<void> {
+  #init(): void {
     // Tool definitions take a ParsedArguments snapshot; reload recreates them.
     for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
     this.#setToolCallRequestHandler();
-    await loadIssueDescriptions();
   }
 
   #combinedRoots(): Root[] | undefined {
@@ -367,10 +374,47 @@ export class McpServer {
         timeout === undefined ? undefined : {timeout},
       );
       this.#lastClientRoots = result.roots;
-      this.#context.setRoots(this.#combinedRoots());
+      this.#context?.setRoots(this.#combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
+  }
+
+  #ensureContext(): Promise<McpContext> {
+    if (this.#closed) {
+      return Promise.reject(new Error('MCP server is closed'));
+    }
+    if (this.#context) {
+      return Promise.resolve(this.#context);
+    }
+    this.#contextPromise ??= Promise.all([
+      import('./McpContext.js'),
+      loadIssueDescriptions(),
+    ])
+      .then(([mcpContextModule]) => {
+        const context = mcpContextModule.McpContext.create(logger, {
+          config: this.#config,
+          heapSnapshotManager: this.#heapSnapshotManager,
+          taskRunner: this.#taskRunner,
+          getBrowser: () => this.#browserManager.ensureBrowser(),
+        });
+        if (this.#closed) {
+          try {
+            context.dispose();
+          } catch (err) {
+            logger?.('Failed to dispose context', err);
+          }
+          throw new Error('MCP server is closed');
+        }
+        context.setRoots(this.#combinedRoots());
+        this.#context = context;
+        return context;
+      })
+      .catch((err: unknown) => {
+        this.#contextPromise = undefined;
+        throw err;
+      });
+    return this.#contextPromise;
   }
 
   async #getContext(): Promise<McpContext> {
@@ -380,7 +424,53 @@ export class McpServer {
       this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
       await this.#initialRoots;
     }
-    return this.#context;
+    return await this.#ensureContext();
+  }
+
+  #handleToolCall(
+    handler: ToolHandler,
+    args?: Record<string, unknown>,
+    options?: {viaMcp?: boolean; signal?: AbortSignal},
+  ): Promise<CallToolResult> {
+    this.#idleCloseAbortController?.abort();
+    const idleTimer = this.#idleTimer;
+    if (!idleTimer) {
+      return handler.handle(args, options);
+    }
+    return idleTimer.track(() => handler.handle(args, options));
+  }
+
+  async #closeIdleBrowser(): Promise<void> {
+    if (this.#closed || this.#idleTimer?.hasActiveWork) {
+      return;
+    }
+    const controller = new AbortController();
+    this.#idleCloseAbortController = controller;
+    try {
+      using guard = await this.#taskRunner.pause(controller.signal);
+      this.#idleCloseAbortController = undefined;
+      if (
+        this.#closed ||
+        controller.signal.aborted ||
+        this.#idleTimer?.hasActiveWork
+      ) {
+        return;
+      }
+      if (this.#context) {
+        await this.#context.releaseScreencasts('the browser was idle');
+        await this.#context.releasePerformanceTrace('the browser was idle');
+        this.#context.onBrowserClosed();
+      }
+      await this.#browserManager.close();
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        logger?.('Failed to close idle browser', err);
+      }
+    } finally {
+      if (this.#idleCloseAbortController === controller) {
+        this.#idleCloseAbortController = undefined;
+      }
+    }
   }
 
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {
@@ -405,10 +495,14 @@ export class McpServer {
           `Tool ${request.params.name} not found`,
         );
       }
-      const result = await entry.handler.handle(request.params.arguments, {
-        viaMcp: true,
-        signal: ctx.mcpReq.signal,
-      });
+      const result = await this.#handleToolCall(
+        entry.handler,
+        request.params.arguments,
+        {
+          viaMcp: true,
+          signal: ctx.mcpReq.signal,
+        },
+      );
       return this.server.server.projectCallToolResult(result, undefined);
     });
   }
@@ -423,7 +517,7 @@ export class McpServer {
         inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      args => handler.handle(args),
+      args => this.#handleToolCall(handler, args),
     );
 
     if (handler.disabled) {

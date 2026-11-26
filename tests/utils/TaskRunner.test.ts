@@ -204,7 +204,7 @@ describe('TaskRunner', () => {
   });
 
   it('orders by queue, not by task duration', async () => {
-    const clock = sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const runner = new TaskRunner();
       const order: string[] = [];
@@ -347,6 +347,25 @@ describe('TaskRunner', () => {
       assert.strictEqual(waiting.started, true);
       waiting.finish();
       await Promise.all([running.done, waiting.done]);
+    });
+
+    it('unblocks unrelated queues when a waiting pause is aborted', async () => {
+      const {runner, childA, childB} = createTree();
+      const a = start(childA);
+      await settle();
+      const controller = new AbortController();
+      const pause = runner.pause(controller.signal);
+      const b = start(childB);
+      await settle();
+      assert.strictEqual(b.started, false);
+      controller.abort();
+      await assert.rejects(pause, {name: 'AbortError'});
+      await settle();
+      assert.strictEqual(b.started, true);
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+      a.finish();
+      b.finish();
+      await Promise.all([a.done, b.done]);
     });
   });
 

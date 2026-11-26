@@ -10,18 +10,25 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from '../../src/collectors/ServiceWorkerCollector.js';
+import {ServiceWorkerCollector} from '../../src/collectors/ServiceWorkerCollector.js';
 import {McpWorker} from '../../src/McpWorker.js';
-import {TargetType, type Protocol} from '../../src/third_party/index.js';
+import {
+  createRemoteException,
+  TargetType,
+  type Protocol,
+} from '../../src/third_party/browser.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {
+  createMockCdpJSHandle,
+  createMockHTTPRequest,
   createMockPuppeteerBrowser,
   createMockPuppeteerTarget,
+  createMockWebWorker,
 } from '../mocks.js';
 
-describe('ServiceWorkerConsoleCollector', () => {
+describe('ServiceWorkerCollector', () => {
   it('limits logs to 1000 per extension', () => {
-    const collector = new ServiceWorkerConsoleCollector(undefined, 10);
+    const collector = new ServiceWorkerCollector(undefined, 10);
     const extensionId = 'test-extension';
 
     const mockDetails: Protocol.Runtime.ExceptionDetails = {
@@ -36,10 +43,10 @@ describe('ServiceWorkerConsoleCollector', () => {
         {...mockDetails, exceptionId: i},
         extensionId,
       );
-      collector.addLog(extensionId, error);
+      collector.console.addLog(extensionId, error);
     }
 
-    const logs = collector.getData(extensionId);
+    const logs = collector.console.getData(extensionId);
     assert.strictEqual(logs.length, 10, 'Should limit logs to 10');
 
     const firstLog = logs[0] as UncaughtError;
@@ -56,21 +63,21 @@ describe('ServiceWorkerConsoleCollector', () => {
       'Last log should be Log 14',
     );
 
-    const data = collector.getData(extensionId);
+    const data = collector.console.getData(extensionId);
     assert.strictEqual(data.length, 10, 'getData should return limited logs');
 
     const logToFind = data[0];
     const logId = logToFind[stableIdSymbol];
     assert.ok(logId, 'Log should have a stable ID');
 
-    const foundLog = collector.getById(extensionId, logId);
+    const foundLog = collector.console.getById(extensionId, logId);
     assert.strictEqual(
       foundLog,
       logToFind,
       'getById should return correct log',
     );
 
-    const foundViaFind = collector.find(extensionId, item => {
+    const foundViaFind = collector.console.find(extensionId, item => {
       return item[stableIdSymbol] === logId;
     });
     assert.strictEqual(
@@ -86,16 +93,114 @@ describe('ServiceWorkerConsoleCollector', () => {
       url: 'chrome-extension://ext-id/sw.js',
     });
     target.type.returns(TargetType.SERVICE_WORKER);
-    target.createCDPSession.rejects(
+    target.worker.rejects(
       new Error(
         'Protocol error (Target.attachToTarget): No target with given id found',
       ),
     );
 
-    const collector = new ServiceWorkerConsoleCollector(browser);
+    const collector = new ServiceWorkerCollector(browser);
     await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
     await new Promise(resolve => setTimeout(resolve, 0));
-    sinon.assert.calledOnce(target.createCDPSession);
+    sinon.assert.calledOnce(target.worker);
+    sinon.assert.notCalled(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('does not throw when subscribing to a service worker times out', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.rejects(new Error('Target.attachToTarget timed out.'));
+
+    const collector = new ServiceWorkerCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sinon.assert.calledOnce(target.worker);
+    sinon.assert.notCalled(target.createCDPSession);
+    collector.dispose();
+  });
+
+  it('removes the exception listener when the service worker target is destroyed', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const worker = createMockWebWorker();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.resolves(worker);
+
+    const collector = new ServiceWorkerCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.strictEqual(worker.listenerCount('exception'), 1);
+
+    browser.emit('targetdestroyed', target);
+
+    assert.strictEqual(worker.listenerCount('exception'), 0);
+    collector.dispose();
+  });
+
+  it('collects uncaught errors from worker exception events', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const worker = createMockWebWorker();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.resolves(worker);
+
+    const collector = new ServiceWorkerCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const remoteObject: Protocol.Runtime.RemoteObject = {
+      type: 'object',
+      description: 'Error: boom',
+    };
+    const handle = createMockCdpJSHandle(remoteObject, worker.client);
+    const details: Protocol.Runtime.ExceptionDetails = {
+      exceptionId: 1,
+      exception: remoteObject,
+      text: 'Uncaught',
+      lineNumber: 0,
+      columnNumber: 0,
+      stackTrace: {callFrames: []},
+    };
+    worker.emit('exception', createRemoteException(details, handle));
+
+    sinon.assert.calledOnce(handle.move);
+    sinon.assert.notCalled(target.createCDPSession);
+    const logs = collector.console.getData('ext-id');
+    assert.strictEqual(logs.length, 1);
+    assert.ok(logs[0] instanceof UncaughtError);
+    assert.strictEqual(logs[0].details, details);
+    assert.strictEqual(logs[0].targetId, 'ext-id');
+    assert.strictEqual(logs[0].session, worker.client);
+    collector.dispose();
+  });
+
+  it('collects network requests from worker request events', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const worker = createMockWebWorker();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.worker.resolves(worker);
+
+    const collector = new ServiceWorkerCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const request = createMockHTTPRequest();
+    worker.emit('request', request);
+
+    sinon.assert.calledOnce(target.worker);
+    assert.deepStrictEqual(collector.network.getData('ext-id'), [request]);
+    assert.deepStrictEqual(collector.console.getData('ext-id'), []);
     collector.dispose();
   });
 });

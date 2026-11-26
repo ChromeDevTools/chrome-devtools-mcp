@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {formatRemoteObject} from '../../src/formatters/RemoteObjectFormatter.js';
-import type {Protocol} from '../../src/third_party/index.js';
+import type {Protocol} from '../../src/third_party/browser.js';
 
 function preview(
   subtype: Protocol.Runtime.ObjectPreview['subtype'],

@@ -12,7 +12,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
-import type {HTTPRequest} from '../../src/third_party/index.js';
+import type {HTTPRequest} from '../../src/third_party/browser.js';
 import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
 
 describe('NetworkFormatter', () => {

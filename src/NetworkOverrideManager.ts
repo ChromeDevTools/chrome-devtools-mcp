@@ -14,13 +14,10 @@ import {
   validateNetworkUrl,
 } from './utils/network.js';
 
-import {
-  type HTTPRequest,
-  Mutex,
-  type Page,
-  type ResourceType,
-} from './third_party/index.js';
+import type {HTTPRequest, Page, ResourceType} from './third_party/browser.js';
+import {Mutex} from './third_party/index.js';
 import {logger, redactUrlForLogging} from './utils/logger.js';
+import {getFilterableResourceType} from './utils/resourceType.js';
 
 interface BaseNetworkOverride {
   urlPattern: string;
@@ -392,7 +389,7 @@ export class NetworkOverrideManager {
       }
       if (
         override.resourceType &&
-        override.resourceType !== request.resourceType()
+        override.resourceType !== getFilterableResourceType(request)
       ) {
         continue;
       }

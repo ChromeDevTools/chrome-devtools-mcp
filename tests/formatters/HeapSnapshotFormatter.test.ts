@@ -13,14 +13,14 @@ import {
   type ContextAnalysisReport,
   formatName,
   HeapSnapshotFormatter,
-  MAX_NAME_LENGTH,
 } from '../../src/formatters/HeapSnapshotFormatter.js';
+import {HEAP_SNAPSHOT_MAX_NAME_LENGTH} from '../../src/formatters/constants.js';
 import {
   HeapSnapshotManager,
   type HeapSnapshotAggregate,
   type HeapSnapshotDiffObject,
 } from '../../src/processors/HeapSnapshotManager.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/browser.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {createMockContextAnalysisResult} from '../mocks.js';
@@ -59,17 +59,18 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(formatName('shortName', {}), 'shortName');
     });
 
-    it('truncates name exceeding MAX_NAME_LENGTH', () => {
+    it('truncates name exceeding HEAP_SNAPSHOT_MAX_NAME_LENGTH', () => {
       const longName = 'a'.repeat(150);
-      const expected = 'a'.repeat(MAX_NAME_LENGTH) + '...';
+      const expected = 'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH) + '...';
       assert.strictEqual(formatName(longName, {}), expected);
     });
 
     it('does not split a surrogate pair at the truncation point', () => {
-      const name = 'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
+      const name =
+        'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
       assert.strictEqual(
         formatName(name, {}),
-        'a'.repeat(MAX_NAME_LENGTH - 1) + '...',
+        'a'.repeat(HEAP_SNAPSHOT_MAX_NAME_LENGTH - 1) + '...',
       );
     });
 

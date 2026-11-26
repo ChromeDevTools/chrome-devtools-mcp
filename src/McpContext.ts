@@ -22,14 +22,15 @@ import type {
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import type {UncaughtError} from './collectors/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
+import {ServiceWorkerCollector} from './collectors/ServiceWorkerCollector.js';
+import {Mutex, type Root} from './third_party/index.js';
 import {
   Locator,
-  Mutex,
   type Browser,
   type BrowserContext,
   type Connection,
   type ConsoleMessage,
+  type HTTPRequest,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
@@ -39,9 +40,8 @@ import {
   type Target,
   type UninstallPWAOptions,
   type Extension,
-  type Root,
   type DevTools,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';
@@ -57,7 +57,11 @@ import {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
-import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {
+  fileUrlToPathWithPosixFallback,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from './utils/files.js';
 import {escapeForLog, redactUrlForLogging} from './utils/logger.js';
 import {
   fetchWithValidatedRedirects,
@@ -178,7 +182,7 @@ export class McpContext implements Context, BrowserlessContext {
   #selectedPageFallback?: {wasClosed: boolean};
   #selectedPageFallbackRead = false;
 
-  #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
+  #serviceWorkerCollector?: ServiceWorkerCollector;
 
   #reconnectNotice = false;
 
@@ -278,10 +282,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * Stops and saves active screencast recordings across all pages when
-   * screencast tools are disabled.
+   * Stops and saves active screencast recordings across all pages.
    */
-  async releaseScreencasts(): Promise<void> {
+  async releaseScreencasts(
+    reason = 'screencast tools were disabled',
+  ): Promise<void> {
     for (const mcpPage of this.#allMcpPages()) {
       const screenRecorderData = mcpPage.getScreenRecorder();
       if (!screenRecorderData) {
@@ -292,7 +297,7 @@ export class McpContext implements Context, BrowserlessContext {
       try {
         await recorder.stop();
         this.logger?.(
-          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+          `The screencast recording was stopped and saved to ${filePath} because ${reason}.`,
         );
       } catch (err) {
         this.logger?.('Failed to stop the screencast recording', err);
@@ -313,10 +318,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * Discards recorded performance traces and stops any running trace when
-   * performance tools are disabled.
+   * Discards recorded performance traces and stops any running trace.
    */
-  async releasePerformanceTrace(): Promise<void> {
+  async releasePerformanceTrace(
+    reason = 'performance tools were disabled',
+  ): Promise<void> {
     this.#traceResults = [];
     for (const mcpPage of this.#allMcpPages()) {
       if (!mcpPage.isRunningPerformanceTrace()) {
@@ -329,7 +335,7 @@ export class McpContext implements Context, BrowserlessContext {
         this.logger?.('Failed to stop the performance trace', err);
       }
       this.logger?.(
-        'The running performance trace was discarded because performance tools were disabled.',
+        `The running performance trace was discarded because ${reason}.`,
       );
     }
   }
@@ -377,8 +383,8 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async #initBrowserState(browser: Browser): Promise<void> {
-    const collector = new ServiceWorkerConsoleCollector(browser);
-    this.#serviceWorkerConsoleCollector = collector;
+    const collector = new ServiceWorkerCollector(browser);
+    this.#serviceWorkerCollector = collector;
     // All listeners are registered synchronously, before the first await. If
     // this call hangs and is abandoned by the tool-call timeout, a later call
     // that installs a different browser removes them in #resetBrowserState().
@@ -403,7 +409,7 @@ export class McpContext implements Context, BrowserlessContext {
     this.#browser?.off('targetcreated', this.#onTargetCreated);
     this.#browser?.off('targetdestroyed', this.#onTargetDestroyed);
 
-    this.#serviceWorkerConsoleCollector?.dispose();
+    this.#serviceWorkerCollector?.dispose();
     for (const mcpPage of this.#allMcpPages()) {
       this.#disposeMcpPage(mcpPage);
     }
@@ -418,9 +424,21 @@ export class McpContext implements Context, BrowserlessContext {
     this.#selectedPageFallback = undefined;
     this.#selectedPageFallbackRead = false;
     this.#traceResults = [];
-    this.#serviceWorkerConsoleCollector = undefined;
+    this.#serviceWorkerCollector = undefined;
     this.#browser = undefined;
     this.#browserReady = undefined;
+  }
+
+  /**
+   * Releases all state bound to the current browser connection before the
+   * browser is closed or disconnected, while preserving `#hasConnected` so the
+   * next connection surfaces a reconnect notice.
+   */
+  onBrowserClosed(): void {
+    if (!this.#browser) {
+      return;
+    }
+    this.#resetBrowserState();
   }
 
   dispose(): void {
@@ -530,7 +548,9 @@ export class McpContext implements Context, BrowserlessContext {
     const resolvedRoots = await Promise.allSettled(
       roots.map(async root => {
         const rootPathUri = root.uri;
-        const rootPath = path.resolve(fileURLToPath(rootPathUri));
+        const rootPath = path.resolve(
+          fileUrlToPathWithPosixFallback(rootPathUri),
+        );
         return await fs.realpath(rootPath);
       }),
     );
@@ -745,8 +765,12 @@ export class McpContext implements Context, BrowserlessContext {
     return notice;
   }
 
+  #findPageById(pageId: number): McpPage | undefined {
+    return this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
+  }
+
   getPageById(pageId: number): McpPage {
-    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
+    const page = this.#findPageById(pageId);
     if (!page) {
       throw new Error('No page found');
     }
@@ -754,13 +778,16 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   /**
-   * The queue for tasks on page `pageId`. The queue exists before the page
-   * does, so a tool call can enter it before the browser connects. It is a
-   * child of {@link taskQueue}.
+   * The queue for tasks on page `pageId`, a child of {@link taskQueue}.
+   * Returns {@link taskQueue} when no page has this id, for example before
+   * the browser connects. No queue is stored for such an id.
    */
   pageTaskQueue(pageId: number): TaskQueue {
     let queue = this.#pageTaskQueues.get(pageId);
     if (!queue) {
+      if (!this.#findPageById(pageId)) {
+        return this.taskQueue;
+      }
       queue = this.#taskRunner.createQueue(this.taskQueue);
       this.#pageTaskQueues.set(pageId, queue);
     }
@@ -841,15 +868,48 @@ export class McpContext implements Context, BrowserlessContext {
     return Array.from(this.#workers.values());
   }
 
+  #getServiceWorkerExtensionId(serviceWorkerId: string): string {
+    const worker = this.getWorkerById(serviceWorkerId);
+    if (worker?.type !== 'service_worker') {
+      throw new Error(
+        `Service worker ${serviceWorkerId} not found. Call list_pages to get the current sw-N IDs.`,
+      );
+    }
+    return new URL(worker.url).hostname;
+  }
+
   getServiceWorkerConsoleData(
     serviceWorkerId: string,
   ): Array<ConsoleMessage | UncaughtError> {
-    const worker = this.getWorkerById(serviceWorkerId);
-    if (worker?.type !== 'service_worker') {
-      throw new Error('Service worker not found.');
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    return this.#serviceWorkerCollector?.console.getData(extensionId) ?? [];
+  }
+
+  getServiceWorkerConsoleMessageById(
+    serviceWorkerId: string,
+    msgid: number,
+  ): ConsoleMessage | UncaughtError {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    if (!this.#serviceWorkerCollector) {
+      throw new Error('Service worker console data is not available.');
     }
-    const extensionId = new URL(worker.url).hostname;
-    return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
+    return this.#serviceWorkerCollector.console.getById(extensionId, msgid);
+  }
+
+  getServiceWorkerNetworkData(serviceWorkerId: string): HTTPRequest[] {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    return this.#serviceWorkerCollector?.network.getData(extensionId) ?? [];
+  }
+
+  getServiceWorkerNetworkRequestById(
+    serviceWorkerId: string,
+    reqid: number,
+  ): HTTPRequest {
+    const extensionId = this.#getServiceWorkerExtensionId(serviceWorkerId);
+    if (!this.#serviceWorkerCollector) {
+      throw new Error('Service worker network data is not available.');
+    }
+    return this.#serviceWorkerCollector.network.getById(extensionId, reqid);
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {

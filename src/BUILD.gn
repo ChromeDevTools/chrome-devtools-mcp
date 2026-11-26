@@ -36,6 +36,7 @@ ts_library("third_party") {
   no_js_emit = true
 
   sources = [
+    "third_party/browser.ts",
     "third_party/cli.ts",
     "third_party/devtools-formatter-worker.ts",
     "third_party/devtools-heap-snapshot-worker.ts",
@@ -82,17 +83,27 @@ third_party_bundle("third_party_index_bundle") {
   entrypoint_name = "index"
   node_require_shim = true
   external = [
-    # Puppeteer loads WebDriver BiDi support only on request. The path is
-    # relative to src/third_party, like every relative entry.
-    "../../node_modules/puppeteer-core/lib/puppeteer/bidi/bidi.js",
-
     # Separate files in the same directory.
+    "./browser.js",
     "./cli.js",
     "./lighthouse-devtools-mcp-bundle.js",
 
     # Optional peer dependencies.
     "@blackwell-systems/gcf",
     "@toon-format/toon",
+  ]
+}
+
+third_party_bundle("third_party_browser_bundle") {
+  entrypoint_name = "browser"
+  node_require_shim = true
+  external = [
+    # Puppeteer loads WebDriver BiDi support only on request. The path is
+    # relative to src/third_party, like every relative entry.
+    "../../node_modules/puppeteer-core/lib/puppeteer/bidi/bidi.js",
+
+    # Separate files in the same directory.
+    "./index.js",
 
     # Imports of @puppeteer/browsers code paths that the server never runs.
     "modern-tar",
@@ -122,6 +133,7 @@ action("third_party_notices") {
   _script = "//scripts/generate-third-party-notices.ts"
   _third_party_gen_dir = "$target_gen_dir/third_party"
   _bundles = [
+    "third_party_browser_bundle",
     "third_party_cli_bundle",
     "third_party_formatter_worker_bundle",
     "third_party_heap_snapshot_worker_bundle",
@@ -186,6 +198,7 @@ ts_library("mcp_lib") {
     "config/mcp-options.ts",
     "config/puppeteer-options.ts",
     "config/tool-options.ts",
+    "daemon/chrome-devtools-cli.ts",
     "daemon/client.ts",
     "daemon/daemon.ts",
     "daemon/types.ts",
@@ -206,6 +219,7 @@ ts_library("mcp_lib") {
     "formatters/RemoteObjectFormatter.ts",
     "formatters/SnapshotFormatter.ts",
     "formatters/WebAuthnFormatter.ts",
+    "formatters/constants.ts",
     "index.ts",
     "processors/ChunkedTraceParser.ts",
     "processors/HeapSnapshotManager.ts",
@@ -246,16 +260,19 @@ ts_library("mcp_lib") {
     "tools/webauthn.ts",
     "tools/webmcp.ts",
     "types.ts",
+    "utils/IdleTimer.ts",
     "utils/TaskRunner.ts",
     "utils/WaitForHelper.ts",
     "utils/bytes.ts",
     "utils/check-for-updates.ts",
     "utils/disclaimers.ts",
+    "utils/duration.ts",
     "utils/errorHandling.ts",
     "utils/files.ts",
     "utils/id.ts",
     "utils/keyboard.ts",
     "utils/logger.ts",
+    "utils/logpoint.ts",
     "utils/network.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",
@@ -293,6 +310,7 @@ group("all") {
     ":lighthouse_bundle",
     ":mcp_lib",
     ":third_party",
+    ":third_party_browser_bundle",
     ":third_party_cli_bundle",
     ":third_party_formatter_worker_bundle",
     ":third_party_heap_snapshot_worker_bundle",

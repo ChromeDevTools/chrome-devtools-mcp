@@ -7,13 +7,8 @@
 import zlib from 'node:zlib';
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod, DevTools} from '../third_party/index.js';
-import {
-  parseRawTraceBuffer,
-  traceResultIsSuccess,
-  type InsightName,
-  type TraceResult,
-} from '../processors/PerformanceTrace.js';
+import {loadBrowser, zod} from '../third_party/index.js';
+import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import {logger} from '../utils/logger.js';
 import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
 
@@ -92,6 +87,7 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
         });
       }
 
+      const {DevTools} = await loadBrowser();
       const categories = [
         '-*',
         ...DevTools.TracingDefaultCategories,
@@ -282,6 +278,8 @@ async function stopTracingAndAppendOutput(
         `The raw trace data was saved to ${file.filename}.`,
       );
     }
+    const {parseRawTraceBuffer, traceResultIsSuccess} =
+      await import('../processors/PerformanceTrace.js');
     const result = await parseRawTraceBuffer(traceEventsBuffer, {
       cpuThrottling: page.cpuThrottlingRate,
       networkThrottling: page.networkConditions ?? undefined,
@@ -306,6 +304,7 @@ async function stopTracingAndAppendOutput(
 /** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
 async function populateCruxData(result: TraceResult): Promise<void> {
   logger?.('populateCruxData called');
+  const {DevTools} = await loadBrowser();
   const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
   // go/jtfbx. Yes, we're aware this API key is public. ;)
   cruxManager.setEndpointForTesting(

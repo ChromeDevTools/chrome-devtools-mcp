@@ -37,23 +37,29 @@ describe('TextSnapshot', () => {
     await assertion;
   });
 
-  it('passes the selected root to Puppeteer and releases its handle', async () => {
+  it('filters the full compact snapshot to the selected root and releases its handle', async () => {
     const page = createMockMcpPage();
     page.uniqueBackendNodeIdToMcpId = new Map();
     page.extraHandles = [];
     const {handle} = createMockElementHandle();
+    handle.backendNodeId.resolves(1);
     page.pptrPage.$.resolves(handle);
     page.pptrPage.accessibility.snapshot.resolves(
-      createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+      createMockAXNode('RootWebArea', {
+        loaderId: '1',
+        children: [
+          createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+        ],
+      }),
     );
 
-    await TextSnapshot.create(page, {selector: '#main-nav'});
+    const snapshot = await TextSnapshot.create(page, {selector: '#main-nav'});
 
+    assert.strictEqual(snapshot.root.role, 'navigation');
     sinon.assert.calledOnceWithExactly(page.pptrPage.$, '#main-nav');
     sinon.assert.calledOnceWithExactly(page.pptrPage.accessibility.snapshot, {
-      root: handle,
-      includeIframes: false,
-      interestingOnly: false,
+      includeIframes: true,
+      interestingOnly: true,
     });
     sinon.assert.calledOnceWithExactly(handle.dispose);
   });
@@ -63,16 +69,28 @@ describe('TextSnapshot', () => {
     page.uniqueBackendNodeIdToMcpId = new Map();
     page.extraHandles = [];
     const {handle} = createMockElementHandle();
+    handle.backendNodeId.resolves(1);
     page.pptrPage.$.resolves(handle);
     page.pptrPage.accessibility.snapshot.resolves(
-      createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+      createMockAXNode('RootWebArea', {
+        loaderId: '1',
+        children: [
+          createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+        ],
+      }),
     );
 
     const snapshot = await TextSnapshot.create(page, {
       selector: '#main-nav',
+      verbose: true,
       devtoolsData: {cdpBackendNodeId: 2},
     });
 
+    sinon.assert.calledOnceWithExactly(page.pptrPage.accessibility.snapshot, {
+      includeIframes: true,
+      interestingOnly: false,
+    });
+    assert.strictEqual(snapshot.verbose, true);
     assert.strictEqual(snapshot.hasSelectedElement, false);
     assert.strictEqual(snapshot.selectedElementUid, undefined);
   });
@@ -100,14 +118,14 @@ describe('TextSnapshot', () => {
     sinon.assert.calledOnceWithExactly(handle.dispose);
   });
 
-  it('rejects a selected root without an accessibility node', async () => {
+  it('rejects a missing full accessibility tree', async () => {
     const page = createMockMcpPage();
     const {handle} = createMockElementHandle();
     page.pptrPage.$.resolves(handle);
     page.pptrPage.accessibility.snapshot.resolves(null);
     await assert.rejects(
       TextSnapshot.create(page, {selector: '#container'}),
-      /No accessibility node for selector "#container"/,
+      /Failed to create accessibility snapshot/,
     );
     sinon.assert.calledOnceWithExactly(handle.dispose);
   });
@@ -217,6 +235,46 @@ describe('TextSnapshot', () => {
     });
   });
 
+  it('keeps extra node UIDs usable after disposing action handles', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <div
+          id="target"
+          role="none"
+          style="width: 100px; height: 100px"
+          data-clicks="0"
+          onclick="this.dataset.clicks++"
+        ></div>
+      `);
+      using retainedHandle = await page.pptrPage.$('#target');
+      assert.ok(retainedHandle);
+      const backendNodeId = await retainedHandle.backendNodeId();
+      page.textSnapshot = await TextSnapshot.create(page, {
+        extraHandles: [retainedHandle],
+      });
+      const uid = page.textSnapshot.resolveCdpElementId(backendNodeId);
+      assert.ok(uid);
+
+      for (let i = 0; i < 2; i++) {
+        using actionHandle = await page.getElementByUid(uid);
+        await actionHandle.click();
+      }
+
+      page.textSnapshot = await TextSnapshot.create(page);
+      assert.strictEqual(
+        page.textSnapshot.resolveCdpElementId(backendNodeId),
+        uid,
+      );
+      assert.strictEqual(
+        await retainedHandle.evaluate(element =>
+          element.getAttribute('data-clicks'),
+        ),
+        '2',
+      );
+    });
+  });
+
   it('keeps retained extra handles outside the selected subtree out of the snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
@@ -226,13 +284,14 @@ describe('TextSnapshot', () => {
           role="none"
           ><button>Outside</button></div
         >
-        <main id="component">
+        <div id="component">
           <div
             id="inside"
             role="none"
             ><button>Inside</button></div
           >
-        </main>
+          <button>Sibling</button></div
+        >
       `);
       const outside = await page.pptrPage.$('#outside');
       const inside = await page.pptrPage.$('#inside');
@@ -246,6 +305,10 @@ describe('TextSnapshot', () => {
         selector: '#component',
       });
 
+      const output = JSON.stringify(snapshot.root);
+      assert.match(output, /Sibling/);
+      assert.match(output, /Inside/);
+      assert.doesNotMatch(output, /Outside/);
       assert.strictEqual(snapshot.resolveCdpElementId(outsideId), undefined);
       assert.ok(snapshot.resolveCdpElementId(insideId));
       assert.deepStrictEqual(page.extraHandles, [outside, inside]);

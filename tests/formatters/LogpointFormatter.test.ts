@@ -7,7 +7,7 @@
 import {describe, it} from 'node:test';
 
 import {LogpointFormatter} from '../../src/formatters/LogpointFormatter.js';
-import type {Logpoint} from '../../src/LogpointManager.js';
+import type {Logpoint} from '../../src/utils/logpoint.js';
 
 describe('LogpointFormatter', () => {
   function formatterTest(label: string, logpoints: Logpoint[]) {

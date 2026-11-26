@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {TimeoutError, zod} from '../third_party/index.js';
+import {loadBrowser, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -26,14 +26,11 @@ in the DevTools Elements panel (if any).`,
   schema: {
     selector: zod
       .string()
+      .trim()
       .min(1)
       .optional()
       .describe(
-        'Limit this snapshot to the subtree of the first element matching ' +
-          'this selector in the main frame. Omit to snapshot the whole page. ' +
-          'Includes all accessibility nodes within that subtree, but not ' +
-          'nested iframe documents. Returns an error if no element matches ' +
-          'or it has no accessibility node.',
+        'Return the accessibility subtree of the first main-frame element matching a Puppeteer selector (CSS, ::-p-text, ::-p-xpath, or >>>). Omit for the whole page. Returns an error if the element or its accessibility content is missing.',
       ),
     verbose: zod
       .boolean()
@@ -100,6 +97,7 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
         visible: request.params.visible,
       });
     } catch (error) {
+      const {TimeoutError} = await loadBrowser();
       if (error instanceof TimeoutError) {
         throw new TimeoutError(
           `${error.message}. Text matching is case-sensitive. DOM text must ` +

@@ -10,12 +10,22 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
-import {TimeoutError} from '../../src/third_party/index.js';
+import {TimeoutError} from '../../src/third_party/browser.js';
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
 import {createHandlerMocks, createMockServerConfig} from '../mocks.js';
 
 describe('snapshot', () => {
   describe('take_snapshot', () => {
+    it('rejects whitespace-only selectors and trims Puppeteer selectors', () => {
+      const {args} = createHandlerMocks();
+      const {selector} = takeSnapshot(args).schema;
+      assert.strictEqual(selector.safeParse('   ').success, false);
+      assert.strictEqual(
+        selector.parse('  ::-p-text(Save)  '),
+        '::-p-text(Save)',
+      );
+    });
+
     it('includes a snapshot', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await takeSnapshot(args).handler({params: {}, page}, response, context);

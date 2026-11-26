@@ -16,8 +16,8 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
-import type {Logpoint, LogpointOptions} from './LogpointManager.js';
 import {LogpointManager} from './LogpointManager.js';
+import type {Logpoint, LogpointOptions} from './utils/logpoint.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   NetworkOverrideManager,
@@ -26,8 +26,15 @@ import {
   type NetworkMockInput,
 } from './NetworkOverrideManager.js';
 import {
-  type Locator,
+  type Flags,
+  type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
   PredefinedNetworkConditions,
+  type RunnerResult,
+} from './third_party/index.js';
+import {
+  type Locator,
   type Dialog,
   type ElementHandle,
   type Frame,
@@ -39,17 +46,12 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
-  type Flags,
-  type JSONSchema7Definition,
-  lighthouseNavigation,
-  lighthouseSnapshot,
-  type RunnerResult,
-} from './third_party/index.js';
+} from './third_party/browser.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
-  MatchedStyles,
+  ElementCssStyles,
   Response,
   ScreenRecorderData,
   WebAuthnAuthenticatorConfig,
@@ -1306,7 +1308,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
     if (!this.textSnapshot) {
       throw new Error(
         `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
@@ -1361,14 +1363,22 @@ export class McpPage implements ContextPage {
       );
     }
 
-    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    const [matchedStyles, computedStyles] = await Promise.all([
+      cssModel.getMatchedStyles(targetElement.id),
+      cssModel.getComputedStyle(targetElement.id),
+    ]);
     if (!matchedStyles) {
       throw new Error(
         `Could not retrieve matched styles for element with uid "${uid}".`,
       );
     }
+    if (!computedStyles) {
+      logger?.(
+        `Could not retrieve computed styles for element with uid ${uid}.`,
+      );
+    }
 
-    return matchedStyles;
+    return {matchedStyles, computedStyles};
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

@@ -105,10 +105,11 @@ export class TaskRunner {
   /**
    * Stops new tasks on every queue. The pause goes ahead of waiting tasks and
    * resolves when every running task has finished. Disposing the guard
-   * resumes the runner.
+   * resumes the runner. Cancellation rejects a waiting pause with the signal's
+   * reason; after acquisition, the caller owns the guard.
    */
-  async pause(): Promise<Disposable> {
-    return await this.#scheduleTask(this.#root, 'high');
+  async pause(signal?: AbortSignal): Promise<Disposable> {
+    return await this.#scheduleTask(this.#root, 'high', signal);
   }
 
   async #scheduleTask(

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
-import type {MatchedStyles} from '../tools/ToolDefinition.js';
+import {DevTools} from '../third_party/browser.js';
+import type {ElementCssStyles, MatchedStyles} from '../tools/ToolDefinition.js';
 
 export type UidResolver = (backendNodeId: number) => string | undefined;
 export type ContainerQuery =
@@ -22,6 +22,7 @@ export interface CssFormatterOptions {
   uid: string;
   resolveUid?: UidResolver;
   containerDetails?: Map<ContainerQuery, ResolvedContainerDetails>;
+  computedProperties?: readonly string[];
 }
 
 /**
@@ -178,7 +179,13 @@ export interface FunctionRule {
   properties: StructuredCssProperty[];
 }
 
+export interface ComputedStyleRule {
+  type: 'computed';
+  properties: Record<string, string>;
+}
+
 export type CascadeRule =
+  | ComputedStyleRule
   | NodeStyleRule
   | AnimationRule
   | MatchedRule
@@ -523,7 +530,9 @@ function getParentNodeInfo(
   };
 }
 
-function getCascadeRuleHeader(rule: CascadeRule): string {
+function getCascadeRuleHeader(
+  rule: Exclude<CascadeRule, ComputedStyleRule>,
+): string {
   let selector: string;
   switch (rule.type) {
     case 'inline':
@@ -600,7 +609,7 @@ function formatAncestorRuleHeader(ancestor: AncestorCSSRule): {
 
 function appendRuleWithAncestors(
   writer: IndentedWriter,
-  rule: Exclude<CascadeRule, KeyframesRule>,
+  rule: Exclude<CascadeRule, ComputedStyleRule | KeyframesRule>,
 ): void {
   const ancestors = 'ancestors' in rule ? rule.ancestors : undefined;
   let ancestorCount = 0;
@@ -658,7 +667,14 @@ function appendCssSectionsToString(
 ): void {
   for (const rule of styles.rules) {
     writer.writeEmptyLine();
-    if (rule.type === 'inherited') {
+    if (rule.type === 'computed') {
+      writer.writeLine('Computed styles:');
+      writer.indent();
+      for (const [name, value] of Object.entries(rule.properties)) {
+        writer.writeLine(`${name}: ${value};`);
+      }
+      writer.dedent();
+    } else if (rule.type === 'inherited') {
       const uidStr = rule.node.uid ? ` (uid: "${rule.node.uid}")` : '';
       writer.writeLine(`Inherited from ${rule.node.selector}${uidStr}:`);
       writer.indent();
@@ -691,10 +707,12 @@ export class CssFormatter {
    * Aggregates all cascading rules impacting the target node.
    */
   static collectRules(
-    matchedStyles: MatchedStyles,
+    styles: ElementCssStyles,
     options: CssFormatterOptions,
   ): CascadeRule[] {
+    const {matchedStyles} = styles;
     const rules: CascadeRule[] = [];
+    CssFormatter.#collectComputedStyles(rules, styles, options);
     CssFormatter.#collectNodeStyles(rules, matchedStyles, options);
     CssFormatter.#collectPseudoStyles(rules, matchedStyles, options);
     CssFormatter.#collectKeyframes(rules, matchedStyles);
@@ -1166,19 +1184,70 @@ export class CssFormatter {
     };
   }
 
+  static #collectComputedStyles(
+    rules: CascadeRule[],
+    styles: ElementCssStyles,
+    options: CssFormatterOptions,
+  ): void {
+    const {matchedStyles, computedStyles} = styles;
+    const {computedProperties} = options;
+    if (!computedStyles || computedStyles.size === 0) {
+      return;
+    }
+
+    let extraProperties: Set<string> | undefined;
+    if (computedProperties?.length) {
+      extraProperties = new Set<string>();
+      const metadata = DevTools.CSSMetadata.cssMetadata();
+      for (const rawName of computedProperties) {
+        const trimmed = rawName.trim();
+        if (!trimmed) {
+          continue;
+        }
+        const name = trimmed.startsWith('--') ? trimmed : trimmed.toLowerCase();
+        extraProperties.add(name);
+        const longhands = metadata.getLonghands(name);
+        if (longhands) {
+          for (const longhand of longhands) {
+            extraProperties.add(longhand);
+          }
+        }
+      }
+    }
+
+    const filtered =
+      DevTools.ComputedStyle.ComputedStyleModel.filterComputedStyleProperties(
+        computedStyles,
+        matchedStyles,
+        {extraProperties},
+      );
+    if (filtered.length === 0) {
+      return;
+    }
+
+    const properties: Record<string, string> = {};
+    for (const prop of filtered) {
+      properties[prop.name] = prop.value;
+    }
+    rules.push({
+      type: 'computed',
+      properties,
+    });
+  }
+
   readonly #matchedStyles: MatchedStyles;
   readonly #options: CssFormatterOptions;
   readonly #cascadeRules: readonly CascadeRule[];
 
   constructor(
-    matchedStyles: MatchedStyles,
+    styles: ElementCssStyles,
     options: CssFormatterOptions,
     cascadeRules?: readonly CascadeRule[],
   ) {
-    this.#matchedStyles = matchedStyles;
+    this.#matchedStyles = styles.matchedStyles;
     this.#options = options;
     this.#cascadeRules =
-      cascadeRules ?? CssFormatter.collectRules(matchedStyles, options);
+      cascadeRules ?? CssFormatter.collectRules(styles, options);
   }
 
   get rules(): readonly CascadeRule[] {
@@ -1191,7 +1260,7 @@ export class CssFormatter {
       `Styles for ${json.element.selector} (uid: "${json.element.uid}"):`,
     ];
 
-    if (this.#cascadeRules.length === 0) {
+    if (json.rules.length === 0) {
       lines.push('', '  (no styles)');
       return lines.join('\n');
     }

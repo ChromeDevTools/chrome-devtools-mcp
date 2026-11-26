@@ -16,7 +16,7 @@ import type {
   ConsoleMessage,
   Protocol,
   DevTools,
-} from '../../src/third_party/index.js';
+} from '../../src/third_party/browser.js';
 import {createMockCDPSession, createMockCdpJSHandle} from '../mocks.js';
 
 interface MockConsoleMessage {
@@ -849,6 +849,40 @@ describe('ConsoleFormatter', () => {
 
         return await ConsoleFormatter.from(message, {
           id: 17,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
+
+    formatterTestDetailed(
+      'formats the position of a wasm frame as a hex byte offset',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => 'from wasm',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 0,
+                column: 45,
+                url: 'wasm://wasm/c9772ffe',
+                name: '$run',
+              },
+              {
+                line: 4,
+                column: 12,
+                url: 'main.js',
+                name: 'start',
+              },
+            ],
+          },
+          asyncFragments: [],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 18,
           resolvedStackTraceForTesting: stackTrace,
         });
       },
