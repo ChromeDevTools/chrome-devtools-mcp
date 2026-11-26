@@ -151,8 +151,6 @@ export async function createTargetUniverse(
       syncedStorage: settingStorage,
       globalStorage: settingStorage,
       localStorage: settingStorage,
-      settingRegistrations:
-        DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
     hostConfig: {},
