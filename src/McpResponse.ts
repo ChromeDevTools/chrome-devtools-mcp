@@ -952,6 +952,7 @@ export class McpResponse implements Response {
       webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
       navigatedToUrl?: string;
+      sameDocument?: boolean;
       geolocation?: {latitude: number; longitude: number};
     } = {};
 
@@ -996,12 +997,14 @@ export class McpResponse implements Response {
     if (this.#attachedWaitForResult) {
       if (this.#attachedWaitForResult.navigatedToUrl) {
         const navigatedToUrl = this.#attachedWaitForResult.navigatedToUrl;
+        const sameDocument = this.#attachedWaitForResult.sameDocument ?? false;
         response.push(
-          this.#attachedWaitForResult.sameDocument
+          sameDocument
             ? `Page navigated to ${navigatedToUrl} within the same document.`
             : `Page navigated to ${navigatedToUrl}.`,
         );
         structuredContent.navigatedToUrl = navigatedToUrl;
+        structuredContent.sameDocument = sameDocument;
       }
       if (this.#attachedWaitForResult.openedPages) {
         const openedPages = this.#attachedWaitForResult.openedPages;
