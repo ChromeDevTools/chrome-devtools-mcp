@@ -418,6 +418,45 @@ describe('network', () => {
   });
 
   describe('list_network_requests', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          listNetworkRequests(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          listNetworkRequests(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
+    it('forwards serviceWorkerId without reading DevTools data', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await listNetworkRequests(args).handler(
+        {params: {serviceWorkerId: 'sw-1', pageSize: 5}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.setIncludeNetworkRequests,
+        true,
+        {
+          pageSize: 5,
+          pageIdx: undefined,
+          resourceTypes: undefined,
+          serviceWorkerId: 'sw-1',
+        },
+      );
+      sinon.assert.notCalled(page.getDevToolsData);
+    });
+
     it('describes the default preserved navigation history', () => {
       const tool = listNetworkRequests(createMockParsedArguments());
       assert.strictEqual(
@@ -529,6 +568,57 @@ describe('network', () => {
   });
 
   describe('get_network_request', () => {
+    it('exposes serviceWorkerId only with categoryExtensions', () => {
+      assert.ok(
+        'serviceWorkerId' in
+          getNetworkRequest(
+            createMockParsedArguments({categoryExtensions: true}),
+          ).schema,
+      );
+      assert.ok(
+        !(
+          'serviceWorkerId' in
+          getNetworkRequest(createMockParsedArguments()).schema
+        ),
+      );
+    });
+
+    it('forwards serviceWorkerId when reqid is provided', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await getNetworkRequest(args).handler(
+        {params: {reqid: 3, serviceWorkerId: 'sw-1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 3, {
+        requestFilePath: undefined,
+        responseFilePath: undefined,
+        serviceWorkerId: 'sw-1',
+      });
+      sinon.assert.notCalled(page.getDevToolsData);
+    });
+
+    it('rejects serviceWorkerId without reqid', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExtensions: true,
+      });
+
+      await assert.rejects(
+        getNetworkRequest(args).handler(
+          {params: {serviceWorkerId: 'sw-1'}, page},
+          response,
+          context,
+        ),
+        /reqid is required when serviceWorkerId is set \(got serviceWorkerId=sw-1\)/,
+      );
+
+      sinon.assert.notCalled(page.getDevToolsData);
+      sinon.assert.notCalled(response.attachNetworkRequest);
+    });
     it('attaches request with explicit reqid', async () => {
       const {page, context, response, args} = createHandlerMocks();
 
@@ -541,6 +631,7 @@ describe('network', () => {
       sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
         requestFilePath: undefined,
         responseFilePath: undefined,
+        serviceWorkerId: undefined,
       });
       sinon.assert.notCalled(page.getDevToolsData);
     });
@@ -564,6 +655,7 @@ describe('network', () => {
       sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
         requestFilePath: '/path/req.txt',
         responseFilePath: '/path/res.txt',
+        serviceWorkerId: undefined,
       });
     });
 

@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// The heavy bundle with Puppeteer, @puppeteer/browsers and the DevTools
+// frontend. Only code that runs once a tool call needs a browser or DevTools
+// should import values from it.
+
 // Runs the polyfills in index.js before Puppeteer and DevTools code.
 import './index.js';
 
@@ -15,9 +19,9 @@ export {
   ConsoleMessage,
   Dialog,
   ElementHandle,
+  EventEmitter,
   Frame,
   Locator,
-  PredefinedNetworkConditions,
   KnownDevices,
   CDPSession,
   CDPSessionEvent,
@@ -44,9 +48,11 @@ export {CdpMouse} from 'puppeteer-core/internal/cdp/Input.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
-export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
+export {PUPPETEER_REVISIONS} from 'puppeteer-core/internal/revisions.js';
+export {createRemoteException} from 'puppeteer-core/internal/cdp/utils.js';
 export {
+  computeExecutablePath,
   resolveDefaultUserDataDir,
   detectBrowserPlatform,
   Browser as BrowserEnum,

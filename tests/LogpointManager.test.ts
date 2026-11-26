@@ -10,13 +10,14 @@ import {describe, it} from 'node:test';
 
 import ts from 'typescript';
 
-import type {Logpoint, LogpointOptions} from '../src/LogpointManager.js';
-import {
-  LogpointError,
-  parseLogpoint,
-  validateExpression,
-} from '../src/LogpointManager.js';
+import {validateExpression} from '../src/LogpointManager.js';
 import type {McpPage} from '../src/McpPage.js';
+import {
+  type Logpoint,
+  LogpointError,
+  type LogpointOptions,
+  parseLogpoint,
+} from '../src/utils/logpoint.js';
 import {serverHooks} from './server.js';
 import {html, waitExecutionFor, withMcpContext} from './utils.js';
 

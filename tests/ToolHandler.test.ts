@@ -18,6 +18,7 @@ import {ConfigParser} from '../src/config/ConfigParser.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
+import {SlimMcpResponse} from '../src/SlimMcpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {FilePersistence} from '../src/telemetry/persistence.js';
 import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
@@ -1610,6 +1611,67 @@ describe('ToolHandler', () => {
           text: 'Tool navigate_page is not available with --slim.',
         },
       ]);
+    });
+
+    function createResponseRecordingHandler(slim: boolean) {
+      const config = parseConfig(slim ? ['--slim'] : []);
+      const toolHandler = sinon.stub().resolves();
+      const tool = defineBrowserlessTool(() => ({
+        name: 'response_tool',
+        description: 'A tool that records the response it gets',
+        annotations: {
+          category: ToolCategory.MEMORY,
+          readOnlyHint: true,
+          conditions: slim ? ['slim'] : [],
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: toolHandler,
+      }))(config.resolved);
+      const context = createMockMcpContext();
+      const handler = new ToolHandler(
+        tool,
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      return {handler, toolHandler, context};
+    }
+
+    it('creates a SlimMcpResponse for slim tools', async () => {
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(true);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match.instanceOf(SlimMcpResponse),
+        context,
+      );
+    });
+
+    it('creates an McpResponse that is not a SlimMcpResponse for other tools', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const {handler, toolHandler, context} =
+        createResponseRecordingHandler(false);
+
+      await handler.handle({});
+
+      sinon.assert.calledOnceWithExactly(
+        toolHandler,
+        {params: {}},
+        sinon.match(
+          response =>
+            response instanceof McpResponse &&
+            !(response instanceof SlimMcpResponse),
+        ),
+        context,
+      );
     });
 
     it('enables slim tools with --slim', () => {

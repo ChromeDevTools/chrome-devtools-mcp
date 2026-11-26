@@ -6,11 +6,13 @@
 
 import {DEFAULT_MAX_NAVIGATION_SAVED} from '../collectors/constants.js';
 import type {YargsOptions} from '../third_party/index.js';
+import {parseDurationMs} from '../utils/duration.js';
 import os from 'node:os';
 import path from 'node:path';
 
 import {
   getCategoryOptions,
+  getCategoryOptionsForViaCli,
   type CategoryArguments,
   type McpOption,
   type McpOptionsFor,
@@ -46,6 +48,7 @@ export interface McpArguments
   usageStatistics: boolean;
   javascriptEvaluation: boolean;
   fileNavigations: boolean;
+  backgroundNewPages: boolean;
   sourceMaps: boolean;
   maxNavigationSaved: number;
   clearcutEndpoint?: string;
@@ -53,6 +56,7 @@ export interface McpArguments
   clearcutIncludePidHeader: boolean;
   slim: boolean;
   viaCli: boolean;
+  idleTimeout?: string;
   redactNetworkHeaders: boolean;
   allowUnrestrictedPaths: boolean;
   filesystemRoot?: string[];
@@ -211,6 +215,13 @@ export const mcpOptions: McpOptions = {
       'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page, the slim navigate tool, install_pwa and launch_pwa reject file: URLs, including view-source: URLs that target them. This restricts navigations the server performs. It is not a filesystem sandbox: it does not affect pages the browser already had open when the server connected, and the browser can reach the filesystem by other means. Use OS sandboxing for full filesystem confinement.',
     reloadable: true,
   },
+  backgroundNewPages: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Set to true to open every page created by new_page in the background, without bringing it to the front, whatever the tool call passes for background. Useful when several agents or the user share one visible browser and new tabs should not take focus.',
+    reloadable: true,
+  },
   sourceMaps: {
     type: 'boolean',
     default: true,
@@ -268,6 +279,18 @@ export const mcpOptions: McpOptions = {
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
   },
+  idleTimeout: {
+    type: 'string',
+    describe:
+      'Close or disconnect an idle browser after this duration without a tool call, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). Closes a launched browser (closing all open pages), or disconnects when using `--browserUrl`, `--wsEndpoint` or `--autoConnect` while leaving that browser open; the next tool call relaunches or reconnects automatically. In the `chrome-devtools` CLI, the background daemon also exits shortly afterwards. Disabled by default.',
+    coerce: (value: string | undefined): string | undefined => {
+      if (value === undefined) {
+        return;
+      }
+      parseDurationMs('idleTimeout', value);
+      return value;
+    },
+  },
   redactNetworkHeaders: {
     type: 'boolean',
     describe:
@@ -316,6 +339,7 @@ export const mcpOptions: McpOptions = {
 
 export const mcpOptionsForViaCli: McpOptions = {
   ...mcpOptions,
+  ...getCategoryOptionsForViaCli(),
   headless: {
     ...mcpOptions.headless,
     default: true,
@@ -323,11 +347,6 @@ export const mcpOptionsForViaCli: McpOptions = {
   memoryDebugging: {
     ...mcpOptions.memoryDebugging,
     default: true,
-  },
-  categoryExtensions: {
-    ...mcpOptions.categoryExtensions,
-    defaultDescription:
-      'true unless autoConnect, browserUrl or wsEndpoint is set',
   },
   experimentalStructuredContent: {
     ...mcpOptions.experimentalStructuredContent,

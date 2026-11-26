@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// The light bundle that the server loads at startup: MCP SDK, zod, ajv and
+// small modules. Puppeteer and DevTools frontend code belong in browser.ts,
+// which loadBrowser() loads on first use.
 import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
@@ -11,6 +14,7 @@ import 'core-js/proposals/iterator-helpers.js';
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 
+import type * as BrowserBundle from './browser.js';
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
 import * as zod from './zod.js';
 
@@ -54,6 +58,12 @@ export {
   AsyncDisposableStack,
   SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
+export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {PredefinedNetworkConditions} from 'puppeteer-core/internal/cdp/PredefinedNetworkConditions.js';
+// eslint-disable-next-line no-restricted-imports
+export * as StringUtilities from '../../third_party/devtools-frontend/front_end/core/platform/StringUtilities.js';
+// eslint-disable-next-line no-restricted-imports
+export * as Debouncer from '../../third_party/devtools-frontend/front_end/core/common/Debouncer.js';
 export async function getToonEncode(): Promise<(val: unknown) => string> {
   const {encode} = await import('@toon-format/toon');
   return encode;
@@ -61,6 +71,17 @@ export async function getToonEncode(): Promise<(val: unknown) => string> {
 export async function getGcfEncode(): Promise<(val: unknown) => string> {
   const {encodeGeneric} = await import('@blackwell-systems/gcf');
   return encodeGeneric;
+}
+
+let browserBundle: Promise<typeof BrowserBundle> | undefined;
+
+/**
+ * Loads the Puppeteer and DevTools bundle on first use, so that modules which
+ * only need it inside tool handlers can be imported without it.
+ */
+export function loadBrowser(): Promise<typeof BrowserBundle> {
+  browserBundle ??= import('./browser.js');
+  return browserBundle;
 }
 
 let lighthouseBundle: Promise<typeof LighthouseBundle> | undefined;

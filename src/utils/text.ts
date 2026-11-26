@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/browser.js';
-
-const {StringUtilities} = DevTools.Platform;
+import {StringUtilities} from '../third_party/index.js';
 
 const VALID_PLACEHOLDER_MATCH_PATTERN =
   /\{(PLACEHOLDER_[a-zA-Z][a-zA-Z0-9_]*)\}/g;

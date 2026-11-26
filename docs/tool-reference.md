@@ -304,7 +304,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension
+**Description:** Requests the specified page dimensions. Chrome may enforce a minimum window size, so the resulting page dimensions can differ from the requested values.
 
 **Parameters:**
 
@@ -365,20 +365,22 @@
 - **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
 - **requestFilePath** (string) _(optional)_: The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.
 - **responseFilePath** (string) _(optional)_: The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.
+- **serviceWorkerId** (string) _(optional)_: Get the request from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. Requires reqid, using the reqid listed for that service worker.
 
 ---
 
 ### `list_network_requests`
 
-**Description:** Lists the most recent requests for the target page since the last navigation.
+**Description:** Lists the most recent requests for the target page since the last navigation. With serviceWorkerId, lists the requests of that extension service worker instead.
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
+- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations. Ignored when serviceWorkerId is set.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+- **serviceWorkerId** (string) _(optional)_: List requests made by the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. The page selected by pageId is still used for the call and its console errors may be appended.
 
 ---
 
@@ -411,8 +413,9 @@
 
 **Parameters:**
 
-- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+- **msgid** (number) **(required)**: The msgid of a console message from [`list_console_messages`](#list_console_messages): for the page, or for the service worker when serviceWorkerId is set.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
+- **serviceWorkerId** (string) _(optional)_: Get the message from the service worker with this ID shown by [`list_pages`](#list_pages) (sw-N) instead of the page. pageId is ignored when set. Stack traces are not available for service worker messages.
 
 ---
 

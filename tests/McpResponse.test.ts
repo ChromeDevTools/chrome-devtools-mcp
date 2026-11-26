@@ -17,7 +17,7 @@ import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/browser.js';
+import {DevTools} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {
@@ -49,6 +49,7 @@ import {
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDiffObject,
+  createMockExtension,
   createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
@@ -896,6 +897,76 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reads an attached message from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const message = createMockConsoleMessage({
+      type: 'log',
+      text: 'logged by the service worker',
+    });
+    context.getServiceWorkerConsoleMessageById.returns(message);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachConsoleMessage(2, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleMessageById,
+      'sw-1',
+      2,
+    );
+    sinon.assert.notCalled(page.getConsoleMessageById);
+    assert.ok(
+      getTextContent(content[0]).includes('logged by the service worker'),
+    );
+  });
+
+  it('reads an attached network request from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    context.getServiceWorkerNetworkRequestById.returns(
+      getMockRequest({url: 'https://sw.example/data.json', stableId: 3}),
+    );
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.attachNetworkRequest(3, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerNetworkRequestById,
+      'sw-1',
+      3,
+    );
+    sinon.assert.notCalled(page.getNetworkRequestById);
+    assert.ok(
+      getTextContent(content[0]).includes('https://sw.example/data.json'),
+    );
+  });
+
+  it('lists network requests from the service worker when serviceWorkerId is set', async () => {
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    context.getServiceWorkerNetworkData.returns([
+      getMockRequest({url: 'https://sw.example/data.json', stableId: 1}),
+    ]);
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.setIncludeNetworkRequests(true, {serviceWorkerId: 'sw-1'});
+
+    const {content} = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerNetworkData,
+      'sw-1',
+    );
+    sinon.assert.notCalled(page.getNetworkRequests);
+    assert.ok(
+      getTextContent(content[0]).includes('https://sw.example/data.json'),
+    );
+  });
+
   it("doesn't list the issue message if mapping returns null", async t => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
@@ -1269,48 +1340,69 @@ describe('McpResponse network pagination', () => {
 
 describe('extensions', () => {
   it('lists extensions', async t => {
-    await withMcpContext(async (response, context) => {
-      response.setListExtensions();
-      // Empty state testing
-      const emptyResult = await response.handle(context);
-      const emptyText = getTextContent(emptyResult.content[0]);
-      assert.ok(
-        emptyText.includes('No unpacked extensions found.'),
-        'Should show message for empty extensions',
-      );
+    const context = createMockMcpContext();
+    context.listExtensions.resolves(new Map());
 
-      response.resetResponseLineForTesting();
-      // Testing with extensions
-      context.listExtensions = async () =>
-        await Promise.resolve(
-          new Map<string, Extension>([
-            [
-              'id1',
-              {
-                id: 'id1',
-                name: 'Extension 1',
-                version: '1.0',
-                enabled: true,
-                path: '/path/to/ext1',
-              } as Extension,
-            ],
-            [
-              'id2',
-              {
-                id: 'id2',
-                name: 'Extension 2',
-                version: '2.0',
-                enabled: false,
-                path: '/path/to/ext2',
-              } as Extension,
-            ],
-          ]),
-        );
-      response.setListExtensions();
-      const {content, structuredContent} = await response.handle(context);
+    const emptyResponse = new McpResponse(createMockServerConfig());
+    emptyResponse.setListExtensions();
+    const emptyResult = await emptyResponse.handle(context);
+    const emptyText = getTextContent(emptyResult.content[0]);
+    assert.ok(
+      emptyText.includes('No unpacked extensions found.'),
+      'Should show message for empty extensions',
+    );
+    assert.deepStrictEqual(
+      JSON.parse(JSON.stringify(emptyResult.structuredContent)),
+      {extensions: []},
+    );
 
-      t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    context.listExtensions.resolves(
+      new Map([
+        [
+          'id1',
+          createMockExtension({
+            id: 'id1',
+            name: 'Extension 1',
+            version: '1.0',
+            enabled: true,
+            path: '/path/to/ext1',
+          }),
+        ],
+        [
+          'id2',
+          createMockExtension({
+            id: 'id2',
+            name: 'Extension 2',
+            version: '2.0',
+            enabled: false,
+            path: '/path/to/ext2',
+          }),
+        ],
+      ]),
+    );
+    const response = new McpResponse(createMockServerConfig());
+    response.setListExtensions();
+    const {content, structuredContent} = await response.handle(context);
+
+    t.assert.snapshot(getTextContent(content[0]));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(structuredContent)), {
+      extensions: [
+        {
+          id: 'id1',
+          name: 'Extension 1',
+          version: '1.0',
+          enabled: true,
+          path: '/path/to/ext1',
+        },
+        {
+          id: 'id2',
+          name: 'Extension 2',
+          version: '2.0',
+          enabled: false,
+          path: '/path/to/ext2',
+        },
+      ],
     });
   });
 });

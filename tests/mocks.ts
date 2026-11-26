@@ -24,12 +24,6 @@
 
 import './setupDevTools.js';
 
-import {
-  EventEmitter,
-  type Frame,
-  type Mouse,
-  type SerializedAXNode,
-} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
@@ -66,6 +60,7 @@ import {
   DevTools,
   Dialog,
   ElementHandle,
+  EventEmitter,
   Locator,
   Target,
   TargetType,
@@ -74,6 +69,8 @@ import {
   WebMCP,
   WebMCPTool,
   type Browser,
+  type Frame,
+  type Mouse,
   type ResourceType,
   type BrowserContext,
   type ConsoleMessageLocation,
@@ -83,6 +80,7 @@ import {
   type Page,
   type Protocol,
   type Realm,
+  type SerializedAXNode,
 } from '../src/third_party/browser.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
@@ -233,10 +231,19 @@ export class MockCDPSession extends CDPSession {
   override id(): string {
     return '';
   }
+  // Internal Puppeteer API that collectors read the target ID from.
+  target(): {_targetId: string} {
+    throw new Error('Not implemented');
+  }
 }
 
-export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSession> {
+export function createMockCDPSession(
+  options: {targetId?: string} = {},
+): sinon.SinonStubbedInstance<MockCDPSession> {
   const session = sinon.createStubInstance(MockCDPSession);
+  if (options.targetId !== undefined) {
+    session.target.returns({_targetId: options.targetId});
+  }
   const connection = sinon.createStubInstance(Connection);
   connection.session.returns(session);
   session.connection.returns(connection);
@@ -250,14 +257,16 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
 export function createMockHTTPRequest(
   options: {
     url?: string;
+    method?: string;
+    headers?: Record<string, string>;
     resourceType?: ResourceType;
   } = {},
 ): sinon.SinonStubbedInstance<CdpHTTPRequest> {
   const request = sinon.createStubInstance(CdpHTTPRequest);
   request.url.returns(options.url ?? 'https://example.com/app.js');
-  request.method.returns('GET');
+  request.method.returns(options.method ?? 'GET');
   request.resourceType.returns(options.resourceType ?? 'script');
-  request.headers.returns({});
+  request.headers.returns(options.headers ?? {});
   request.continue.resolves();
   request.respond.resolves();
   request.abort.resolves();
@@ -507,7 +516,11 @@ class MockWebWorker extends WebWorker {
 }
 
 export function createMockWebWorker(): sinon.SinonStubbedInstance<MockWebWorker> {
-  return sinon.createStubInstance(MockWebWorker);
+  const worker = sinon.createStubInstance(MockWebWorker);
+  const client = createMockCDPSession();
+  sinon.stub(worker, 'client').get(() => client);
+  stubEventEmitter(worker);
+  return worker;
 }
 
 export function createMockMcpWorker(
@@ -1129,13 +1142,13 @@ export function createMockExtension(
   } = {},
 ): Extension {
   const extension = sinon.createStubInstance(CdpExtension);
-  sinon.stub(extension, 'id').value(options.id ?? 'mock-extension-id');
+  sinon.stub(extension, 'id').get(() => options.id ?? 'mock-extension-id');
   sinon
     .stub(extension, 'path')
-    .value(options.path ?? '/path/to/mock/extension');
-  sinon.stub(extension, 'name').value(options.name ?? 'Mock Extension');
-  sinon.stub(extension, 'version').value(options.version ?? '1.0.0');
-  sinon.stub(extension, 'enabled').value(options.enabled ?? true);
+    .get(() => options.path ?? '/path/to/mock/extension');
+  sinon.stub(extension, 'name').get(() => options.name ?? 'Mock Extension');
+  sinon.stub(extension, 'version').get(() => options.version ?? '1.0.0');
+  sinon.stub(extension, 'enabled').get(() => options.enabled ?? true);
   return extension as unknown as Extension;
 }
 
