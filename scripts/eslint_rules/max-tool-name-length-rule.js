@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Model APIs reject long function names: OpenAI and Anthropic allow at most 64
-// characters. MCP clients may shorten names that exceed the limit, but a tool
-// name longer than that can never be sent unchanged. See also b/590083070
+// Model APIs accept function names of up to 128 characters, but MCP clients
+// and agent harnesses can add their own prefixes before sending tool names to
+// the model (for example `mcp_<plugin>_<server>_<tool>`). Limiting tool names
+// to 64 characters leaves headroom for those prefixes. See also b/590083070
 // (internal).
 const DEFAULT_MAX_LENGTH = 64;
 
