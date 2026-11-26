@@ -8,7 +8,7 @@ import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
-import type {McpResponse, DataFormat} from './McpResponse.js';
+import type {McpResponse, DataFormat, SnapshotRenderer} from './McpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {
   DisposableStack,
@@ -61,6 +61,7 @@ class ToolCallTimeoutError extends Error {}
 type ResponseFactory = (
   slim: boolean,
   config: ReadonlyServerConfig,
+  snapshotRenderer?: SnapshotRenderer,
 ) => McpResponse;
 
 let responseFactory: Promise<ResponseFactory> | undefined;
@@ -73,11 +74,14 @@ function loadResponseFactory(): Promise<ResponseFactory> {
   responseFactory ??= Promise.all([
     import('./McpResponse.js'),
     import('./SlimMcpResponse.js'),
-  ]).then(([mcpResponseModule, slimMcpResponseModule]) => (slim, config) => {
-    return slim
-      ? new slimMcpResponseModule.SlimMcpResponse(config)
-      : new mcpResponseModule.McpResponse(config);
-  });
+  ]).then(
+    ([mcpResponseModule, slimMcpResponseModule]) =>
+      (slim, config, snapshotRenderer) => {
+        return slim
+          ? new slimMcpResponseModule.SlimMcpResponse(config, snapshotRenderer)
+          : new mcpResponseModule.McpResponse(config, snapshotRenderer);
+      },
+  );
   return responseFactory;
 }
 
@@ -276,6 +280,7 @@ export class ToolHandler {
     config: ReadonlyServerConfig,
     private readonly getContext: () => Promise<McpContext>,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
+    private readonly snapshotRenderer?: SnapshotRenderer,
   ) {
     this.#tool = tool;
     this.#config = config;
@@ -556,7 +561,11 @@ export class ToolHandler {
     let pageUrl: string | undefined;
     try {
       logger?.(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-      const response = createResponse(isSlimTool(tool), this.#config);
+      const response = createResponse(
+        isSlimTool(tool),
+        this.#config,
+        this.snapshotRenderer,
+      );
       // The execution owns the queue even when its caller stops waiting.
       const execution = isBrowserlessTool(tool)
         ? this.#runBrowserlessTool(tool, params, response, context, signal)

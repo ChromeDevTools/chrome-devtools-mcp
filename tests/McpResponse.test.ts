@@ -14,12 +14,19 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../src/config/mcp-options.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../src/formatters/ConsoleFormatter.js';
+import {SnapshotFormatter} from '../src/formatters/SnapshotFormatter.js';
 import type {McpContext} from '../src/McpContext.js';
-import {McpResponse} from '../src/McpResponse.js';
+import {
+  McpResponse,
+  type DataFormat,
+  type SnapshotRenderInput,
+  type SnapshotRenderer,
+} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/browser.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
+import {truncateText} from '../src/utils/text.js';
 import {
   closePage,
   listPages,
@@ -97,6 +104,122 @@ after(() => {
 });
 
 describe('McpResponse', () => {
+  describe('snapshot renderer', () => {
+    const secret = 'private-value';
+
+    function createSnapshotResponse(renderer?: SnapshotRenderer) {
+      const root: TextSnapshotNode = {
+        id: '1_0',
+        role: 'textbox',
+        name: `${'A'.repeat(45)}${secret}${'B'.repeat(45)}`,
+        children: [],
+        elementHandle: async () => null,
+      };
+      const snapshot = new TextSnapshot({
+        root,
+        idToNode: new Map([[root.id, root]]),
+        snapshotId: 'snapshot-43',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      sinon.stub(TextSnapshot, 'create').resolves(snapshot);
+      const page = createMockMcpPage({id: 9});
+      const context = createMockMcpContext({selectedPage: page});
+      const response = new McpResponse(createMockServerConfig(), renderer);
+      response.setPage(page);
+      response.includeSnapshot();
+      return {response, context};
+    }
+
+    it('passes the sampled identity and renders both response forms', async () => {
+      const renderer = sinon.spy((input: SnapshotRenderInput) => {
+        assert.strictEqual(input.pageId, 9);
+        assert.strictEqual(input.snapshotId, 'snapshot-43');
+        assert.ok(input.formatter instanceof SnapshotFormatter);
+        const rawText = input.formatter.toString();
+        assert.ok(rawText.includes(secret));
+        assert.ok(JSON.stringify(input.formatter.toJSON()).includes(secret));
+        const boundaryInsideSecret =
+          rawText.indexOf(secret) + secret.length - 1;
+        const redactedText = rawText.replace(secret, '[redacted]');
+        return {
+          text: truncateText(redactedText, boundaryInsideSecret, {
+            ellipsis: '',
+          }),
+          structured: {name: '[redacted]'},
+        };
+      });
+      const {response, context} = createSnapshotResponse(renderer);
+
+      const result = await response.handle(context);
+
+      sinon.assert.calledOnce(renderer);
+      assert.deepStrictEqual(result.structuredContent, {
+        snapshot: {name: '[redacted]'},
+      });
+      assert.ok(getTextContent(result.content[0]).includes('[redacted]'));
+      assert.ok(!JSON.stringify(result).includes(secret));
+    });
+
+    for (const dataFormat of ['toon', 'gcf'] satisfies DataFormat[]) {
+      it(`encodes the rendered structured snapshot with ${dataFormat}`, async () => {
+        const renderer = sinon.stub().returns({
+          text: 'safe text',
+          structured: {name: 'safe structure'},
+        });
+        const {response, context} = createSnapshotResponse(renderer);
+
+        const result = await response.handle(context, dataFormat);
+
+        sinon.assert.calledOnce(renderer);
+        assert.deepStrictEqual(result.structuredContent, {
+          snapshot: {name: 'safe structure'},
+        });
+        assert.ok(getTextContent(result.content[0]).includes('safe structure'));
+        assert.ok(!JSON.stringify(result).includes(secret));
+      });
+    }
+
+    it('leaves full file exports on the original path', async () => {
+      const renderer = sinon.stub();
+      const {response, context} = createSnapshotResponse(renderer);
+      context.saveFile.resolves({filename: '/safe/snapshot.txt'});
+      response.includeSnapshot({
+        verbose: false,
+        filePath: '/safe/snapshot.txt',
+      });
+
+      const result = await response.handle(context);
+
+      sinon.assert.notCalled(renderer);
+      sinon.assert.calledOnce(context.saveFile);
+      const [fileContent, filePath, extension] =
+        context.saveFile.firstCall.args;
+      assert.ok(new TextDecoder().decode(fileContent).includes(secret));
+      assert.strictEqual(filePath, '/safe/snapshot.txt');
+      assert.strictEqual(extension, '.txt');
+      assert.deepStrictEqual(result.structuredContent, {
+        snapshotFilePath: '/safe/snapshot.txt',
+      });
+    });
+
+    it('fails without returning the raw snapshot when rendering fails', async () => {
+      const renderer = sinon
+        .stub()
+        .rejects(new Error(`render failed: ${secret}`));
+      const {response, context} = createSnapshotResponse(renderer);
+
+      await assert.rejects(response.handle(context), error => {
+        assert.ok(error instanceof Error);
+        assert.strictEqual(error.message, 'Snapshot renderer failed');
+        return true;
+      });
+
+      sinon.assert.calledOnce(renderer);
+      sinon.assert.notCalled(context.saveFile);
+    });
+  });
+
   it('truncates a long page title without splitting a surrogate pair', async () => {
     // The 50 code unit limit leaves 47 for the title; the emoji sits at 46-47.
     const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);

@@ -18,6 +18,7 @@ import {
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import type {McpContext} from './McpContext.js';
+import type {SnapshotRenderer} from './McpResponse.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
@@ -51,9 +52,17 @@ import {VERSION} from './version.js';
  */
 const ROOTS_REQUEST_TIMEOUT = 5_000;
 
+export type {
+  SnapshotRenderInput,
+  SnapshotRenderOutput,
+  SnapshotRenderer,
+} from './McpResponse.js';
+
 export interface McpServerOptions {
   browserManager: BrowserManager;
   logFile?: fs.WriteStream;
+  /** Replaces response snapshots only; file exports retain their full content. */
+  snapshotRenderer?: SnapshotRenderer;
 }
 
 interface ToolEntry {
@@ -65,6 +74,7 @@ export class McpServer {
   readonly server: SdkMcpServer;
   #config: ServerConfig;
   #browserManager: BrowserManager;
+  readonly #snapshotRenderer?: SnapshotRenderer;
   #context?: McpContext;
   #contextPromise?: Promise<McpContext>;
   #closed = false;
@@ -92,6 +102,7 @@ export class McpServer {
   private constructor(config: ServerConfig, options: McpServerOptions) {
     this.#config = config;
     this.#browserManager = options.browserManager;
+    this.#snapshotRenderer = options.snapshotRenderer;
     const serverArgs = this.#config.resolved;
     if (serverArgs.idleTimeout !== undefined) {
       this.#idleTimer = new IdleTimer({
@@ -479,6 +490,7 @@ export class McpServer {
       this.#config,
       () => this.#getContext(),
       () => this.#browserManager.abandonPendingAttempt(),
+      this.#snapshotRenderer,
     );
   }
 
@@ -539,6 +551,7 @@ export async function createMcpServer(
   serverArgs: ParsedArguments,
   options: {
     logFile?: fs.WriteStream;
+    snapshotRenderer?: SnapshotRenderer;
   },
 ): Promise<{server: SdkMcpServer}> {
   // createMcpServer takes a flat ParsedArguments snapshot and only returns

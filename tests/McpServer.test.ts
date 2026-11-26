@@ -22,11 +22,17 @@ import {mcpOptions} from '../src/config/mcp-options.js';
 import {getIssueDescription} from '../src/devtools/issueDescriptions.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
+import type {
+  SnapshotRenderInput,
+  SnapshotRenderer,
+} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
 import {ScreenRecorder} from '../src/third_party/browser.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
+import type {TextSnapshotNode} from '../src/types.js';
 import {saveLogsToFile} from '../src/utils/logger.js';
 
 import {
@@ -62,7 +68,10 @@ describe('McpServer', () => {
 
   async function createTestServer(
     extraArgs: string[] = [],
-    {mockContext = true}: {mockContext?: boolean} = {},
+    {
+      mockContext = true,
+      snapshotRenderer,
+    }: {mockContext?: boolean; snapshotRenderer?: SnapshotRenderer} = {},
   ) {
     const browserManager = sinon.createStubInstance(BrowserManager);
     const browser = createMockPuppeteerBrowser();
@@ -77,7 +86,10 @@ describe('McpServer', () => {
 
     const configParser = createConfigParser(extraArgs);
     const config = configParser.parseConfig();
-    const server = await McpServer.from(config, {browserManager});
+    const server = await McpServer.from(config, {
+      browserManager,
+      snapshotRenderer,
+    });
     return {server, browserManager, context, config, configParser};
   }
 
@@ -315,6 +327,72 @@ describe('McpServer', () => {
   });
 
   describe('callTool', () => {
+    it('renders explicit and automatic snapshots with its server hook', async () => {
+      const renderer = sinon.spy((input: SnapshotRenderInput) => {
+        assert.strictEqual(input.pageId, 9);
+        assert.strictEqual(input.snapshotId, 'snapshot-43');
+        return {text: 'safe snapshot', structured: {name: 'safe snapshot'}};
+      });
+      const {server, context} = await createTestServer(
+        ['--experimentalStructuredContent'],
+        {
+          snapshotRenderer: renderer,
+        },
+      );
+      const page = context.getSelectedMcpPage();
+      Object.defineProperty(page, 'id', {value: 9});
+      context.getPageById.withArgs(9).returns(page);
+      const root: TextSnapshotNode = {
+        id: '1_0',
+        role: 'textbox',
+        name: 'private-value',
+        children: [],
+        elementHandle: async () => null,
+      };
+      const snapshot = new TextSnapshot({
+        root,
+        idToNode: new Map([[root.id, root]]),
+        snapshotId: 'snapshot-43',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      sinon.stub(TextSnapshot, 'create').resolves(snapshot);
+
+      try {
+        const explicit = await server.callTool('take_snapshot', {pageId: 9});
+        const automatic = await server.callTool('wait_for', {
+          pageId: 9,
+          text: ['Ready'],
+        });
+
+        assert.strictEqual(
+          explicit.isError,
+          undefined,
+          JSON.stringify(explicit),
+        );
+        assert.strictEqual(
+          automatic.isError,
+          undefined,
+          JSON.stringify(automatic),
+        );
+        sinon.assert.calledTwice(renderer);
+        const safeSnapshot = {name: 'safe snapshot'};
+        assert.deepStrictEqual(explicit.structuredContent, {
+          snapshot: safeSnapshot,
+        });
+        assert.deepStrictEqual(automatic.structuredContent, {
+          message: 'Element matching one of ["Ready"] found.',
+          snapshot: safeSnapshot,
+        });
+        for (const result of [explicit, automatic]) {
+          assert.ok(JSON.stringify(result).includes('safe snapshot'));
+          assert.ok(!JSON.stringify(result).includes('private-value'));
+        }
+      } finally {
+        await server.close();
+      }
+    });
+
     it('forwards the MCP request signal through the dispatcher', async () => {
       const started = Promise.withResolvers<AbortSignal>();
       const aborted = Promise.withResolvers<void>();

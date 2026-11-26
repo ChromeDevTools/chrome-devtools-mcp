@@ -89,6 +89,21 @@ const MAX_CONSOLE_ERRORS = 10;
 
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
+export interface SnapshotRenderInput {
+  pageId: number;
+  snapshotId: string;
+  formatter: SnapshotFormatter;
+}
+
+export interface SnapshotRenderOutput {
+  text: string;
+  structured: object;
+}
+
+export type SnapshotRenderer = (
+  input: SnapshotRenderInput,
+) => SnapshotRenderOutput | Promise<SnapshotRenderOutput>;
+
 interface TraceInsightData {
   trace: TraceResult;
   insightSetId: string;
@@ -168,13 +183,18 @@ export class McpResponse implements Response {
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
   #webAuthnFormatter?: WebAuthnFormatter;
+  readonly #snapshotRenderer?: SnapshotRenderer;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
   }
 
-  constructor(config: ReadonlyServerConfig) {
+  constructor(
+    config: ReadonlyServerConfig,
+    snapshotRenderer?: SnapshotRenderer,
+  ) {
     this.#config = config;
+    this.#snapshotRenderer = snapshotRenderer;
   }
 
   setPage(page: McpPage): void {
@@ -565,7 +585,7 @@ export class McpResponse implements Response {
 
   async #handleSnapshot(
     context: McpContext,
-  ): Promise<SnapshotFormatter | string | undefined> {
+  ): Promise<SnapshotFormatter | SnapshotRenderOutput | string | undefined> {
     if (!this.#snapshotParams) {
       return undefined;
     }
@@ -584,6 +604,18 @@ export class McpResponse implements Response {
         '.txt',
       );
       return result.filename;
+    }
+    if (this.#snapshotRenderer) {
+      try {
+        return await this.#snapshotRenderer({
+          pageId: this.#page.id,
+          snapshotId: this.#page.textSnapshot.snapshotId,
+          formatter,
+        });
+      } catch {
+        // Renderer errors may contain snapshot values; do not expose them.
+        throw new Error('Snapshot renderer failed');
+      }
     }
     return formatter;
   }
@@ -957,7 +989,7 @@ export class McpResponse implements Response {
       detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
       consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
       consoleErrors?: Array<ConsoleFormatter | IssueFormatter>;
-      snapshot: SnapshotFormatter | string | undefined;
+      snapshot: SnapshotFormatter | SnapshotRenderOutput | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
       traceSummary?: TraceResult;
@@ -1420,12 +1452,19 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         response.push(`Saved snapshot to ${data.snapshot}.`);
         structuredContent.snapshotFilePath = data.snapshot;
       } else {
-        structuredContent.snapshot = data.snapshot.toJSON();
+        const renderedSnapshot =
+          data.snapshot instanceof SnapshotFormatter
+            ? {
+                structured: data.snapshot.toJSON(),
+                text: data.snapshot.toString(),
+              }
+            : data.snapshot;
+        structuredContent.snapshot = renderedSnapshot.structured;
         response.push('## Latest page snapshot');
         response.push(
           compactEncode
             ? compactEncode(structuredContent.snapshot)
-            : data.snapshot.toString(),
+            : renderedSnapshot.text,
         );
       }
     }

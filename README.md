@@ -186,6 +186,16 @@ If you are developing agentic tooling and want to provide an integrated browser 
 
 For a reference implementation, see the [Gemini CLI browser agent documentation](https://geminicli.com/docs/core/subagents/#browser-agent).
 
+Programmatic embedders can pass an optional `snapshotRenderer` to
+`McpServer.from(config, options)` or `createMcpServer(serverArgs, options)`.
+The callback receives the sampled snapshot's `SnapshotFormatter`, `pageId`, and
+`snapshotId`, and returns `{text, structured}` for the response. It applies to
+snapshots attached by any tool, while `take_snapshot` file exports keep their
+full output and existing path validation. Without the option, responses are
+unchanged. A renderer error fails the tool call without returning the raw
+snapshot. Keep redaction, excerpt limits, and continuation state in the
+embedder; redact before truncating and key continuation by both IDs.
+
 [advanced-usage-guide]: ./docs/advanced-usage.md
 [changelog]: ./CHANGELOG.md
 [cli]: ./docs/cli.md
