@@ -508,6 +508,10 @@
     "flagType": "boolean"
   },
   {
+    "name": "idle_timeout_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "code_mode_present",
     "flagType": "boolean"
   },

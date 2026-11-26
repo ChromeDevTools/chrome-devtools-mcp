@@ -2175,6 +2175,71 @@ describe('McpContext', () => {
     });
   });
 
+  describe('onBrowserClosed', () => {
+    it('disposes browser state and surfaces a reconnect notice on the next connection', async () => {
+      const browser1 = createMockPuppeteerBrowser();
+      browser1.targets.returns([createPageTarget().target]);
+      const browser2 = createMockPuppeteerBrowser();
+      browser2.targets.returns([createPageTarget().target]);
+      const getBrowser = sinon
+        .stub<[], Promise<Browser>>()
+        .onFirstCall()
+        .resolves(browser1)
+        .onSecondCall()
+        .resolves(browser2);
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config: createMockServerConfig(),
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      await context.ensureBrowser();
+      assert.strictEqual(context.consumeReconnectNotice(), false);
+      const [firstPage] = context.getPages();
+      assert.ok(firstPage);
+      const disposeSpy = sinon.spy(firstPage, 'dispose');
+
+      context.onBrowserClosed();
+
+      sinon.assert.calledOnceWithExactly(disposeSpy);
+      assert.deepStrictEqual(context.getPages(), []);
+      assert.throws(() => context.browser, /Not connected to a browser/);
+
+      await context.ensureBrowser();
+      assert.strictEqual(context.consumeReconnectNotice(), true);
+      context.dispose();
+    });
+
+    it('is a no-op before a browser connects', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([createPageTarget().target]);
+      const getBrowser = sinon.stub<[], Promise<Browser>>().resolves(browser);
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config: createMockServerConfig(),
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      context.onBrowserClosed();
+      await context.ensureBrowser();
+
+      assert.strictEqual(context.consumeReconnectNotice(), false);
+      context.dispose();
+    });
+  });
+
   describe('extensions', () => {
     const server = serverHooks();
 

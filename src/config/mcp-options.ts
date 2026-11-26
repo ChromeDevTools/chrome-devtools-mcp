@@ -6,6 +6,7 @@
 
 import {DEFAULT_MAX_NAVIGATION_SAVED} from '../collectors/constants.js';
 import type {YargsOptions} from '../third_party/index.js';
+import {parseDurationMs} from '../utils/duration.js';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -57,6 +58,7 @@ export interface McpArguments
   codeMode: boolean;
   codeModeMainWorld: boolean;
   viaCli: boolean;
+  idleTimeout?: string;
   redactNetworkHeaders: boolean;
   allowUnrestrictedPaths: boolean;
   filesystemRoot?: string[];
@@ -291,6 +293,18 @@ export const mcpOptions: McpOptions = {
     describe:
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
+  },
+  idleTimeout: {
+    type: 'string',
+    describe:
+      'Close or disconnect an idle browser after this duration without a tool call, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). Closes a launched browser (closing all open pages), or disconnects when using `--browserUrl`, `--wsEndpoint` or `--autoConnect` while leaving that browser open; the next tool call relaunches or reconnects automatically. In the `chrome-devtools` CLI, the background daemon also exits shortly afterwards. Disabled by default.',
+    coerce: (value: string | undefined): string | undefined => {
+      if (value === undefined) {
+        return;
+      }
+      parseDurationMs('idleTimeout', value);
+      return value;
+    },
   },
   redactNetworkHeaders: {
     type: 'boolean',

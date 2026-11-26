@@ -35,7 +35,9 @@ import {buildStrictRuntimeOutputSchema} from './tools/codeMode/codeModeSchema.js
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
+import {parseDurationMs} from './utils/duration.js';
 import {getErrorMessage} from './utils/errorHandling.js';
+import {IdleTimer} from './utils/IdleTimer.js';
 import {logger} from './utils/logger.js';
 import {TaskRunner} from './utils/TaskRunner.js';
 import {VERSION} from './version.js';
@@ -84,12 +86,22 @@ export class McpServer {
    */
   #initialRoots?: Promise<void>;
   #configWatcher?: ConfigWatcher;
+  #idleTimer?: IdleTimer;
+  #idleCloseAbortController?: AbortController;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
     this.#config = config;
     this.#browserManager = options.browserManager;
     const serverArgs = this.#config.resolved;
+    if (serverArgs.idleTimeout !== undefined) {
+      this.#idleTimer = new IdleTimer({
+        timeoutMs: parseDurationMs('idleTimeout', serverArgs.idleTimeout),
+        onIdle: () => {
+          void this.#closeIdleBrowser();
+        },
+      });
+    }
 
     if (serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -170,7 +182,7 @@ export class McpServer {
         isError: true,
       };
     }
-    return await toolHandler.handle(args);
+    return await this.#handleToolCall(toolHandler, args);
   }
 
   /**
@@ -287,6 +299,8 @@ export class McpServer {
    */
   async close(): Promise<void> {
     this.#closed = true;
+    this.#idleCloseAbortController?.abort();
+    this.#idleTimer?.dispose();
     this.#configWatcher?.dispose();
     this.#configWatcher = undefined;
     try {
@@ -414,6 +428,52 @@ export class McpServer {
     return await this.#ensureContext();
   }
 
+  #handleToolCall(
+    handler: ToolHandler,
+    args?: Record<string, unknown>,
+    options?: {viaMcp?: boolean; signal?: AbortSignal},
+  ): Promise<CallToolResult> {
+    this.#idleCloseAbortController?.abort();
+    const idleTimer = this.#idleTimer;
+    if (!idleTimer) {
+      return handler.handle(args, options);
+    }
+    return idleTimer.track(() => handler.handle(args, options));
+  }
+
+  async #closeIdleBrowser(): Promise<void> {
+    if (this.#closed || this.#idleTimer?.hasActiveWork) {
+      return;
+    }
+    const controller = new AbortController();
+    this.#idleCloseAbortController = controller;
+    try {
+      using guard = await this.#taskRunner.pause(controller.signal);
+      this.#idleCloseAbortController = undefined;
+      if (
+        this.#closed ||
+        controller.signal.aborted ||
+        this.#idleTimer?.hasActiveWork
+      ) {
+        return;
+      }
+      if (this.#context) {
+        await this.#context.releaseScreencasts('the browser was idle');
+        await this.#context.releasePerformanceTrace('the browser was idle');
+        this.#context.onBrowserClosed();
+      }
+      await this.#browserManager.close();
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        logger?.('Failed to close idle browser', err);
+      }
+    } finally {
+      if (this.#idleCloseAbortController === controller) {
+        this.#idleCloseAbortController = undefined;
+      }
+    }
+  }
+
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {
     return new ToolHandler(
       tool,
@@ -436,10 +496,14 @@ export class McpServer {
           `Tool ${request.params.name} not found`,
         );
       }
-      const result = await entry.handler.handle(request.params.arguments, {
-        viaMcp: true,
-        signal: ctx.mcpReq.signal,
-      });
+      const result = await this.#handleToolCall(
+        entry.handler,
+        request.params.arguments,
+        {
+          viaMcp: true,
+          signal: ctx.mcpReq.signal,
+        },
+      );
       return this.server.server.projectCallToolResult(result, undefined);
     });
   }
@@ -460,7 +524,7 @@ export class McpServer {
             outputSchema,
             annotations: tool.annotations,
           },
-          args => handler.handle(args),
+          args => this.#handleToolCall(handler, args),
         )
       : this.server.registerTool(
           tool.name,
@@ -469,7 +533,7 @@ export class McpServer {
             inputSchema: handler.registeredInputSchema,
             annotations: tool.annotations,
           },
-          args => handler.handle(args),
+          args => this.#handleToolCall(handler, args),
         );
 
     if (handler.disabled) {

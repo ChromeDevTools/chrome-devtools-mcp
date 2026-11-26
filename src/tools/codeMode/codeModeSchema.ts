@@ -1015,24 +1015,58 @@ function collectCascadeRuleTypeLiterals(): string {
   return literals.length > 0 ? literals.join('|') : 'string';
 }
 
-const SNAPSHOT_NODE_RAW_TS = zodSchemaToTs(snapshotNodeSchema);
-const PAGINATION_TS = zodSchemaToTs(paginationOutputObjectSchema);
-const ACTION_RESULT_RAW_TS = zodOutputShapeToTs(
-  withRequiredOk(actionOutputSchema),
-);
-const NET_CONCISE_TS = zodSchemaToTs(networkRequestConciseSchema);
-const NET_DETAILED_TS = zodSchemaToTs(networkRequestDetailedSchema);
-const CONSOLE_CONCISE_TS = zodSchemaToTs(consoleMessageConciseSchema);
-const CONSOLE_DETAILED_TS = zodSchemaToTs(consoleMessageDetailedSchema);
-const ISSUE_CONCISE_TS = zodSchemaToTs(issueConciseSchema);
-const ISSUE_DETAILED_TS = zodSchemaToTs(issueDetailedSchema);
-const CSS_PROP_TS = zodSchemaToTs(structuredCssPropertySchema);
-const CSS_STYLES_RAW_TS = zodSchemaToTs(structuredCssStylesSchema);
-const CSS_RULE_TYPES_TS = collectCascadeRuleTypeLiterals();
+interface DeclarationTypeConstants {
+  snapshotNodeRawTs: string;
+  paginationTs: string;
+  actionResultRawTs: string;
+  netConciseTs: string;
+  netDetailedTs: string;
+  consoleConciseTs: string;
+  consoleDetailedTs: string;
+  issueConciseTs: string;
+  issueDetailedTs: string;
+  cssPropTs: string;
+  cssStylesRawTs: string;
+  cssRuleTypesTs: string;
+}
+
+let cachedDeclarationTypeConstants: DeclarationTypeConstants | undefined;
+
+function getDeclarationTypeConstants(): DeclarationTypeConstants {
+  cachedDeclarationTypeConstants ??= {
+    snapshotNodeRawTs: zodSchemaToTs(snapshotNodeSchema),
+    paginationTs: zodSchemaToTs(paginationOutputObjectSchema),
+    actionResultRawTs: zodOutputShapeToTs(withRequiredOk(actionOutputSchema)),
+    netConciseTs: zodSchemaToTs(networkRequestConciseSchema),
+    netDetailedTs: zodSchemaToTs(networkRequestDetailedSchema),
+    consoleConciseTs: zodSchemaToTs(consoleMessageConciseSchema),
+    consoleDetailedTs: zodSchemaToTs(consoleMessageDetailedSchema),
+    issueConciseTs: zodSchemaToTs(issueConciseSchema),
+    issueDetailedTs: zodSchemaToTs(issueDetailedSchema),
+    cssPropTs: zodSchemaToTs(structuredCssPropertySchema),
+    cssStylesRawTs: zodSchemaToTs(structuredCssStylesSchema),
+    cssRuleTypesTs: collectCascadeRuleTypeLiterals(),
+  };
+  return cachedDeclarationTypeConstants;
+}
 
 export function buildCodeModeApiDeclaration(
   innerTools: readonly AnyToolDefinition[],
 ): string {
+  const {
+    snapshotNodeRawTs,
+    paginationTs,
+    actionResultRawTs,
+    netConciseTs,
+    netDetailedTs,
+    consoleConciseTs,
+    consoleDetailedTs,
+    issueConciseTs,
+    issueDetailedTs,
+    cssPropTs,
+    cssStylesRawTs,
+    cssRuleTypesTs,
+  } = getDeclarationTypeConstants();
   const netDetailExtraFields: ToolSchema = {};
   for (const [k, v] of Object.entries(networkRequestDetailedSchema.shape)) {
     if (
@@ -1044,8 +1078,8 @@ export function buildCodeModeApiDeclaration(
     }
   }
   const netDetailExtraTs = zodOutputShapeToTs(netDetailExtraFields)
-    .replaceAll(`Array<${NET_CONCISE_TS}>`, 'NetReq[]')
-    .replaceAll(`${NET_CONCISE_TS}[]`, 'NetReq[]');
+    .replaceAll(`Array<${netConciseTs}>`, 'NetReq[]')
+    .replaceAll(`${netConciseTs}[]`, 'NetReq[]');
 
   const issueDetailExtraFields: ToolSchema = {};
   for (const [k, v] of Object.entries(issueDetailedSchema.shape)) {
@@ -1060,15 +1094,15 @@ export function buildCodeModeApiDeclaration(
       'type SnapshotNode = { id?: string; role?: string; name?: string; children?: SnapshotNode[]; [key: string]: unknown };',
     ),
     compactTsWhitespace(
-      `type ActionResult = ${ACTION_RESULT_RAW_TS.replaceAll(SNAPSHOT_NODE_RAW_TS, 'SnapshotNode')};`,
+      `type ActionResult = ${actionResultRawTs.replaceAll(snapshotNodeRawTs, 'SnapshotNode')};`,
     ),
-    compactTsWhitespace(`type Pagination = ${PAGINATION_TS};`),
-    compactTsWhitespace(`type NetReq = ${NET_CONCISE_TS};`),
-    compactTsWhitespace(`type ConsoleMsg = ${CONSOLE_CONCISE_TS};`),
-    compactTsWhitespace(`type IssueMsg = ${ISSUE_CONCISE_TS};`),
-    compactTsWhitespace(`type CssProp = ${CSS_PROP_TS};`),
+    compactTsWhitespace(`type Pagination = ${paginationTs};`),
+    compactTsWhitespace(`type NetReq = ${netConciseTs};`),
+    compactTsWhitespace(`type ConsoleMsg = ${consoleConciseTs};`),
+    compactTsWhitespace(`type IssueMsg = ${issueConciseTs};`),
+    compactTsWhitespace(`type CssProp = ${cssPropTs};`),
     compactTsWhitespace(
-      `type CssRule = { type: ${CSS_RULE_TYPES_TS}; selector?: string; name?: string; source?: string; matchingSelectors?: string[]; isUserAgent?: boolean; active?: boolean; pseudoType?: string; atRuleType?: string; subsection?: string; node?: { selector: string; uid?: string }; ancestors?: Array<{ type: string; name?: string; query?: string; selector?: string; atRuleType?: string; container?: { selector: string; uid?: string } }>; properties?: CssProp[] | Record<string, string>; keyframes?: Array<{ keyText: string; source?: string; properties: CssProp[] }> };`,
+      `type CssRule = { type: ${cssRuleTypesTs}; selector?: string; name?: string; source?: string; matchingSelectors?: string[]; isUserAgent?: boolean; active?: boolean; pseudoType?: string; atRuleType?: string; subsection?: string; node?: { selector: string; uid?: string }; ancestors?: Array<{ type: string; name?: string; query?: string; selector?: string; atRuleType?: string; container?: { selector: string; uid?: string } }>; properties?: CssProp[] | Record<string, string>; keyframes?: Array<{ keyText: string; source?: string; properties: CssProp[] }> };`,
     ),
   ];
 
@@ -1085,22 +1119,22 @@ export function buildCodeModeApiDeclaration(
     const head = rawSig.slice(0, splitIdx);
     const tail = rawSig
       .slice(splitIdx)
-      .replaceAll(`Promise<${ACTION_RESULT_RAW_TS}>`, 'Promise<ActionResult>')
-      .replaceAll(SNAPSHOT_NODE_RAW_TS, 'SnapshotNode')
-      .replaceAll(`pagination?: ${PAGINATION_TS}`, 'pagination?: Pagination')
+      .replaceAll(`Promise<${actionResultRawTs}>`, 'Promise<ActionResult>')
+      .replaceAll(snapshotNodeRawTs, 'SnapshotNode')
+      .replaceAll(`pagination?: ${paginationTs}`, 'pagination?: Pagination')
       .replaceAll(
-        `matchedStyles: ${CSS_STYLES_RAW_TS}`,
+        `matchedStyles: ${cssStylesRawTs}`,
         'matchedStyles: { element: { uid: string; selector: string }; rules: CssRule[] }',
       )
-      .replaceAll(NET_DETAILED_TS, `NetReq & ${netDetailExtraTs}`)
-      .replaceAll(`Array<${NET_CONCISE_TS}>`, 'NetReq[]')
-      .replaceAll(`${NET_CONCISE_TS}[]`, 'NetReq[]')
+      .replaceAll(netDetailedTs, `NetReq & ${netDetailExtraTs}`)
+      .replaceAll(`Array<${netConciseTs}>`, 'NetReq[]')
+      .replaceAll(`${netConciseTs}[]`, 'NetReq[]')
       .replaceAll(
-        `Array<${CONSOLE_CONCISE_TS} | ${ISSUE_CONCISE_TS}>`,
+        `Array<${consoleConciseTs} | ${issueConciseTs}>`,
         'Array<ConsoleMsg | IssueMsg>',
       )
       .replaceAll(
-        `${CONSOLE_DETAILED_TS} | ${ISSUE_DETAILED_TS}`,
+        `${consoleDetailedTs} | ${issueDetailedTs}`,
         `(ConsoleMsg & { args: string[] }) | (IssueMsg & ${issueDetailExtraTs})`,
       );
     methodLines.push(compactTsWhitespace(`${head}${tail}`));

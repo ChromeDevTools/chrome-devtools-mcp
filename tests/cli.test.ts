@@ -1076,6 +1076,8 @@ describe('cli args parsing', () => {
       cliOptions.categoryExperimentalThirdParty?.defaultDescription,
       'true',
     );
+    assert.strictEqual(mcpOptions.idleTimeout.hidden, undefined);
+    assert.strictEqual(cliOptions.idleTimeout?.hidden, undefined);
   });
 
   describe('mutual exclusivity', () => {
