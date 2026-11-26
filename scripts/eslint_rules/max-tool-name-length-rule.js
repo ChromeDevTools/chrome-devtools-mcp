@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// MCP clients prefix tool names before sending them to the model, e.g.
-// `mcp_<plugin>_<server>_<tool>`, and model APIs reject function names longer
-// than 64 characters. Keeping tool names short leaves room for that prefix.
-// 26 characters fit the prefix of the Google-internal plugin, see
-// b/590083070 (internal).
-const DEFAULT_MAX_LENGTH = 26;
+// Model APIs reject long function names: OpenAI and Anthropic allow at most 64
+// characters. MCP clients may shorten names that exceed the limit, but a tool
+// name longer than that can never be sent unchanged. See also b/590083070
+// (internal).
+const DEFAULT_MAX_LENGTH = 64;
 
 const TOOL_DEFINERS = new Set([
   'defineTool',
