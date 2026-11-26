@@ -15,12 +15,14 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 import sinon from 'sinon';
 
 import {
+  DEFAULT_RPC_TIMEOUT_MS,
   sendCommand,
   handleResponse,
   startDaemon,
   stopDaemon,
   verifyDaemonVersion,
 } from '../../src/daemon/client.js';
+import {MAX_SET_TIMEOUT_MS} from '../../src/utils/duration.js';
 import {
   DAEMON_SCRIPT_PATH,
   IS_WINDOWS,
@@ -219,6 +221,21 @@ describe('daemon client', () => {
       } finally {
         child.kill();
       }
+    });
+    it('cancels an in-flight tool call when the client times out and keeps the daemon healthy', async () => {
+      await startDaemon([], sessionId);
+
+      await assert.rejects(
+        sendCommand(
+          {method: 'invoke_tool', tool: 'list_pages', args: {}},
+          sessionId,
+          50,
+        ),
+        /Timeout waiting for daemon response/,
+      );
+
+      const status = await sendCommand({method: 'status'}, sessionId);
+      assert.strictEqual(status.success, true);
     });
   });
 
@@ -426,37 +443,58 @@ describe('daemon response deadline', () => {
     return {socket, destroy};
   }
 
-  it('receives a tool result after the default socket deadline', async () => {
+  it('uses a 180s default deadline for invoke_tool regardless of args.timeout', async () => {
     using dir = createTempDir('cdm-deadline-test-');
-    const {socket} = setupDeadlineTest(dir.path);
+    const {socket, destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
-      {method: 'invoke_tool', tool: 'navigate_page', args: {timeout: 120_000}},
+      {method: 'invoke_tool', tool: 'lighthouse_audit', args: {}},
       '',
     );
-    const expected = {success: true, result: 'loaded', error: null};
+    const expected = {success: true, result: 'done', error: null};
     const received = result.catch((error: unknown) => error);
-    await clock.tickAsync(75_000);
+    await clock.tickAsync(179_999);
+    sinon.assert.notCalled(destroy);
     socket.emit('data', Buffer.from(JSON.stringify(expected) + '\0'));
     assert.deepStrictEqual(await received, expected);
   });
 
-  it('still times out when a long-running tool never responds', async () => {
+  it('times out at 180s when invoke_tool never responds', async () => {
     using dir = createTempDir('cdm-deadline-test-');
     const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
-      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 120_000}},
+      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 5000}},
       '',
     );
     const assertion = assert.rejects(
       result,
-      /Timeout waiting for daemon response/,
+      /Timeout waiting for daemon response after 180000ms/,
     );
-    await clock.tickAsync(179_999);
+    await clock.tickAsync(DEFAULT_RPC_TIMEOUT_MS - 1);
     sinon.assert.notCalled(destroy);
     await clock.tickAsync(1);
     await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
+  });
+
+  it('does not extend the default RPC deadline from tool args.timeout', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const result = sendCommand(
+      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 300_000}},
+      '',
+    );
+    const assertion = assert.rejects(
+      result,
+      /Timeout waiting for daemon response after 180000ms/,
+    );
+    await clock.tickAsync(DEFAULT_RPC_TIMEOUT_MS - 1);
+    sinon.assert.notCalled(destroy);
+    await clock.tickAsync(1);
+    await assertion;
+    sinon.assert.calledOnceWithExactly(destroy);
   });
 
   it('status still times out at exactly 60 seconds', async () => {
@@ -474,26 +512,8 @@ describe('daemon response deadline', () => {
     sinon.assert.calledOnceWithExactly(destroy);
   });
 
-  it('adds the response grace period to a short tool timeout', async () => {
-    using dir = createTempDir('cdm-deadline-test-');
-    const {destroy} = setupDeadlineTest(dir.path);
-    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
-    const assertion = assert.rejects(
-      sendCommand(
-        {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 5000}},
-        '',
-      ),
-      /Timeout waiting for daemon response/,
-    );
-    await clock.tickAsync(64_999);
-    sinon.assert.notCalled(destroy);
-    await clock.tickAsync(1);
-    await assertion;
-    sinon.assert.calledOnceWithExactly(destroy);
-  });
-
   for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
-    it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
+    it(`keeps the 180s default deadline when tool args.timeout is ${timeout}`, async () => {
       using dir = createTempDir('cdm-deadline-test-');
       const {destroy} = setupDeadlineTest(dir.path);
       const clock = sinon.useFakeTimers({
@@ -507,7 +527,7 @@ describe('daemon response deadline', () => {
         result,
         /Timeout waiting for daemon response/,
       );
-      await clock.tickAsync(59_999);
+      await clock.tickAsync(DEFAULT_RPC_TIMEOUT_MS - 1);
       sinon.assert.notCalled(destroy);
       await clock.tickAsync(1);
       await assertion;
@@ -515,21 +535,22 @@ describe('daemon response deadline', () => {
     });
   }
 
-  it('does not overflow the timer for an extremely large tool timeout', async () => {
+  it('clamps an explicit RPC timeout above MAX_SET_TIMEOUT_MS', async () => {
     using dir = createTempDir('cdm-deadline-test-');
     const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
-      {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 2 ** 31}},
+      {method: 'invoke_tool', tool: 'wait_for', args: {}},
       '',
+      MAX_SET_TIMEOUT_MS + 60_000,
     );
     const assertion = assert.rejects(
       result,
       /Timeout waiting for daemon response/,
     );
-    await clock.tickAsync(60_000);
+    await clock.tickAsync(MAX_SET_TIMEOUT_MS - 1);
     sinon.assert.notCalled(destroy);
-    await clock.tickAsync(2 ** 31 - 1 - 60_000);
+    await clock.tickAsync(1);
     await assertion;
   });
 

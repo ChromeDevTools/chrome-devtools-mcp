@@ -28,6 +28,7 @@ import {assertValidSessionId, isDaemonRunning, serializeArgs} from './utils.js';
 import {yargs} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {logDisclaimers} from '../utils/disclaimers.js';
+import {parseDurationMs} from '../utils/duration.js';
 import {stripTerminalEscapes} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
@@ -242,6 +243,17 @@ export async function runCli(
           choices: ['md', 'json'],
           default: 'md',
         });
+        y.option('rpc-timeout', {
+          type: 'string',
+          description:
+            'Timeout for waiting on the daemon response, as an integer followed by s, m or h, for example 90s, 5m or 1h (defaults to 180s).',
+          coerce: (value: unknown): number | undefined => {
+            if (value === undefined) {
+              return undefined;
+            }
+            return parseDurationMs('rpc-timeout', value);
+          },
+        });
         registerCommandArgs(y, args);
         return y;
       },
@@ -264,14 +276,26 @@ export async function runCli(
             }
           }
 
-          const response = await sendDaemonCommand(
-            {
-              method: 'invoke_tool',
-              tool: commandName,
-              args: commandArgs,
-            },
-            sessionId,
-          );
+          const rpcTimeout = argv['rpc-timeout'] as number | undefined;
+          const response =
+            rpcTimeout !== undefined
+              ? await sendDaemonCommand(
+                  {
+                    method: 'invoke_tool',
+                    tool: commandName,
+                    args: commandArgs,
+                  },
+                  sessionId,
+                  rpcTimeout,
+                )
+              : await sendDaemonCommand(
+                  {
+                    method: 'invoke_tool',
+                    tool: commandName,
+                    args: commandArgs,
+                  },
+                  sessionId,
+                );
 
           if (response.success) {
             const toolResult: CallToolResult = JSON.parse(response.result);

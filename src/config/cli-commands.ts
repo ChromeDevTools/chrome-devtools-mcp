@@ -106,6 +106,7 @@ export type OptionKind = 'boolean' | 'array' | 'text' | 'value';
 export const GLOBAL_CLI_OPTIONS: ReadonlyMap<string, OptionKind> = new Map([
   ['sessionId', 'value'],
   ['outputFormat', 'value'],
+  ['rpcTimeout', 'value'],
   ['help', 'boolean'],
   ['version', 'boolean'],
 ]);

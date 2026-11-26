@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import {PipeTransport} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
+import {MAX_SET_TIMEOUT_MS} from '../utils/duration.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
 import {getTempFilePath} from '../utils/files.js';
 import {
@@ -150,25 +151,8 @@ export async function startDaemon(
   await waitForDaemonReady(sessionId);
 }
 
-const SEND_COMMAND_TIMEOUT = 60_000; // ms
-const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
-// Allow browser connection (up to TOOL_CALL_TIMEOUT_MS) and response construction.
-const RESPONSE_GRACE_MS = 60_000;
-
-function getCommandResponseTimeout(command: DaemonMessage): number {
-  if (command.method !== 'invoke_tool') {
-    return SEND_COMMAND_TIMEOUT;
-  }
-  const toolTimeout = command.args?.timeout;
-  if (
-    typeof toolTimeout !== 'number' ||
-    !Number.isFinite(toolTimeout) ||
-    toolTimeout <= 0
-  ) {
-    return SEND_COMMAND_TIMEOUT;
-  }
-  return Math.min(toolTimeout + RESPONSE_GRACE_MS, MAX_TIMER_DELAY_MS);
-}
+const CONTROL_COMMAND_TIMEOUT_MS = 60_000;
+export const DEFAULT_RPC_TIMEOUT_MS = 180_000;
 
 /**
  * `sendCommand` opens a socket connection sends a single command and disconnects.
@@ -176,12 +160,20 @@ function getCommandResponseTimeout(command: DaemonMessage): number {
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout: number = getCommandResponseTimeout(command),
+  timeout?: number,
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {
     throw new Error('Daemon is not running.');
   }
+
+  const effectiveTimeout = Math.min(
+    timeout ??
+      (command.method === 'invoke_tool'
+        ? DEFAULT_RPC_TIMEOUT_MS
+        : CONTROL_COMMAND_TIMEOUT_MS),
+    MAX_SET_TIMEOUT_MS,
+  );
 
   const socketPath = getSocketPath(sessionId);
   assertSecureSocketPath(socketPath);
@@ -193,8 +185,12 @@ export async function sendCommand(
   return await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(new Error('Timeout waiting for daemon response'));
-    }, timeout);
+      reject(
+        new Error(
+          `Timeout waiting for daemon response after ${effectiveTimeout}ms`,
+        ),
+      );
+    }, effectiveTimeout);
 
     const transport = new PipeTransport(socket, socket, puppeteerLogger);
     transport.onmessage = async (message: string) => {

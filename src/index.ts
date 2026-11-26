@@ -168,6 +168,7 @@ export class McpServer {
   async callTool(
     name: string,
     args: Record<string, unknown> = {},
+    options?: {signal?: AbortSignal},
   ): Promise<CallToolResult> {
     const toolHandler = this.#tools.get(name)?.handler;
     if (!toolHandler) {
@@ -181,7 +182,7 @@ export class McpServer {
         isError: true,
       };
     }
-    return await this.#handleToolCall(toolHandler, args);
+    return await this.#handleToolCall(toolHandler, args, options);
   }
 
   /**
