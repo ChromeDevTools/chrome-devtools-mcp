@@ -372,21 +372,3 @@ You can connect directly to a Chrome WebSocket endpoint and include custom heade
 To get the WebSocket endpoint from a running Chrome instance, visit `http://127.0.0.1:9222/json/version` and look for the `webSocketDebuggerUrl` field.
 
 You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
-
-## Customizing CLI command names
-
-When `chrome-devtools-mcp` or `chrome-devtools` is invoked through an external
-wrapper script or an alternate package manager (`pnpm`, `yarn`, `bun`), you can
-override the command names printed in `--help`, CLI hints, and error or update
-messages:
-
-- `CHROME_DEVTOOLS_MCP_SCRIPT_NAME`: Overrides the MCP server command name shown
-  by `chrome-devtools-mcp --help` (defaults to `chrome-devtools-mcp`, or
-  `npx chrome-devtools-mcp@latest` when invoked via `npx`), and omits hardcoded
-  `npm`/`npx` install commands from server update notices and missing
-  peer-dependency errors.
-- `CHROME_DEVTOOLS_MCP_CLI_SCRIPT_NAME`: Overrides the CLI command name shown in
-  `chrome-devtools` help, usage hints, daemon version mismatch warnings, and
-  disabled-tool messages (defaults to `chrome-devtools`), and omits hardcoded
-  `npm` install commands from CLI update notices and missing peer-dependency
-  errors.

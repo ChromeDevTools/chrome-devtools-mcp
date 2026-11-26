@@ -37,7 +37,6 @@ import {getErrorMessage, toError} from './utils/errorHandling.js';
 import {fileUrlToPathWithPosixFallback} from './utils/files.js';
 import {logger} from './utils/logger.js';
 import {raceWithSignal} from './utils/raceWithSignal.js';
-import {resolveCliScriptName} from './utils/scriptName.js';
 import type {TaskQueue} from './utils/TaskRunner.js';
 import {pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -69,11 +68,7 @@ function buildDisabledMessage(
     ? `is in category ${categoryLabel} which`
     : `requires ${flag.startsWith('--experimental') ? 'experimental feature' : 'flag'} ${flag} and`;
 
-  return (
-    `Tool ${toolName} ${reason} is currently disabled. Enable it by ` +
-    `running ${resolveCliScriptName()} start ${flag}=true. For more ` +
-    'information check the README.'
-  );
+  return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
 function getDisabledReason(

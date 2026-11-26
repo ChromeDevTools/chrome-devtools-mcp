@@ -121,7 +121,6 @@ ts_library("tests") {
     "utils/pagination.test.ts",
     "utils/raceWithSignal.test.ts",
     "utils/resourceType.test.ts",
-    "utils/scriptName.test.ts",
     "utils/text.test.ts",
     "utils/timeout.test.ts",
     "utils/url.test.ts",

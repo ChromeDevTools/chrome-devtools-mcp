@@ -15,7 +15,6 @@ import {
   type InferredOptionTypes,
 } from '../third_party/cli.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
-import {resolveMcpScriptName} from '../utils/scriptName.js';
 
 import {ConfigLocator} from './ConfigLocator.js';
 import {
@@ -59,7 +58,7 @@ export class ConfigParser {
   ): Argv<InferredOptionTypes<Record<string, YargsOptions>>> {
     const yargsInstance = yargs(hideBin(this.argv));
     return yargsInstance
-      .scriptName(resolveMcpScriptName(this.argv, this.env))
+      .scriptName(this.#resolveScriptName())
       .parserConfiguration({
         'strip-aliased': true,
         'strip-dashed': true,
@@ -194,5 +193,12 @@ export class ConfigParser {
     });
     this.#usageStatisticsNoticeShown = true;
     return config;
+  }
+
+  #resolveScriptName(): string {
+    if (this.argv.length > 1 && /[/\\]_npx[/\\]/.test(this.argv[1])) {
+      return 'npx chrome-devtools-mcp@latest';
+    }
+    return 'chrome-devtools-mcp';
   }
 }

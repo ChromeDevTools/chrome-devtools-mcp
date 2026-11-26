@@ -15,7 +15,6 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 import sinon from 'sinon';
 
 import {
-  formatDaemonVersionMismatchWarning,
   sendCommand,
   handleResponse,
   startDaemon,
@@ -28,34 +27,8 @@ import {
   getPidFilePath,
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
-import {CLI_SCRIPT_NAME_ENV} from '../../src/utils/scriptName.js';
 import {VERSION} from '../../src/version.js';
 import {createTempDir} from '../utils.js';
-
-describe('formatDaemonVersionMismatchWarning', () => {
-  it('uses default chrome-devtools start when env var is unset', () => {
-    const warning = formatDaemonVersionMismatchWarning('1.0.0', '2.0.0', {});
-    assert.strictEqual(
-      warning,
-      'Warning: Daemon server version (1.0.0) does not match CLI version ' +
-        "(2.0.0). Run 'chrome-devtools start' to update and restart the " +
-        'daemon.',
-    );
-  });
-
-  it('uses CHROME_DEVTOOLS_MCP_CLI_SCRIPT_NAME when set', () => {
-    const warning = formatDaemonVersionMismatchWarning('1.0.0', '2.0.0', {
-      [CLI_SCRIPT_NAME_ENV]: '  custom-devtools  ',
-    });
-    assert.strictEqual(
-      warning,
-      'Warning: Daemon server version (1.0.0) does not match CLI version ' +
-        "(2.0.0). Run 'custom-devtools start' to update and restart the " +
-        'daemon.',
-    );
-    assert.doesNotMatch(warning, /'chrome-devtools start'/);
-  });
-});
 
 describe('stopDaemon signal failures', () => {
   it('rejects and keeps the PID file when SIGKILL throws EPERM', async () => {
