@@ -77,24 +77,163 @@ export function getPidFilePath(sessionId: string): string {
   return path.join(runtimeDir, 'daemon.pid');
 }
 
+function isEnoent(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+interface SecurePathOptions {
+  label: string;
+  filePath: string;
+  stats: fs.Stats;
+  expectedType: 'directory' | 'file' | 'socket';
+  forbiddenModeMask?: number;
+}
+
+function assertSecurePathStats({
+  label,
+  filePath,
+  stats,
+  expectedType,
+  forbiddenModeMask = 0,
+}: SecurePathOptions): void {
+  const currentUserUid = os.userInfo().uid;
+
+  if (stats.isSymbolicLink()) {
+    throw new Error(
+      `${label} ${filePath} must not be a symbolic link. Possible tampering.`,
+    );
+  }
+  if (expectedType === 'directory' && !stats.isDirectory()) {
+    throw new Error(
+      `${label} ${filePath} is not a directory. Possible tampering.`,
+    );
+  }
+  if (expectedType === 'file' && !stats.isFile()) {
+    throw new Error(
+      `${label} ${filePath} is not a regular file. Possible tampering.`,
+    );
+  }
+  if (expectedType === 'socket' && !stats.isSocket()) {
+    throw new Error(
+      `${label} ${filePath} is not a Unix socket. Possible tampering.`,
+    );
+  }
+  if (stats.uid !== currentUserUid) {
+    throw new Error(
+      `${label} ${filePath} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
+    );
+  }
+  if (forbiddenModeMask && (stats.mode & forbiddenModeMask) !== 0) {
+    const restriction =
+      expectedType === 'directory' ? 'accessible' : 'writable';
+    throw new Error(
+      `${label} ${filePath} has insecure permissions (Mode: ${stats.mode.toString(8)}). It should not be ${restriction} by group or others.`,
+    );
+  }
+}
+
+export function assertSecureRuntimeDir(dirPath: string): void {
+  if (IS_WINDOWS) {
+    return;
+  }
+  assertSecurePathStats({
+    label: 'Runtime directory',
+    filePath: dirPath,
+    stats: fs.lstatSync(dirPath),
+    expectedType: 'directory',
+    forbiddenModeMask: 0o077,
+  });
+}
+
+export function assertSecureSocketPath(socketPath: string): void {
+  if (IS_WINDOWS) {
+    return;
+  }
+  assertSecureRuntimeDir(path.dirname(socketPath));
+  assertSecurePathStats({
+    label: 'Daemon socket',
+    filePath: socketPath,
+    stats: fs.lstatSync(socketPath),
+    expectedType: 'socket',
+  });
+}
+
+function readPidFile(pidFile: string): string | null {
+  if (IS_WINDOWS) {
+    try {
+      return fs.readFileSync(pidFile, 'utf-8');
+    } catch (error) {
+      if (isEnoent(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  try {
+    assertSecureRuntimeDir(path.dirname(pidFile));
+  } catch (error) {
+    if (isEnoent(error)) {
+      return null;
+    }
+    throw error;
+  }
+
+  let lstats: fs.Stats;
+  try {
+    lstats = fs.lstatSync(pidFile);
+  } catch (error) {
+    if (isEnoent(error)) {
+      return null;
+    }
+    throw error;
+  }
+  const pidForbiddenModeMask = fs.constants.S_IWGRP | fs.constants.S_IWOTH;
+  assertSecurePathStats({
+    label: 'Daemon PID file',
+    filePath: pidFile,
+    stats: lstats,
+    expectedType: 'file',
+    forbiddenModeMask: pidForbiddenModeMask,
+  });
+
+  let fd = -1;
+  try {
+    fd = fs.openSync(pidFile, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    assertSecurePathStats({
+      label: 'Daemon PID file',
+      filePath: pidFile,
+      stats: fs.fstatSync(fd),
+      expectedType: 'file',
+      forbiddenModeMask: pidForbiddenModeMask,
+    });
+    return fs.readFileSync(fd, 'utf-8');
+  } catch (error) {
+    if (isEnoent(error)) {
+      return null;
+    }
+    throw error;
+  } finally {
+    if (fd !== -1) {
+      fs.closeSync(fd);
+    }
+  }
+}
+
 export function getDaemonPid(sessionId: string): number | null {
   assertValidSessionId(sessionId);
-  try {
-    const pidFile = getPidFilePath(sessionId);
-    logger?.(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
-    if (!fs.existsSync(pidFile)) {
-      return null;
-    }
-    const pidContent = fs.readFileSync(pidFile, 'utf-8');
-    const pid = parseInt(pidContent.trim(), 10);
-    logger?.(`Daemon pid: ${pid}`);
-    if (isNaN(pid)) {
-      return null;
-    }
-    return pid;
-  } catch {
+  const pidFile = getPidFilePath(sessionId);
+  logger?.(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
+  const pidContent = readPidFile(pidFile);
+  if (pidContent === null) {
     return null;
   }
+  const pid = parseInt(pidContent.trim(), 10);
+  logger?.(`Daemon pid: ${pid}`);
+  if (isNaN(pid)) {
+    return null;
+  }
+  return pid;
 }
 
 const verifiedDaemonPids = new Map<number, boolean>();

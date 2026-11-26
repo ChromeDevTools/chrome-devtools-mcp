@@ -26,6 +26,9 @@ import type {
 } from './types.js';
 import {
   DAEMON_SCRIPT_PATH,
+  IS_WINDOWS,
+  assertSecureRuntimeDir,
+  assertSecureSocketPath,
   getDaemonPid,
   getSocketPath,
   getPidFilePath,
@@ -124,16 +127,11 @@ export async function startDaemon(
   const pidFilePath = getPidFilePath(sessionId);
 
   if (fs.existsSync(pidFilePath)) {
-    if (process.platform !== 'win32') {
-      const pidDir = path.dirname(pidFilePath);
-      if (
-        fs.lstatSync(pidDir).isSymbolicLink() ||
-        fs.lstatSync(pidFilePath).isSymbolicLink()
-      ) {
-        throw new Error(
-          `Refusing to remove daemon PID file through a symbolic link: ${pidFilePath}`,
-        );
-      }
+    assertSecureRuntimeDir(path.dirname(pidFilePath));
+    if (!IS_WINDOWS && fs.lstatSync(pidFilePath).isSymbolicLink()) {
+      throw new Error(
+        `Refusing to remove daemon PID file through a symbolic link: ${pidFilePath}`,
+      );
     }
     fs.unlinkSync(pidFilePath);
   }
@@ -186,6 +184,7 @@ export async function sendCommand(
   }
 
   const socketPath = getSocketPath(sessionId);
+  assertSecureSocketPath(socketPath);
 
   const socket = net.createConnection({
     path: socketPath,
@@ -219,6 +218,22 @@ export async function sendCommand(
   });
 }
 
+function removePidFileSafely(pidFilePath: string): void {
+  try {
+    assertSecureRuntimeDir(path.dirname(pidFilePath));
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+  try {
+    fs.unlinkSync(pidFilePath);
+  } catch {
+    // Ignore if file already removed.
+  }
+}
+
 export async function stopDaemon(sessionId: string): Promise<void> {
   if (!isDaemonRunning(sessionId)) {
     logger?.('Daemon is not running');
@@ -246,7 +261,6 @@ export async function stopDaemon(sessionId: string): Promise<void> {
       () => !isDaemonRunning(sessionId),
       `Timeout: daemon (pid ${pid}) did not exit within ${FILE_TIMEOUT}ms`,
     );
-    fs.rmSync(pidFilePath, {force: true});
   } catch (error) {
     if (pid) {
       try {
@@ -264,15 +278,14 @@ export async function stopDaemon(sessionId: string): Promise<void> {
         }
       }
     }
-    try {
-      fs.unlinkSync(pidFilePath);
-    } catch {
-      // Ignore if file already removed.
-    }
+    removePidFileSafely(pidFilePath);
     if (isDaemonRunning(sessionId)) {
       throw error;
     }
+    return;
   }
+
+  removePidFileSafely(pidFilePath);
 }
 
 export async function verifyDaemonVersion(
