@@ -1331,6 +1331,10 @@
       {
         "name": "timeout",
         "argType": "number"
+      },
+      {
+        "name": "include_transmitted",
+        "argType": "boolean"
       }
     ]
   },
