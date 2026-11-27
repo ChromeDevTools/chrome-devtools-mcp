@@ -25,6 +25,7 @@ const DIALOG_BEFORE_LOAD_MESSAGE =
   'The page opened a dialog before it finished loading.';
 
 async function finishedBeforeDialog(
+  page: ContextPage,
   navigation: Promise<unknown>,
   signal: AbortSignal,
 ): Promise<boolean> {
@@ -32,7 +33,7 @@ async function finishedBeforeDialog(
     await raceWithSignal(navigation, signal);
     return true;
   } catch (error) {
-    if (signal.aborted) {
+    if (signal.aborted && page.getDialog()) {
       return false;
     }
     throw error;
@@ -298,6 +299,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                   try {
                     if (
                       await finishedBeforeDialog(
+                        page,
                         page.pptrPage.goto(request.params.url, options),
                         signal,
                       )
@@ -316,6 +318,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                   try {
                     if (
                       await finishedBeforeDialog(
+                        page,
                         page.pptrPage.goBack(options),
                         signal,
                       )
@@ -334,6 +337,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                   try {
                     if (
                       await finishedBeforeDialog(
+                        page,
                         page.pptrPage.goForward(options),
                         signal,
                       )
@@ -352,6 +356,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                   try {
                     if (
                       await finishedBeforeDialog(
+                        page,
                         page.pptrPage.reload({
                           ...options,
                           ignoreCache: request.params.ignoreCache,
@@ -396,7 +401,9 @@ export const navigatePage: PageToolFactory = definePageTool(
         }
 
         response.setIncludePages(true);
-        response.setListThirdPartyDeveloperTools();
+        if (!page.getDialog()) {
+          response.setListThirdPartyDeveloperTools();
+        }
         response.setListWebMcpTools();
       },
     };
