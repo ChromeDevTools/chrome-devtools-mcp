@@ -62,6 +62,9 @@ export interface PaginationOptions {
 
 export type CD4ACommentThread = DevTools.CD4ABridge.CommentThread;
 export type CD4ARevealTarget = DevTools.CD4ABridge.RevealTarget;
+export type CD4AGetCommentThreadsOptions = NonNullable<
+  Parameters<DevTools.CD4ABridge.CD4ABridge['getCommentThreads']>[0]
+>;
 
 export enum CD4ABridgeEvents {
   COMMENT_THREADS_CHANGED = 'CommentThreadsChanged',

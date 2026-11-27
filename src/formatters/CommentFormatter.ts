@@ -16,6 +16,7 @@ export interface StructuredCommentThread {
   text: string;
   elementUid?: string;
   reqid?: number;
+  previouslyTransmitted?: boolean;
 }
 
 function formatCommentThread(thread: StructuredCommentThread): string {
@@ -28,6 +29,9 @@ function formatCommentThread(thread: StructuredCommentThread): string {
   }
   if (thread.reqid !== undefined) {
     lines.push(`- Related network reqid: ${thread.reqid}`);
+  }
+  if (thread.previouslyTransmitted) {
+    lines.push('- Previously delivered: true');
   }
   return lines.join('\n');
 }
@@ -79,6 +83,9 @@ export class CommentFormatter {
       }
       if (reqid !== undefined) {
         item.reqid = reqid;
+      }
+      if (thread.previouslyTransmitted) {
+        item.previouslyTransmitted = true;
       }
       structuredThreads.push(item);
     }

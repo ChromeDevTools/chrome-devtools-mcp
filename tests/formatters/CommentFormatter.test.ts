@@ -77,6 +77,21 @@ describe('CommentFormatter', () => {
     return formatter;
   });
 
+  formatterTest('marks previously delivered threads', () => {
+    const rawThreads: CD4ACommentThread[] = [
+      {
+        id: 'comment-1',
+        text: 'Fix the color contrast here',
+        previouslyTransmitted: true,
+      },
+      {
+        id: 'comment-2',
+        text: 'Fix heading font size',
+      },
+    ];
+    return CommentFormatter.from(rawThreads);
+  });
+
   formatterTest(
     'omits unresolved targets when from() resolves undefined',
     async () => {

@@ -76,6 +76,16 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
           `Defaults to ${DEFAULT_COMMENT_WAIT_MS}, maximum ${MAX_COMMENT_WAIT_MS}. ` +
           `Set to 0 to return immediately without waiting.`,
       ),
+    includeTransmitted: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Also return open comment threads that an earlier call already ' +
+          'returned. Threads returned again have "Previously delivered: ' +
+          'true". Resolved threads are never returned. When such threads ' +
+          'exist, the call returns immediately without waiting. Do not set ' +
+          'it while polling for new comments.',
+      ),
   },
   blockedByDialog: false,
   // The handler only reads page state and waits for comment events, so it
@@ -98,10 +108,12 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
       return;
     }
 
-    const timeout = request.params.timeout ?? DEFAULT_COMMENT_WAIT_MS;
+    const {timeout = DEFAULT_COMMENT_WAIT_MS, includeTransmitted} =
+      request.params;
+    const options = includeTransmitted ? {includeTransmitted} : {};
     const start = Date.now();
     const deadline = start + timeout;
-    let threads = await bridge.getComments(devtoolsPage);
+    let threads = await bridge.getComments(devtoolsPage, options);
     while (threads.length === 0) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
@@ -112,7 +124,7 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
         break;
       }
       // Another tool may have changed state during the wait, so fetch again.
-      threads = await bridge.getComments(devtoolsPage);
+      threads = await bridge.getComments(devtoolsPage, options);
     }
 
     if (threads.length === 0 && timeout > 0) {

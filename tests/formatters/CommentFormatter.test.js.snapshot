@@ -32,6 +32,31 @@ exports[`CommentFormatter > formats single thread using static formatThread 1`] 
 - Related element uid: node-99
 `;
 
+exports[`CommentFormatter > marks previously delivered threads toJSON 1`] = `
+[
+  {
+    "id": "comment-1",
+    "text": "Fix the color contrast here",
+    "previouslyTransmitted": true
+  },
+  {
+    "id": "comment-2",
+    "text": "Fix heading font size"
+  }
+]
+`;
+
+exports[`CommentFormatter > marks previously delivered threads toString 1`] = `
+Found 2 DevTools comment thread(s):
+
+### Thread: comment-1
+- Comment: Fix the color contrast here
+- Previously delivered: true
+
+### Thread: comment-2
+- Comment: Fix heading font size
+`;
+
 exports[`CommentFormatter > omits unresolved targets when from() resolves undefined toJSON 1`] = `
 [
   {
