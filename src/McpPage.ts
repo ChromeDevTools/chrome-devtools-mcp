@@ -41,6 +41,7 @@ import {
   type Viewport,
   type WebMCPTool,
   type Protocol,
+  type CoverageEntry,
   type Page,
   type Target,
   type ConsoleMessage,
@@ -48,14 +49,19 @@ import {
   DevTools,
 } from './third_party/browser.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
-import type {
-  ContextPage,
-  DevToolsData,
-  ElementCssStyles,
-  Response,
-  ScreenRecorderData,
-  WebAuthnAuthenticatorConfig,
-  WebAuthnAuthenticatorState,
+import {
+  ANONYMOUS_COVERAGE_URL,
+  type ContextPage,
+  type CoverageReport,
+  type CoverageResource,
+  type CoverageResourceType,
+  type DevToolsData,
+  type ElementCssStyles,
+  type Response,
+  type ScreenRecorderData,
+  type StartCoverageOptions,
+  type WebAuthnAuthenticatorConfig,
+  type WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -98,6 +104,109 @@ const WEBAUTHN_CREATION_OPTIONS = [
   'hasResidentKey',
   'hasUserVerification',
 ] as const;
+
+interface CoverageSession {
+  js: boolean;
+  css: boolean;
+}
+
+function usedBytesFromRanges(
+  ranges: ReadonlyArray<{start: number; end: number}>,
+): number {
+  let used = 0;
+  for (const range of ranges) {
+    used += Math.max(0, range.end - range.start);
+  }
+  return used;
+}
+
+function unusedPercent(unused: number, total: number): number {
+  if (total <= 0) {
+    return 0;
+  }
+  return Math.round((unused / total) * 1000) / 10;
+}
+
+function coverageResourceUrl(url: string): string {
+  if (url.length === 0 || url.startsWith('debugger://')) {
+    return ANONYMOUS_COVERAGE_URL;
+  }
+  return url;
+}
+
+function addCoverageEntry(
+  aggregated: Map<string, CoverageResource>,
+  type: CoverageResourceType,
+  entry: CoverageEntry,
+): void {
+  const totalBytes = entry.text.length;
+  if (totalBytes === 0) {
+    return;
+  }
+  const url = coverageResourceUrl(entry.url);
+  const key = `${type}:${url}`;
+  const usedBytes = Math.min(totalBytes, usedBytesFromRanges(entry.ranges));
+  const existing = aggregated.get(key);
+  if (!existing) {
+    const unusedBytes = totalBytes - usedBytes;
+    aggregated.set(key, {
+      url,
+      type,
+      totalBytes,
+      usedBytes,
+      unusedBytes,
+      unusedPercent: unusedPercent(unusedBytes, totalBytes),
+    });
+    return;
+  }
+  existing.totalBytes += totalBytes;
+  existing.usedBytes += usedBytes;
+  existing.unusedBytes = existing.totalBytes - existing.usedBytes;
+  existing.unusedPercent = unusedPercent(
+    existing.unusedBytes,
+    existing.totalBytes,
+  );
+}
+
+function buildCoverageReport(
+  jsEntries: CoverageEntry[],
+  cssEntries: CoverageEntry[],
+): CoverageReport {
+  const aggregated = new Map<string, CoverageResource>();
+  for (const entry of jsEntries) {
+    addCoverageEntry(aggregated, 'JS', entry);
+  }
+  for (const entry of cssEntries) {
+    addCoverageEntry(aggregated, 'CSS', entry);
+  }
+  const resources = [...aggregated.values()];
+  resources.sort((a, b) => {
+    if (b.unusedBytes !== a.unusedBytes) {
+      return b.unusedBytes - a.unusedBytes;
+    }
+    if (a.url !== b.url) {
+      return a.url.localeCompare(b.url);
+    }
+    return a.type.localeCompare(b.type);
+  });
+  let totalBytes = 0;
+  let usedBytes = 0;
+  for (const resource of resources) {
+    totalBytes += resource.totalBytes;
+    usedBytes += resource.usedBytes;
+  }
+  const unusedBytes = totalBytes - usedBytes;
+  return {
+    resources,
+    totals: {
+      resources: resources.length,
+      totalBytes,
+      usedBytes,
+      unusedBytes,
+      unusedPercent: unusedPercent(unusedBytes, totalBytes),
+    },
+  };
+}
 
 export function replaceHtmlElementsWithUids(
   schema: JSONSchema7Definition,
@@ -227,6 +336,9 @@ export class McpPage implements ContextPage {
 
   // Performance trace
   #isRunningPerformanceTrace = false;
+
+  // Code coverage
+  #coverageSession?: CoverageSession;
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
@@ -626,6 +738,97 @@ export class McpPage implements ContextPage {
     this.#isRunningPerformanceTrace = x;
   }
 
+  isRunningCoverage(): boolean {
+    return this.#coverageSession !== undefined;
+  }
+
+  async startCoverage(options: StartCoverageOptions): Promise<void> {
+    if (this.isClosed()) {
+      throw new Error(`Page ${this.id} is closed. Coverage cannot be started.`);
+    }
+    if (this.#coverageSession) {
+      throw new Error(
+        `Coverage is already running on page ${this.id}. Call stop_coverage first.`,
+      );
+    }
+    const {js, css} = options;
+    if (!js && !css) {
+      throw new Error('At least one of js or css must be true.');
+    }
+    const started: CoverageSession = {js: false, css: false};
+    try {
+      // Puppeteer marks coverage as enabled before it sends the CDP commands,
+      // so a rejected start still has to be stopped. Mark each source as
+      // started before awaiting it so the catch block below stops it.
+      if (js) {
+        started.js = true;
+        await this.pptrPage.coverage.startJSCoverage({
+          reportAnonymousScripts: true,
+        });
+      }
+      if (css) {
+        started.css = true;
+        await this.pptrPage.coverage.startCSSCoverage();
+      }
+      this.#coverageSession = started;
+    } catch (error) {
+      this.#coverageSession = undefined;
+      await this.#stopCoverageSources(started);
+      throw new Error(
+        `Failed to start coverage on page ${this.id}: ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
+  }
+
+  async stopCoverage(): Promise<CoverageReport> {
+    if (this.isClosed()) {
+      this.#coverageSession = undefined;
+      throw new Error(`Page ${this.id} is closed. Coverage cannot be stopped.`);
+    }
+    const session = this.#coverageSession;
+    if (!session) {
+      throw new Error(
+        `No coverage session is running on page ${this.id}. Call start_coverage first.`,
+      );
+    }
+    this.#coverageSession = undefined;
+    try {
+      const jsEntries = session.js
+        ? await this.pptrPage.coverage.stopJSCoverage()
+        : [];
+      const cssEntries = session.css
+        ? await this.pptrPage.coverage.stopCSSCoverage()
+        : [];
+      return buildCoverageReport(jsEntries, cssEntries);
+    } catch (error) {
+      await this.#stopCoverageSources(session);
+      throw new Error(
+        `Failed to stop coverage on page ${this.id}: ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
+  }
+
+  async #stopCoverageSources(session: CoverageSession): Promise<void> {
+    const stops: Array<Promise<unknown>> = [];
+    if (session.js) {
+      stops.push(
+        this.pptrPage.coverage.stopJSCoverage().catch(() => {
+          // Coverage may not have started or may already be stopped.
+        }),
+      );
+    }
+    if (session.css) {
+      stops.push(
+        this.pptrPage.coverage.stopCSSCoverage().catch(() => {
+          // Coverage may not have started or may already be stopped.
+        }),
+      );
+    }
+    await Promise.all(stops);
+  }
+
   throwIfDialogOpen(): void {
     const dialog = this.getDialog();
     if (dialog) {
@@ -938,6 +1141,13 @@ export class McpPage implements ContextPage {
   dispose(): void {
     this.#disposed = true;
     this.#isRunningPerformanceTrace = false;
+    const coverageSession = this.#coverageSession;
+    this.#coverageSession = undefined;
+    if (coverageSession && this.#pptrPage) {
+      void this.#stopCoverageSources(coverageSession).catch(e => {
+        logger?.('Failed to stop coverage on dispose', e);
+      });
+    }
     this.disposeCommentBridge();
     if (this.#screenRecorder) {
       const {recorder} = this.#screenRecorder;

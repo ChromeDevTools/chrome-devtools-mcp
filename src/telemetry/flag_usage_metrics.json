@@ -510,5 +510,13 @@
   {
     "name": "idle_timeout_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "category_coverage_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_coverage",
+    "flagType": "boolean"
   }
 ]

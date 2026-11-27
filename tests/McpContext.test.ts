@@ -2011,6 +2011,7 @@ describe('McpContext', () => {
       const config = createMockServerConfig({
         memoryDebugging: true,
         devtoolsComments: true,
+        categoryCoverage: true,
       });
       const context = await createMockContext({config});
       const releaseScreencasts = sinon
@@ -2020,6 +2021,7 @@ describe('McpContext', () => {
       const releasePerformanceTrace = sinon
         .stub(context, 'releasePerformanceTrace')
         .resolves();
+      const releaseCoverage = sinon.stub(context, 'releaseCoverage').resolves();
       const releaseDevToolsComments = sinon.stub(
         context,
         'releaseDevToolsComments',
@@ -2028,12 +2030,14 @@ describe('McpContext', () => {
       await updateConfig(config, context, {
         categoryDebugging: false,
         categoryPerformance: false,
+        categoryCoverage: false,
         memoryDebugging: false,
       });
 
       sinon.assert.calledOnceWithExactly(releaseScreencasts);
       sinon.assert.calledOnceWithExactly(releaseHeapSnapshots);
       sinon.assert.calledOnceWithExactly(releasePerformanceTrace);
+      sinon.assert.calledOnceWithExactly(releaseCoverage);
       sinon.assert.calledOnceWithExactly(releaseDevToolsComments);
     });
 
@@ -2041,6 +2045,7 @@ describe('McpContext', () => {
       const config = createMockServerConfig({
         memoryDebugging: true,
         devtoolsComments: true,
+        categoryCoverage: true,
       });
       const context = await createMockContext({config});
       const releaseScreencasts = sinon
@@ -2050,6 +2055,7 @@ describe('McpContext', () => {
       const releasePerformanceTrace = sinon
         .stub(context, 'releasePerformanceTrace')
         .resolves();
+      const releaseCoverage = sinon.stub(context, 'releaseCoverage').resolves();
       const releaseDevToolsComments = sinon.stub(
         context,
         'releaseDevToolsComments',
@@ -2060,6 +2066,7 @@ describe('McpContext', () => {
       sinon.assert.calledOnceWithExactly(releaseScreencasts);
       sinon.assert.calledOnceWithExactly(releaseHeapSnapshots);
       sinon.assert.calledOnceWithExactly(releasePerformanceTrace);
+      sinon.assert.calledOnceWithExactly(releaseCoverage);
       sinon.assert.calledOnceWithExactly(releaseDevToolsComments);
     });
 
@@ -2076,6 +2083,7 @@ describe('McpContext', () => {
       const releasePerformanceTrace = sinon
         .stub(context, 'releasePerformanceTrace')
         .resolves();
+      const releaseCoverage = sinon.stub(context, 'releaseCoverage').resolves();
       const releaseDevToolsComments = sinon.stub(
         context,
         'releaseDevToolsComments',
@@ -2089,6 +2097,7 @@ describe('McpContext', () => {
       sinon.assert.notCalled(releaseScreencasts);
       sinon.assert.notCalled(releaseHeapSnapshots);
       sinon.assert.notCalled(releasePerformanceTrace);
+      sinon.assert.notCalled(releaseCoverage);
       sinon.assert.notCalled(releaseDevToolsComments);
     });
   });
@@ -2142,6 +2151,59 @@ describe('McpContext', () => {
       context.releaseHeapSnapshots();
 
       sinon.assert.notCalled(disposeSpy);
+    });
+
+    it('stops running coverage when coverage tools are released', async () => {
+      const {page: pptrPage, target} = createPageTarget();
+      const context = await createMockContext({
+        config: createMockServerConfig({categoryCoverage: true}),
+        targets: [target],
+      });
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.init();
+      await mcpPage.startCoverage({js: true, css: true});
+
+      await context.releaseCoverage();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnceWithExactly(pptrPage.coverage.stopCSSCoverage);
+      assert.strictEqual(mcpPage.isRunningCoverage(), false);
+    });
+
+    it('continues to the next page when stopping coverage fails on one page', async () => {
+      const {page: firstPptrPage, target: firstTarget} = createPageTarget();
+      const {page: secondPptrPage, target: secondTarget} = createPageTarget();
+      const context = await createMockContext({
+        config: createMockServerConfig({categoryCoverage: true}),
+        targets: [firstTarget, secondTarget],
+      });
+      const [firstPage, secondPage] = context.getPages();
+      assert.ok(firstPage);
+      assert.ok(secondPage);
+      await firstPage.init();
+      await secondPage.init();
+      await firstPage.startCoverage({js: true, css: true});
+      await secondPage.startCoverage({js: true, css: true});
+      firstPptrPage.coverage.stopJSCoverage.rejects(new Error('stop failed'));
+
+      await context.releaseCoverage();
+
+      sinon.assert.calledTwice(firstPptrPage.coverage.stopJSCoverage);
+      sinon.assert.calledOnceWithExactly(
+        firstPptrPage.coverage.stopCSSCoverage,
+      );
+      sinon.assert.calledOnceWithExactly(
+        secondPptrPage.coverage.stopJSCoverage,
+      );
+      sinon.assert.calledOnceWithExactly(
+        secondPptrPage.coverage.stopCSSCoverage,
+      );
+      sinon.assert.callOrder(
+        firstPptrPage.coverage.stopJSCoverage,
+        secondPptrPage.coverage.stopJSCoverage,
+      );
+      assert.strictEqual(firstPage.isRunningCoverage(), false);
+      assert.strictEqual(secondPage.isRunningCoverage(), false);
     });
 
     it('stops the running performance trace and clears recorded traces', async () => {

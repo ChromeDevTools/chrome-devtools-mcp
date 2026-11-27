@@ -68,6 +68,14 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       );
       return;
     }
+    const coveragePage = context
+      .getPages()
+      .find(page => page.isRunningCoverage());
+    if (coveragePage) {
+      throw new Error(
+        `Coverage is running on page ${coveragePage.id}. Coverage skews trace timings, so call stop_coverage before performance_start_trace.`,
+      );
+    }
     const page = request.page;
     const networkOverrides = page.listNetworkMocks();
     const {warning} = new NetworkOverridesFormatter(networkOverrides).toJSON();

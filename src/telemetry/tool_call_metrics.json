@@ -1472,5 +1472,31 @@
         "argType": "string"
       }
     ]
+  },
+  {
+    "name": "start_coverage",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "js",
+        "argType": "boolean"
+      },
+      {
+        "name": "css",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "stop_coverage",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
   }
 ]
