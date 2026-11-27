@@ -9,6 +9,7 @@ import {pathToFileURL} from 'node:url';
 import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/browser.js';
+import {raceWithSignal} from '../utils/raceWithSignal.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -150,6 +151,7 @@ Example with arguments: \`(el) => el.innerText\`
                 await performEvaluation(worker, source, format, [], response, {
                   filePath,
                   context,
+                  signal: request.signal,
                 });
               },
               // Service workers cannot interact with the DOM, so never wait for it.
@@ -205,6 +207,7 @@ Example with arguments: \`(el) => el.innerText\`
               {
                 filePath,
                 context,
+                signal: request.signal,
               },
             );
           },
@@ -245,15 +248,12 @@ const resolveScriptSource = async (
   }
 };
 
-const performEvaluation = async (
+const evaluate = async (
   evaluatable: Evaluatable,
   source: string,
   format: 'function' | 'script',
   args: Array<JSHandle<unknown>>,
-  response: Response,
-  options: {context: Context; filePath?: string},
-): Promise<void> => {
-  let result: string | undefined;
+): Promise<string | undefined> => {
   if (format === 'function') {
     const functionSource = source.trimEnd().replace(/;$/, '');
     using fn = await evaluatable.evaluateHandle<
@@ -261,7 +261,7 @@ const performEvaluation = async (
       () => (...args: unknown[]) => unknown
     >(`(\n${functionSource}\n)`);
     // Normalize non-Error values inside the page callback (serialized by Puppeteer) so CDP preserves the message.
-    result = await evaluatable.evaluate(
+    return await evaluatable.evaluate(
       async (fn, ...args) => {
         try {
           return JSON.stringify(await fn(...args));
@@ -290,10 +290,26 @@ const performEvaluation = async (
       fn,
       ...args,
     );
-  } else {
-    using value = await evaluatable.evaluateHandle(source);
-    result = await evaluatable.evaluate(value => JSON.stringify(value), value);
   }
+  using value = await evaluatable.evaluateHandle(source);
+  return await evaluatable.evaluate(value => JSON.stringify(value), value);
+};
+
+const performEvaluation = async (
+  evaluatable: Evaluatable,
+  source: string,
+  format: 'function' | 'script',
+  args: Array<JSHandle<unknown>>,
+  response: Response,
+  options: {context: Context; filePath?: string; signal?: AbortSignal},
+): Promise<void> => {
+  const {signal} = options;
+  signal?.throwIfAborted();
+  const evaluation = evaluate(evaluatable, source, format, args);
+  // The page may never settle the evaluation, so stop waiting on cancellation.
+  const result = signal
+    ? await raceWithSignal(evaluation, signal)
+    : await evaluation;
 
   if (options.filePath) {
     const data = new TextEncoder().encode(result ?? 'undefined');

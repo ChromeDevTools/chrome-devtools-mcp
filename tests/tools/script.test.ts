@@ -97,6 +97,61 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), '');
       });
     });
+    it(
+      'rejects a pending evaluation when the request is cancelled',
+      {
+        timeout: 10_000,
+      },
+      async () => {
+        await withMcpContext(async (response, context, args) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          const controller = new AbortController();
+          const evaluation = evaluateScript(args).handler(
+            {
+              params: {
+                function: String(() => {
+                  document.title = 'pending';
+                  return new Promise(() => {});
+                }),
+              },
+              signal: controller.signal,
+            },
+            response,
+            context,
+          );
+          await page.waitForFunction(() => document.title === 'pending', {
+            timeout: 5_000,
+          });
+          controller.abort();
+          await assert.rejects(evaluation, {name: 'AbortError'});
+        });
+      },
+    );
+    it('does not start an evaluation for an already cancelled request', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const controller = new AbortController();
+        controller.abort();
+        await assert.rejects(
+          evaluateScript(args).handler(
+            {
+              params: {
+                function: String(() => {
+                  document.title = 'started';
+                }),
+              },
+              signal: controller.signal,
+            },
+            response,
+            context,
+          ),
+          {name: 'AbortError'},
+        );
+        assert.strictEqual(
+          await context.getSelectedMcpPage().pptrPage.title(),
+          '',
+        );
+      });
+    });
     it('does not execute multi-statement source in function mode', async () => {
       await withMcpContext(async (response, context, args) => {
         await assert.rejects(
@@ -681,6 +736,71 @@ describe('script', () => {
       );
     });
 
+    it(
+      'rejects a pending service worker evaluation when the request is cancelled',
+      {
+        timeout: 20_000,
+      },
+      async () => {
+        await withMcpContext(
+          async (response, context, args) => {
+            await installExtension(args).handler(
+              {params: {path: EXTENSION_PATH}},
+              response,
+              context,
+            );
+            const extensionId = extractExtensionId(response);
+            const swTarget = await context.browser.waitForTarget(
+              t =>
+                t.type() === 'service_worker' && t.url().includes(extensionId),
+            );
+            context.createWorkersSnapshot();
+            const sw = context.getWorkers().find(s => s.target === swTarget);
+            assert.ok(sw);
+            await context.triggerExtensionAction(extensionId);
+
+            const controller = new AbortController();
+            const evaluation = evaluateScript(args).handler(
+              {
+                params: {
+                  function: String(() => {
+                    Object.assign(globalThis, {pending: true});
+                    return new Promise(() => {});
+                  }),
+                  serviceWorkerId: sw.id,
+                },
+                signal: controller.signal,
+              },
+              response,
+              context,
+            );
+            const started = async (): Promise<boolean> => {
+              response.resetResponseLineForTesting();
+              await evaluateScript(args).handler(
+                {
+                  params: {
+                    function: String(() => 'pending' in globalThis),
+                    serviceWorkerId: sw.id,
+                  },
+                },
+                response,
+                context,
+              );
+              return response.responseLines.at(2) === 'true';
+            };
+            for (let i = 0; i < 50 && !(await started()); i++) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            assert.ok(await started());
+            controller.abort();
+            await assert.rejects(evaluation, {name: 'AbortError'});
+            await context.uninstallExtension(extensionId);
+          },
+          {},
+          {categoryExtensions: true},
+        );
+      },
+    );
     it('throws error when both pageId and serviceWorkerId are provided', async () => {
       const {page, context, response} = createHandlerMocks();
       await assert.rejects(
