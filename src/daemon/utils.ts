@@ -249,6 +249,29 @@ export function getDaemonPid(sessionId: string): number | null {
 }
 
 const verifiedDaemonPids = new Map<number, boolean>();
+const WINDOWS_PIPE_ROOT = '\\\\.\\pipe\\';
+
+function hasWindowsDaemonPipe(sessionId: string): boolean {
+  const socketPath = getSocketPath(sessionId);
+  const pipeName = socketPath.startsWith(WINDOWS_PIPE_ROOT)
+    ? socketPath.slice(WINDOWS_PIPE_ROOT.length)
+    : socketPath;
+  try {
+    const dir = fs.opendirSync(WINDOWS_PIPE_ROOT);
+    try {
+      for (let entry = dir.readSync(); entry !== null; entry = dir.readSync()) {
+        if (entry.name === pipeName) {
+          return true;
+        }
+      }
+    } finally {
+      dir.closeSync();
+    }
+  } catch {
+    // Fall back to command line inspection if the pipe list cannot be read.
+  }
+  return false;
+}
 
 function getProcessCommandLine(pid: number): string {
   if (process.platform === 'linux' && fs.existsSync('/proc')) {
@@ -282,10 +305,14 @@ function getProcessCommandLine(pid: number): string {
   );
 }
 
-function isDaemonProcess(pid: number): boolean {
+function isDaemonProcess(pid: number, sessionId: string): boolean {
   const cached = verifiedDaemonPids.get(pid);
   if (cached !== undefined) {
     return cached;
+  }
+  if (IS_WINDOWS && hasWindowsDaemonPipe(sessionId)) {
+    verifiedDaemonPids.set(pid, true);
+    return true;
   }
   try {
     const commandLine = getProcessCommandLine(pid).trim();
@@ -305,10 +332,10 @@ export function isDaemonRunning(sessionId: string): boolean {
   if (pid) {
     try {
       process.kill(pid, 0);
-      return isDaemonProcess(pid);
+      return isDaemonProcess(pid, sessionId);
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'EPERM') {
-        return isDaemonProcess(pid);
+        return isDaemonProcess(pid, sessionId);
       }
       // Process is dead, stale PID file. Proceed with startup.
       verifiedDaemonPids.delete(pid);

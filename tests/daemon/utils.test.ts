@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import childProcess, {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -486,6 +487,74 @@ describe('daemon pid handling', () => {
       writePidFile(SESSION_ID, `${proc.pid}\n`);
       assert.strictEqual(isDaemonRunning(SESSION_ID), true);
     });
+
+    it(
+      'skips PowerShell inspection on Windows when the daemon named pipe exists',
+      {skip: !IS_WINDOWS},
+      async () => {
+        using tempDir = createTempDir('cdm-daemon-utils-test-');
+        process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+        using proc = await spawnReadyProcess([DAEMON_SCRIPT_PATH]);
+        writePidFile(SESSION_ID, `${proc.pid}\n`);
+
+        const server = net.createServer();
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen({path: getSocketPath(SESSION_ID)}, () => resolve());
+        });
+
+        try {
+          const opendirSyncSpy = sinon.spy(fs, 'opendirSync');
+          const execFileSyncSpy = sinon.spy(childProcess, 'execFileSync');
+
+          assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+          sinon.assert.calledOnceWithExactly(opendirSyncSpy, '\\\\.\\pipe\\');
+          sinon.assert.notCalled(execFileSyncSpy);
+
+          // Subsequent checks in the same process hit verifiedDaemonPids.
+          assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+          sinon.assert.calledOnce(opendirSyncSpy);
+          sinon.assert.notCalled(execFileSyncSpy);
+        } finally {
+          await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+      },
+    );
+
+    it(
+      'falls back to PowerShell inspection on Windows when pipe enumeration fails',
+      {skip: !IS_WINDOWS},
+      () => {
+        using tempDir = createTempDir('cdm-daemon-utils-test-');
+        process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+        const pid = 1234567896;
+        writePidFile(SESSION_ID, `${pid}\n`);
+        sinon.stub(process, 'kill').withArgs(pid, 0).returns(true);
+        sinon
+          .stub(fs, 'opendirSync')
+          .throws(new Error('pipe enumeration failed'));
+        const inspection = sinon
+          .stub(childProcess, 'execFileSync')
+          .returns(`${process.execPath} ${DAEMON_SCRIPT_PATH}`);
+
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+        sinon.assert.calledOnceWithExactly(
+          inspection,
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
+          ],
+          {
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+          },
+        );
+      },
+    );
 
     it('caches the verified process identity across repeated checks', async () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
