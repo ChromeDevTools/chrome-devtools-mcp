@@ -274,6 +274,7 @@ ts_library("mcp_lib") {
     "utils/keyboard.ts",
     "utils/logger.ts",
     "utils/logpoint.ts",
+    "utils/mwgMapping.ts",
     "utils/network.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",

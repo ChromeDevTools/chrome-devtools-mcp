@@ -17,6 +17,7 @@ import {
   type RunnerResult,
   type OutputMode,
 } from '../third_party/index.js';
+import {getMwgGuidesForLighthouseAudit} from '../utils/mwgMapping.js';
 
 import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
@@ -161,6 +162,10 @@ const getFailedAudits = (lhr: Result): LighthouseFailedAudit[] => {
     }
     if (audit.displayValue) {
       failedAudit.displayValue = audit.displayValue;
+    }
+    const guides = getMwgGuidesForLighthouseAudit(audit.id);
+    if (guides.length > 0) {
+      failedAudit.modernWebGuidance = guides;
     }
     failedAudits.push(failedAudit);
   }

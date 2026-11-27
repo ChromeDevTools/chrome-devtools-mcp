@@ -485,6 +485,9 @@ describe('lighthouse', () => {
         contrast.description,
         'Low-contrast text is difficult to read.',
       );
+      assert.deepEqual(contrast.modernWebGuidance, [
+        'ensure-sufficient-color-contrast',
+      ]);
       assert.strictEqual(contrast.totalNodes, 13);
       assert.strictEqual(contrast.nodes.length, 10);
       assert.deepEqual(contrast.nodes[0], {
@@ -497,6 +500,8 @@ describe('lighthouse', () => {
       assert.ok(!contrast.nodes.some(n => n.selector === 'div.item-2'));
       assert.ok(!contrast.nodes.some(n => n.selector === 'div.item-99'));
 
+      assert.strictEqual(title.modernWebGuidance, undefined);
+      assert.strictEqual('modernWebGuidance' in title, false);
       assert.deepEqual(title, {
         id: 'document-title',
         title: 'Missing title',
