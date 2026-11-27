@@ -365,22 +365,60 @@ describe('pages', () => {
       const {context, response, args} = createHandlerMocks();
       const page = createMockMcpPage();
       context.newPage.resolves(page);
-      const error = new Error('Navigation timeout of 1000 ms exceeded');
-      page.pptrPage.goto.rejects(error);
+      const controller = new AbortController();
+      page.waitForEventsAfterAction.callsFake(async action => {
+        await action(controller.signal);
+        return {};
+      });
+      page.pptrPage.goto.callsFake(() => {
+        controller.abort(new Error('Action interrupted by a dialog'));
+        return new Promise<never>(() => {});
+      });
       page.getDialog.returns(createMockDialog({message: 'blocked'}));
 
-      await assert.rejects(
-        newPage(args).handler(
-          {params: {url: 'https://example.com', timeout: 1000}},
-          response,
-          context,
-        ),
-        error,
+      await newPage(args).handler(
+        {params: {url: 'https://example.com', timeout: 1000}},
+        response,
+        context,
       );
 
       sinon.assert.notCalled(context.selectPage);
       sinon.assert.notCalled(context.closePage);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The page opened a dialog before it finished loading.',
+      );
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      sinon.assert.notCalled(response.setListThirdPartyDeveloperTools);
+    });
+    it('reports a dialog that blocks the new page load without waiting for the timeout', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const start = Date.now();
+
+        await newPage(args).handler(
+          {
+            params: {
+              url: 'data:text/html,<script>alert("loading")</script>',
+              timeout: 30_000,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.ok(Date.now() - start < 10_000);
+        const page = context.getSelectedMcpPage();
+        assert.strictEqual(page, context.getPageById(2));
+        const dialog = page.getDialog();
+        assert.ok(dialog);
+        assert.strictEqual(dialog.message(), 'loading');
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'The page opened a dialog before it finished loading.',
+        );
+        assert.ok(response.includePages);
+        await dialog.dismiss();
+      });
     });
     it('create a page', async () => {
       await withMcpContext(async (response, context, args) => {
@@ -1290,6 +1328,120 @@ describe('pages', () => {
         );
       });
     });
+
+    it('reports a dialog that blocks the page load without waiting for the timeout', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        const start = Date.now();
+
+        await navigatePage(args).handler(
+          {
+            params: {
+              url: 'data:text/html,<script>alert("loading")</script>',
+              timeout: 30_000,
+            },
+            page,
+          },
+          response,
+          context,
+        );
+
+        assert.ok(Date.now() - start < 10_000);
+        const dialog = page.getDialog();
+        assert.ok(dialog);
+        assert.strictEqual(dialog.message(), 'loading');
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'The page opened a dialog before it finished loading.',
+        );
+        await dialog.dismiss();
+      });
+    });
+
+    it('reports the navigation error when an abort has no dialog open', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const controller = new AbortController();
+      page.waitForEventsAfterAction.callsFake(async action => {
+        await action(controller.signal);
+        return {};
+      });
+      page.pptrPage.goto.callsFake(() => {
+        controller.abort(new Error('Action interrupted by a dialog'));
+        return new Promise<never>(() => {});
+      });
+
+      await navigatePage(args).handler(
+        {params: {url: 'https://example.com'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Unable to navigate in the selected page: Action interrupted by a dialog.',
+      );
+      sinon.assert.calledOnce(response.setListThirdPartyDeveloperTools);
+    });
+
+    for (const [type, method, failure] of [
+      ['back', 'goBack', 'Unable to navigate back in the selected page'],
+      [
+        'forward',
+        'goForward',
+        'Unable to navigate forward in the selected page',
+      ],
+      ['reload', 'reload', 'Unable to reload the selected page'],
+    ] as const) {
+      it(`reports a dialog that blocks ${type} without waiting for the timeout`, async () => {
+        const {page, context, response, args} = createHandlerMocks();
+        const controller = new AbortController();
+        page.waitForEventsAfterAction.callsFake(async action => {
+          await action(controller.signal);
+          return {};
+        });
+        page.getDialog.returns(createMockDialog({message: 'blocked'}));
+        page.pptrPage[method].callsFake(() => {
+          controller.abort(new Error('Action interrupted by a dialog'));
+          return new Promise<never>(() => {});
+        });
+
+        await navigatePage(args).handler(
+          {params: {type}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          response.appendResponseLine,
+          'The page opened a dialog before it finished loading.',
+        );
+        sinon.assert.notCalled(response.setListThirdPartyDeveloperTools);
+      });
+
+      it(`reports the ${type} error when an abort has no dialog open`, async () => {
+        const {page, context, response, args} = createHandlerMocks();
+        const controller = new AbortController();
+        page.waitForEventsAfterAction.callsFake(async action => {
+          await action(controller.signal);
+          return {};
+        });
+        page.pptrPage[method].callsFake(() => {
+          controller.abort(new Error('Action interrupted by a dialog'));
+          return new Promise<never>(() => {});
+        });
+
+        await navigatePage(args).handler(
+          {params: {type}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          response.appendResponseLine,
+          `${failure}: Action interrupted by a dialog.`,
+        );
+      });
+    }
 
     it('go forward with error', async () => {
       await withMcpContext(async (response, context, args) => {
