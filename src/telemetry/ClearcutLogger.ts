@@ -79,6 +79,52 @@ function calculateDaysSince(
   return Math.ceil(diffTime / MS_PER_DAY);
 }
 
+interface ResolvedMcpClient {
+  mcpClient: McpClient;
+  rawClientName?: string;
+}
+
+function resolveMcpClient(clientName: string): ResolvedMcpClient {
+  const lowerName = clientName.toLowerCase();
+  if (lowerName.includes('claude-desktop')) {
+    return {mcpClient: McpClient.MCP_CLIENT_CLAUDE_DESKTOP};
+  }
+  if (lowerName.includes('claude')) {
+    return {mcpClient: McpClient.MCP_CLIENT_CLAUDE_CODE};
+  }
+  if (lowerName.includes('gemini')) {
+    return {mcpClient: McpClient.MCP_CLIENT_GEMINI_CLI};
+  }
+  if (clientName === DAEMON_CLIENT_NAME) {
+    return {mcpClient: McpClient.MCP_CLIENT_DT_MCP_CLI};
+  }
+  if (lowerName.includes('openclaw')) {
+    return {mcpClient: McpClient.MCP_CLIENT_OPENCLAW};
+  }
+  if (lowerName.includes('opencode')) {
+    return {mcpClient: McpClient.MCP_CLIENT_OPENCODE};
+  }
+  if (lowerName.includes('codex')) {
+    return {mcpClient: McpClient.MCP_CLIENT_CODEX};
+  }
+  if (lowerName.includes('antigravity')) {
+    return {mcpClient: McpClient.MCP_CLIENT_ANTIGRAVITY};
+  }
+  if (lowerName.includes('grok') || lowerName.includes('xai')) {
+    return {mcpClient: McpClient.MCP_CLIENT_GROK};
+  }
+  if (lowerName.includes('copilot')) {
+    return {mcpClient: McpClient.MCP_CLIENT_GITHUB_COPILOT};
+  }
+  if (lowerName.includes('hermes-agent')) {
+    return {mcpClient: McpClient.MCP_CLIENT_HERMES};
+  }
+  return {
+    mcpClient: McpClient.MCP_CLIENT_OTHER,
+    rawClientName: sanitizeClientName(clientName),
+  };
+}
+
 export interface ClearcutLoggerOptions {
   appVersion: string;
   persistence: Persistence;
@@ -151,48 +197,31 @@ export class ClearcutLogger {
   }
 
   setClientName(clientName: string): void {
-    const lowerName = clientName.toLowerCase();
-    if (lowerName.includes('claude-desktop')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_DESKTOP;
-    } else if (lowerName.includes('claude')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_CODE;
-    } else if (lowerName.includes('gemini')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GEMINI_CLI;
-    } else if (clientName === DAEMON_CLIENT_NAME) {
-      this.#mcpClient = McpClient.MCP_CLIENT_DT_MCP_CLI;
-    } else if (lowerName.includes('openclaw')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_OPENCLAW;
-    } else if (lowerName.includes('opencode')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_OPENCODE;
-    } else if (lowerName.includes('codex')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CODEX;
-    } else if (lowerName.includes('antigravity')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_ANTIGRAVITY;
-    } else if (lowerName.includes('grok') || lowerName.includes('xai')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GROK;
-    } else if (lowerName.includes('copilot')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GITHUB_COPILOT;
-    } else if (lowerName.includes('hermes-agent')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_HERMES;
-    } else {
-      this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
-      this.#rawClientName = sanitizeClientName(clientName);
-    }
+    const resolved = resolveMcpClient(clientName);
+    this.#mcpClient = resolved.mcpClient;
+    this.#rawClientName = resolved.rawClientName;
   }
 
   #addMcpClient(
     payload: ChromeDevToolsMcpExtension,
+    clientName?: string,
   ): ChromeDevToolsMcpExtension {
+    const resolved = clientName
+      ? resolveMcpClient(clientName)
+      : {
+          mcpClient: this.#mcpClient,
+          rawClientName: this.#rawClientName,
+        };
     const ext: ChromeDevToolsMcpExtension = {
       ...payload,
-      mcp_client: this.#mcpClient,
+      mcp_client: resolved.mcpClient,
     };
     if (
-      this.#mcpClient === McpClient.MCP_CLIENT_OTHER &&
-      this.#rawClientName !== undefined
+      resolved.mcpClient === McpClient.MCP_CLIENT_OTHER &&
+      resolved.rawClientName !== undefined
     ) {
       ext.raw_mcp_client_info = {
-        raw_client_name: this.#rawClientName,
+        raw_client_name: resolved.rawClientName,
       };
     }
     return ext;
@@ -235,8 +264,9 @@ export class ClearcutLogger {
     latencyMs: number;
     devToolsData?: DevToolsData;
     pageUrl?: string;
+    clientName?: string;
   }): Promise<void> {
-    void this.#logToolActiveIfNeeded().catch(error => {
+    void this.#logToolActiveIfNeeded(args.clientName).catch(error => {
       logger?.('Error in logToolActiveIfNeeded:', error);
     });
 
@@ -261,9 +291,12 @@ export class ClearcutLogger {
 
     this.#getWatchdog().send({
       type: WatchdogMessageType.LOG_EVENT,
-      payload: this.#addMcpClient({
-        tool_invocation,
-      }),
+      payload: this.#addMcpClient(
+        {
+          tool_invocation,
+        },
+        args.clientName,
+      ),
     });
   }
 
@@ -314,7 +347,7 @@ export class ClearcutLogger {
     });
   }
 
-  async #logToolActiveIfNeeded(): Promise<void> {
+  async #logToolActiveIfNeeded(clientName?: string): Promise<void> {
     // Expect state loaded at first tool call, if not, just skip logging.
     if (!this.#state) {
       return;
@@ -340,11 +373,14 @@ export class ClearcutLogger {
 
     this.#getWatchdog().send({
       type: WatchdogMessageType.LOG_EVENT,
-      payload: this.#addMcpClient({
-        tool_active: {
-          days_since_last_tool_call: bucketizeDaysSince(daysSinceToolCall),
+      payload: this.#addMcpClient(
+        {
+          tool_active: {
+            days_since_last_tool_call: bucketizeDaysSince(daysSinceToolCall),
+          },
         },
-      }),
+        clientName,
+      ),
     });
 
     this.#state.lastToolCall = now.toISOString();

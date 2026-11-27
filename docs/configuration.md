@@ -157,6 +157,39 @@ The Chrome DevTools MCP server supports the following configuration option:
   Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.
   - **Type:** number
 
+- **`--transport`**
+  Transport mode for the MCP server. "stdio" (default) communicates over standard input/output. "http" starts a stateless 2026-07-28 MCP HTTP server.
+  - **Type:** string
+  - **Choices:** `stdio`, `http`
+  - **Default:** `stdio`
+
+- **`--host`**
+  Hostname or IP address to bind the HTTP server to when --transport http is set.
+  - **Type:** string
+  - **Default:** `127.0.0.1`
+
+- **`--port`**
+  TCP port to bind the HTTP server to when --transport http is set. Use 0 to let the OS assign an ephemeral port.
+  - **Type:** number
+  - **Default:** `3000`
+
+- **`--allowedHosts`/ `--allowed-hosts`**
+  Additional hostnames (without ports) allowed in the HTTP Host header when --transport http is set. May be specified more than once.
+  - **Type:** array
+
+- **`--allowedOrigins`/ `--allowed-origins`**
+  Additional origin hostnames (without scheme or port) allowed in the HTTP Origin header when --transport http is set. May be specified more than once.
+  - **Type:** array
+
+- **`--allowUnauthenticatedHttp`/ `--allow-unauthenticated-http`**
+  Allow binding a non-loopback --host in HTTP mode without a Bearer token. Use with caution.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--httpToken`/ `--http-token`**
+  Static Bearer token for authenticating HTTP requests. Accepted only in the JSON config file or via the CHROME_DEVTOOLS_MCP_HTTP_TOKEN environment variable (not as a CLI flag).
+  - **Type:** string
+
 - **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string

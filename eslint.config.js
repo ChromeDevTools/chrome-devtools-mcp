@@ -541,6 +541,7 @@ export default defineConfig([
     files: [
       'src/tools/**/*.ts',
       'src/config/**/*.ts',
+      'src/http/**/*.ts',
       'src/telemetry/**/*.ts',
       'src/BrowserManager.ts',
       'src/processors/HeapSnapshotManager.ts',

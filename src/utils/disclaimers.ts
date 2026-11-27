@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import {isLoopbackHost} from '../config/http-options.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  type ParsedArguments,
+} from '../config/mcp-options.js';
 
 export function logCruxDisclaimer(args: ParsedArguments): void {
   if (!args.slim && args.performanceCrux) {
@@ -34,5 +38,23 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
 For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
     );
+  }
+
+  if (args.transport === 'http') {
+    if (
+      !args.allowUnrestrictedPaths &&
+      ((args.filesystemRoot ?? []).length === 0 ||
+        args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT)
+    ) {
+      console.error(
+        'Stateless HTTP transport does not support MCP roots. Tools that read or write local files are restricted to the OS temp directory unless --workspace is configured.',
+      );
+    }
+
+    if (!isLoopbackHost(args.host) && !args.httpToken) {
+      console.error(
+        `WARNING: HTTP server is bound to non-loopback host "${args.host}" without authentication. Any reachable client can control the browser.`,
+      );
+    }
   }
 };

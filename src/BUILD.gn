@@ -40,6 +40,7 @@ ts_library("third_party") {
     "third_party/cli.ts",
     "third_party/devtools-formatter-worker.ts",
     "third_party/devtools-heap-snapshot-worker.ts",
+    "third_party/http.ts",
     "third_party/index.ts",
     "third_party/lighthouse-devtools-mcp-bundle.d.ts",
     "third_party/zod.ts",
@@ -86,6 +87,7 @@ third_party_bundle("third_party_index_bundle") {
     # Separate files in the same directory.
     "./browser.js",
     "./cli.js",
+    "./http.js",
     "./lighthouse-devtools-mcp-bundle.js",
 
     # Optional peer dependencies.
@@ -118,6 +120,11 @@ third_party_bundle("third_party_cli_bundle") {
   node_require_shim = true
 }
 
+third_party_bundle("third_party_http_bundle") {
+  entrypoint_name = "http"
+  node_require_shim = true
+}
+
 third_party_bundle("third_party_formatter_worker_bundle") {
   entrypoint_name = "devtools-formatter-worker"
 }
@@ -137,6 +144,7 @@ action("third_party_notices") {
     "third_party_cli_bundle",
     "third_party_formatter_worker_bundle",
     "third_party_heap_snapshot_worker_bundle",
+    "third_party_http_bundle",
     "third_party_index_bundle",
   ]
 
@@ -195,6 +203,7 @@ ts_library("mcp_lib") {
     "config/category-options.ts",
     "config/cli-commands.ts",
     "config/cli-options.ts",
+    "config/http-options.ts",
     "config/mcp-options.ts",
     "config/puppeteer-options.ts",
     "config/tool-options.ts",
@@ -219,6 +228,8 @@ ts_library("mcp_lib") {
     "formatters/SnapshotFormatter.ts",
     "formatters/WebAuthnFormatter.ts",
     "formatters/constants.ts",
+    "http/HttpServer.ts",
+    "http/security.ts",
     "index.ts",
     "processors/ChunkedTraceParser.ts",
     "processors/HeapSnapshotManager.ts",
@@ -311,6 +322,7 @@ group("all") {
     ":third_party_cli_bundle",
     ":third_party_formatter_worker_bundle",
     ":third_party_heap_snapshot_worker_bundle",
+    ":third_party_http_bundle",
     ":third_party_index_bundle",
     ":third_party_notices",
   ]

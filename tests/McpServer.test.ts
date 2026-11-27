@@ -11,17 +11,30 @@ import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import {Client, InMemoryTransport} from '@modelcontextprotocol/client';
+import {
+  getOAuthProtectedResourceMetadataUrl,
+  OAuthError,
+  OAuthErrorCode,
+  oauthMetadataResponse,
+  requireBearerAuth,
+} from '@modelcontextprotocol/server';
 import sinon from 'sinon';
 
-import {BrowserManager} from '../src/BrowserManager.js';
 import {getOffByDefaultCategories} from '../src/config/category-options.js';
 import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {ConfigWatcher} from '../src/config/ConfigWatcher.js';
 import {mcpOptions} from '../src/config/mcp-options.js';
-import {McpServer} from '../src/index.js';
+import {BrowserManager, McpServer, ServerConfig} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {FilePersistence} from '../src/telemetry/persistence.js';
+import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
+import {WatchdogClient} from '../src/telemetry/WatchdogClient.js';
+import {
+  type AuthInfo,
+  McpServer as SdkMcpServer,
+} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
@@ -972,6 +985,502 @@ describe('McpServer', () => {
         applyError,
       );
       sinon.assert.notCalled(watched.logStream.write);
+    });
+  });
+
+  describe('createHttpHandler', () => {
+    function createModernRequest(
+      method: string,
+      params: Record<string, unknown> = {},
+      options: {
+        id?: number;
+        clientName?: string;
+        signal?: AbortSignal;
+      } = {},
+    ): Request {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'MCP-Protocol-Version': '2026-07-28',
+        'Mcp-Method': method,
+      };
+      if (method === 'tools/call' && typeof params['name'] === 'string') {
+        headers['Mcp-Name'] = params['name'];
+      }
+      return new Request('http://127.0.0.1:3000/mcp', {
+        method: 'POST',
+        headers,
+        signal: options.signal,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: options.id ?? 1,
+          method,
+          params: {
+            ...params,
+            _meta: {
+              'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+              'io.modelcontextprotocol/clientInfo': {
+                name: options.clientName ?? 'test-http-client',
+                version: '1.0.0',
+              },
+              'io.modelcontextprotocol/clientCapabilities': {},
+            },
+          },
+        }),
+      });
+    }
+
+    async function readSseMessages(
+      reader: ReadableStreamDefaultReader<Uint8Array>,
+      count: number,
+    ): Promise<Array<Record<string, unknown>>> {
+      const decoder = new TextDecoder();
+      const messages: Array<Record<string, unknown>> = [];
+      let buffer = '';
+      const deadline = Date.now() + 5_000;
+      while (messages.length < count) {
+        const remaining = deadline - Date.now();
+        assert.ok(remaining > 0, 'Timed out waiting for SSE message');
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const result = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Timed out reading SSE stream')),
+              remaining,
+            );
+          }),
+        ]).finally(() => {
+          clearTimeout(timer);
+        });
+        if (result.done) {
+          break;
+        }
+        buffer += decoder.decode(result.value, {stream: true});
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          for (const line of frame.split('\n')) {
+            if (line.startsWith('data: ')) {
+              messages.push(JSON.parse(line.slice('data: '.length)));
+            }
+          }
+        }
+      }
+      return messages;
+    }
+
+    it('serves 2026-07-28 requests and logs per-request telemetry clientName', async () => {
+      const persistence = sinon.createStubInstance(FilePersistence, {
+        loadState: Promise.resolve({lastToolCall: new Date().toISOString()}),
+      });
+      const watchdogClient = sinon.createStubInstance(WatchdogClient);
+      const telemetry = ClearcutLogger.initialize({
+        persistence,
+        appVersion: '1.0.0',
+        createWatchdogClient: () => watchdogClient,
+        sendToClearcut: sinon.stub().resolves({success: true}),
+      });
+      telemetry.setClientName('gemini-cli');
+      await Promise.resolve();
+
+      const {server, context} = await createTestServer();
+      const handler = server.createHttpHandler();
+      try {
+        const discoverResponse = await handler.fetch(
+          createModernRequest('server/discover'),
+        );
+        assert.strictEqual(discoverResponse.status, 200);
+        const discoverBody = await discoverResponse.json();
+        assert.ok(
+          Array.isArray(discoverBody.result?.supportedVersions) &&
+            discoverBody.result.supportedVersions.includes('2026-07-28'),
+        );
+        assert.strictEqual(
+          discoverBody.result?.capabilities?.tools?.listChanged,
+          true,
+        );
+
+        const listResponse = await handler.fetch(
+          createModernRequest('tools/list', {}, {id: 2}),
+        );
+        assert.strictEqual(listResponse.status, 200);
+        const listBody = await listResponse.json();
+        const listedNames = listBody.result?.tools?.map(
+          (tool: {name: string}) => tool.name,
+        );
+        assert.ok(Array.isArray(listedNames));
+        assert.ok(listedNames.includes('list_pages'));
+
+        const callResponse = await handler.fetch(
+          createModernRequest(
+            'tools/call',
+            {name: 'list_pages', arguments: {}},
+            {id: 3, clientName: 'claude-code'},
+          ),
+        );
+        assert.strictEqual(callResponse.status, 200);
+        const callBody = await callResponse.json();
+        assert.strictEqual(callBody.result?.isError, undefined);
+        sinon.assert.calledOnce(context.ensureBrowser);
+        sinon.assert.calledOnce(context.createPagesSnapshot);
+
+        await handler.fetch(
+          createModernRequest(
+            'tools/call',
+            {name: 'list_pages', arguments: {}},
+            {id: 4, clientName: 'custom-http-agent'},
+          ),
+        );
+        await server.callTool('list_pages', {});
+
+        sinon.assert.callCount(watchdogClient.send, 3);
+        assert.strictEqual(
+          watchdogClient.send.firstCall.args[0].type,
+          WatchdogMessageType.LOG_EVENT,
+        );
+        assert.strictEqual(
+          watchdogClient.send.firstCall.args[0].payload.mcp_client,
+          McpClient.MCP_CLIENT_CLAUDE_CODE,
+        );
+        assert.strictEqual(
+          watchdogClient.send.secondCall.args[0].payload.mcp_client,
+          McpClient.MCP_CLIENT_OTHER,
+        );
+        assert.deepStrictEqual(
+          watchdogClient.send.secondCall.args[0].payload.raw_mcp_client_info,
+          {raw_client_name: 'custom-http-agent'},
+        );
+        assert.strictEqual(
+          watchdogClient.send.thirdCall.args[0].payload.mcp_client,
+          McpClient.MCP_CLIENT_GEMINI_CLI,
+        );
+        assert.strictEqual(
+          watchdogClient.send.thirdCall.args[0].payload.raw_mcp_client_info,
+          undefined,
+        );
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('rejects 2025 legacy requests', async () => {
+      const {server} = await createTestServer();
+      const handler = server.createHttpHandler();
+      try {
+        const legacyRequest = new Request('http://127.0.0.1:3000/mcp', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: {
+              protocolVersion: '2025-11-25',
+              capabilities: {},
+              clientInfo: {name: 'legacy-client', version: '1.0.0'},
+            },
+          }),
+        });
+        const response = await handler.fetch(legacyRequest);
+        assert.strictEqual(response.status, 400);
+        const body = await response.json();
+        assert.strictEqual(body.error?.code, -32022);
+        assert.ok(
+          Array.isArray(body.error?.data?.supported) &&
+            body.error.data.supported.includes('2026-07-28'),
+        );
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('notifies subscriptions/listen on applyConfig and reflects updated tools', async () => {
+      const {server} = await createTestServer();
+      const handler = server.createHttpHandler({keepAliveMs: 0});
+      const response = await handler.fetch(
+        createModernRequest(
+          'subscriptions/listen',
+          {notifications: {toolsListChanged: true}},
+          {id: 10},
+        ),
+      );
+      assert.strictEqual(response.status, 200);
+      assert.match(
+        response.headers.get('content-type') ?? '',
+        /^text\/event-stream/,
+      );
+      assert.ok(response.body);
+      const reader = response.body.getReader();
+      try {
+        const [ack] = await readSseMessages(reader, 1);
+        assert.strictEqual(
+          ack['method'],
+          'notifications/subscriptions/acknowledged',
+        );
+
+        await server.applyConfig(parseConfig());
+        await server.applyConfig(parseConfig(['--memoryDebugging']));
+
+        const [changed] = await readSseMessages(reader, 1);
+        assert.strictEqual(
+          changed['method'],
+          'notifications/tools/list_changed',
+        );
+
+        const listResponse = await handler.fetch(
+          createModernRequest('tools/list', {}, {id: 11}),
+        );
+        const listBody = await listResponse.json();
+        const listedNames = listBody.result?.tools?.map(
+          (tool: {name: string}) => tool.name,
+        );
+        assert.ok(Array.isArray(listedNames));
+        assert.ok(listedNames.includes('get_heapsnapshot_summary'));
+
+        await server.close();
+        const [terminal] = await readSseMessages(reader, 1);
+        assert.strictEqual(terminal['id'], 10);
+      } finally {
+        await reader.cancel();
+        await server.close();
+      }
+    });
+
+    it('unregisters a closed HTTP handler from config change notifications', async () => {
+      const {server} = await createTestServer();
+      const handler = server.createHttpHandler();
+      const toolsChanged = sinon.spy(handler.notify, 'toolsChanged');
+      try {
+        await handler.close();
+        await server.applyConfig(parseConfig(['--memoryDebugging']));
+        sinon.assert.notCalled(toolsChanged);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('skips waiting on stdio client roots during HTTP tool calls', async () => {
+      const {server} = await createTestServer();
+      const protocol = server.server.server;
+      sinon.stub(protocol, 'getClientCapabilities').returns({roots: {}});
+      const rootsRequest = sinon
+        .stub(protocol, 'request')
+        .returns(new Promise(() => {}));
+      const handler = server.createHttpHandler();
+      try {
+        const response = await handler.fetch(
+          createModernRequest('tools/call', {
+            name: 'list_pages',
+            arguments: {},
+          }),
+        );
+        assert.strictEqual(response.status, 200);
+        const body = await response.json();
+        assert.strictEqual(body.result?.isError, undefined);
+        sinon.assert.notCalled(rootsRequest);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('passes authInfo through to the per-request protocol server', async () => {
+      let receivedAuthInfo: AuthInfo | undefined;
+      const originalConnect = SdkMcpServer.prototype.connect;
+      sinon.stub(SdkMcpServer.prototype, 'connect').callsFake(async function (
+        this: SdkMcpServer,
+        transport,
+      ) {
+        await originalConnect.call(this, transport);
+        const originalOnMessage = transport.onmessage;
+        assert.ok(originalOnMessage);
+        transport.onmessage = (message, extra) => {
+          receivedAuthInfo = extra?.authInfo;
+          originalOnMessage(message, extra);
+        };
+      });
+
+      const {server} = await createTestServer();
+      const handler = server.createHttpHandler();
+      const authInfo: AuthInfo = {
+        token: 'static-token',
+        clientId: 'http-client',
+        scopes: ['mcp'],
+      };
+      try {
+        const response = await handler.fetch(
+          createModernRequest('tools/call', {
+            name: 'list_pages',
+            arguments: {},
+          }),
+          {authInfo},
+        );
+        assert.strictEqual(response.status, 200);
+        assert.deepStrictEqual(receivedAuthInfo, authInfo);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('does not close shared BrowserManager, McpContext, or ConfigWatcher when a request ends', async () => {
+      using configFile = createTempFile('{}', 'cd4a.http.lifecycle.json');
+      sinon.stub(ConfigWatcher.prototype, 'start');
+      const watcherDispose = sinon.stub(ConfigWatcher.prototype, 'dispose');
+      const {server, browserManager, context} = await createTestServer([
+        '--config',
+        configFile.path,
+      ]);
+      server.watchConfig();
+      const handler = server.createHttpHandler();
+
+      const firstResponse = await handler.fetch(
+        createModernRequest(
+          'tools/call',
+          {name: 'list_pages', arguments: {}},
+          {id: 1},
+        ),
+      );
+      const secondResponse = await handler.fetch(
+        createModernRequest(
+          'tools/call',
+          {name: 'list_pages', arguments: {}},
+          {id: 2},
+        ),
+      );
+      assert.strictEqual(firstResponse.status, 200);
+      assert.strictEqual(secondResponse.status, 200);
+      sinon.assert.notCalled(browserManager.close);
+      sinon.assert.notCalled(context.dispose);
+      sinon.assert.notCalled(watcherDispose);
+
+      await server.close();
+      sinon.assert.calledOnce(browserManager.close);
+      sinon.assert.calledOnce(context.dispose);
+      sinon.assert.calledOnce(watcherDispose);
+      await assert.rejects(
+        handler.fetch(createModernRequest('server/discover')),
+        /closed/i,
+      );
+    });
+
+    it('embeds with OAuth 2.1 middleware using public index exports', async () => {
+      const resourceServerUrl = new URL('https://host.example/mcp');
+      const resourceMetadataUrl =
+        getOAuthProtectedResourceMetadataUrl(resourceServerUrl);
+      const oauthMetadataOptions = {
+        resourceServerUrl,
+        scopesSupported: ['devtools:mcp'],
+        oauthMetadata: {
+          issuer: 'https://auth.example',
+          authorization_endpoint: 'https://auth.example/authorize',
+          token_endpoint: 'https://auth.example/token',
+          response_types_supported: ['code'],
+        },
+      };
+      const expectedAuth: AuthInfo = {
+        token: 'valid-oauth-token',
+        clientId: 'hosted-agent',
+        scopes: ['devtools:mcp'],
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        resource: resourceServerUrl,
+      };
+      const checkAuth = requireBearerAuth({
+        expectedResource: resourceServerUrl,
+        requiredScopes: ['devtools:mcp'],
+        resourceMetadataUrl,
+        verifier: {
+          verifyAccessToken: async token => {
+            if (token === 'valid-oauth-token') {
+              return expectedAuth;
+            }
+            throw new OAuthError(OAuthErrorCode.InvalidToken, 'Invalid token');
+          },
+        },
+      });
+
+      const context = createMockMcpContext();
+      context.ensureBrowser.resolves(createMockPuppeteerBrowser());
+      context.getPages.returns([]);
+      sinon.stub(McpContext, 'create').returns(context);
+
+      const config = ServerConfig.create({
+        cliArgs: {},
+        fileArgs: {},
+        env: {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        suppressUsageStatisticsNotice: true,
+      });
+      const browserManager = new BrowserManager(config);
+      sinon
+        .stub(browserManager, 'ensureBrowser')
+        .resolves(createMockPuppeteerBrowser());
+      sinon.stub(browserManager, 'close').resolves();
+
+      const server = await McpServer.from(config, {browserManager});
+      const handler = server.createHttpHandler();
+
+      async function embeddedFetch(request: Request): Promise<Response> {
+        const metadata = oauthMetadataResponse(request, oauthMetadataOptions);
+        if (metadata) {
+          return metadata;
+        }
+        const auth = await checkAuth(request);
+        if (auth instanceof Response) {
+          return auth;
+        }
+        return await handler.fetch(request, {authInfo: auth});
+      }
+
+      try {
+        const metadataRes = await embeddedFetch(
+          new Request(resourceMetadataUrl, {method: 'GET'}),
+        );
+        assert.strictEqual(metadataRes.status, 200);
+        const metadataBody = await metadataRes.json();
+        assert.strictEqual(metadataBody.resource, resourceServerUrl.href);
+
+        const unauthRes = await embeddedFetch(
+          createModernRequest('server/discover'),
+        );
+        assert.strictEqual(unauthRes.status, 401);
+        assert.match(
+          unauthRes.headers.get('www-authenticate') ?? '',
+          new RegExp(`resource_metadata="${resourceMetadataUrl}"`),
+        );
+
+        const authedReq = new Request(resourceServerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            'MCP-Protocol-Version': '2026-07-28',
+            'Mcp-Method': 'tools/call',
+            'Mcp-Name': 'list_pages',
+            Authorization: 'Bearer valid-oauth-token',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: {
+              name: 'list_pages',
+              arguments: {},
+              _meta: {
+                'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities': {},
+                'io.modelcontextprotocol/clientInfo': {
+                  name: 'hosted-agent',
+                  version: '1.0.0',
+                },
+              },
+            },
+          }),
+        });
+        const authedRes = await embeddedFetch(authedReq);
+        assert.strictEqual(authedRes.status, 200);
+        const authedBody = await authedRes.json();
+        assert.strictEqual(authedBody.result?.isError, undefined);
+      } finally {
+        await server.close();
+      }
     });
   });
 });

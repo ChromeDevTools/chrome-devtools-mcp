@@ -23,14 +23,18 @@ import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
   type CallToolResult,
+  createMcpHandler,
+  type CreateMcpHandlerOptions,
+  type McpHttpHandler,
   McpServer as SdkMcpServer,
   ProtocolError,
   ProtocolErrorCode,
   type RegisteredTool,
   type Root,
+  type ServerNotifier,
   type Transport,
 } from './third_party/index.js';
-import {ToolHandler} from './ToolHandler.js';
+import {ToolHandler, type ToolHandleOptions} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
@@ -49,14 +53,43 @@ import {VERSION} from './version.js';
  */
 const ROOTS_REQUEST_TIMEOUT = 5_000;
 
+export {BrowserManager, type BrowserManagerOptions} from './BrowserManager.js';
+export {
+  ServerConfig,
+  type ReadonlyServerConfig,
+  type ServerConfigCreateOptions,
+  type ServerConfigInit,
+} from './config/ServerConfig.js';
+export {
+  HttpServer,
+  type HttpServerAddress,
+  type HttpServerOptions,
+} from './http/HttpServer.js';
+
 export interface McpServerOptions {
   browserManager: BrowserManager;
   logFile?: fs.WriteStream;
 }
 
 interface ToolEntry {
+  tool: AnyToolDefinition;
   handler: ToolHandler;
   registeredTool: RegisteredTool;
+}
+
+function createSdkMcpServer(): SdkMcpServer {
+  return new SdkMcpServer(
+    {
+      name: 'chrome_devtools',
+      title: 'Chrome DevTools MCP server',
+      version: VERSION,
+    },
+    {
+      capabilities: {logging: {}, tools: {listChanged: true}},
+      // Enabling or updating many tools at once sends a single notification.
+      debouncedNotificationMethods: ['notifications/tools/list_changed'],
+    },
+  );
 }
 
 export class McpServer {
@@ -82,6 +115,8 @@ export class McpServer {
   #initialRoots?: Promise<void>;
   #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
+  #httpNotifiers = new Set<ServerNotifier>();
+  #httpHandlers = new Set<McpHttpHandler>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
     this.#config = config;
@@ -99,18 +134,7 @@ export class McpServer {
       });
     }
 
-    this.server = new SdkMcpServer(
-      {
-        name: 'chrome_devtools',
-        title: 'Chrome DevTools MCP server',
-        version: VERSION,
-      },
-      {
-        capabilities: {logging: {}, tools: {listChanged: true}},
-        // Enabling or updating many tools at once sends a single notification.
-        debouncedNotificationMethods: ['notifications/tools/list_changed'],
-      },
-    );
+    this.server = createSdkMcpServer();
 
     this.#context = McpContext.create(logger, {
       config: this.#config,
@@ -157,6 +181,32 @@ export class McpServer {
       this.watchConfig();
     }
     return await this.server.connect(transport);
+  }
+
+  /**
+   * Creates a stateless 2026-07-28 MCP HTTP handler backed by this server's
+   * shared runtime. Legacy 2025 requests are rejected.
+   */
+  createHttpHandler(
+    options?: Omit<CreateMcpHandlerOptions, 'legacy'>,
+  ): McpHttpHandler {
+    const handler = createMcpHandler(() => this.#createProtocolServer(), {
+      ...options,
+      legacy: 'reject',
+    });
+    const wrappedHandler: McpHttpHandler = {
+      fetch: handler.fetch,
+      notify: handler.notify,
+      bus: handler.bus,
+      close: async () => {
+        this.#httpNotifiers.delete(handler.notify);
+        this.#httpHandlers.delete(wrappedHandler);
+        await handler.close();
+      },
+    };
+    this.#httpNotifiers.add(handler.notify);
+    this.#httpHandlers.add(wrappedHandler);
+    return wrappedHandler;
   }
 
   async callTool(
@@ -209,14 +259,22 @@ export class McpServer {
     }
 
     this.#config.commit(nextConfig);
+    let toolsChanged = false;
     for (const {entry, tool} of updates) {
+      entry.tool = tool;
       if (entry.handler.update(tool)) {
+        toolsChanged = true;
         entry.registeredTool.update({
           description: tool.description,
           paramsSchema: entry.handler.registeredInputSchema,
           annotations: tool.annotations,
           enabled: !entry.handler.disabled,
         });
+      }
+    }
+    if (toolsChanged) {
+      for (const notifier of this.#httpNotifiers) {
+        notifier.toolsChanged();
       }
     }
 
@@ -291,6 +349,10 @@ export class McpServer {
   async close(): Promise<void> {
     this.#configWatcher?.dispose();
     this.#configWatcher = undefined;
+    const httpHandlers = [...this.#httpHandlers];
+    this.#httpHandlers.clear();
+    this.#httpNotifiers.clear();
+    await Promise.allSettled(httpHandlers.map(handler => handler.close()));
     try {
       this.#context.dispose();
     } catch (err) {
@@ -327,7 +389,10 @@ export class McpServer {
     for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
-    this.#setToolCallRequestHandler();
+    this.#setToolCallRequestHandler(this.server, {
+      waitForRoots: true,
+      useRequestClientName: false,
+    });
     await loadIssueDescriptions();
   }
 
@@ -370,8 +435,8 @@ export class McpServer {
     }
   }
 
-  async #getContext(): Promise<McpContext> {
-    if (this.#lastClientRoots === undefined) {
+  async #getContext(waitForRoots = true): Promise<McpContext> {
+    if (waitForRoots && this.#lastClientRoots === undefined) {
       // Nothing listed yet, so this call has to wait – bounded, since every
       // tool call waits on it, and a later background refresh still lands
       this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
@@ -384,17 +449,46 @@ export class McpServer {
     return new ToolHandler(
       tool,
       this.#config,
-      () => this.#getContext(),
+      waitForRoots => this.#getContext(waitForRoots),
       () => this.#browserManager.abandonPendingAttempt(),
     );
+  }
+
+  #createProtocolServer(): SdkMcpServer {
+    const sdkServer = createSdkMcpServer();
+    sdkServer.server.setRequestHandler('logging/setLevel', () => {
+      return {};
+    });
+    for (const [name, entry] of this.#tools) {
+      const registeredTool = sdkServer.registerTool(
+        name,
+        {
+          description: entry.tool.description,
+          inputSchema: entry.handler.registeredInputSchema,
+          annotations: entry.tool.annotations,
+        },
+        args => entry.handler.handle(args, {waitForRoots: false}),
+      );
+      if (entry.handler.disabled) {
+        registeredTool.disable();
+      }
+    }
+    this.#setToolCallRequestHandler(sdkServer, {
+      waitForRoots: false,
+      useRequestClientName: true,
+    });
+    return sdkServer;
   }
 
   /**
    * Overrides the SDK's `tools/call` handler so enabled and input-schema
    * checks run inside `ToolHandler.handle()` inside the task runner.
    */
-  #setToolCallRequestHandler(): void {
-    this.server.server.setRequestHandler('tools/call', async (request, ctx) => {
+  #setToolCallRequestHandler(
+    sdkServer: SdkMcpServer,
+    options: {waitForRoots: boolean; useRequestClientName: boolean},
+  ): void {
+    sdkServer.server.setRequestHandler('tools/call', async (request, ctx) => {
       const entry = this.#tools.get(request.params.name);
       if (!entry) {
         throw new ProtocolError(
@@ -402,11 +496,21 @@ export class McpServer {
           `Tool ${request.params.name} not found`,
         );
       }
-      const result = await entry.handler.handle(request.params.arguments, {
+      const handleOptions: ToolHandleOptions = {
         viaMcp: true,
         signal: ctx.mcpReq.signal,
-      });
-      return this.server.server.projectCallToolResult(result, undefined);
+      };
+      if (!options.waitForRoots) {
+        handleOptions.waitForRoots = false;
+      }
+      if (options.useRequestClientName) {
+        handleOptions.clientName = sdkServer.server.getClientVersion()?.name;
+      }
+      const result = await entry.handler.handle(
+        request.params.arguments,
+        handleOptions,
+      );
+      return sdkServer.server.projectCallToolResult(result, undefined);
     });
   }
 
@@ -427,7 +531,7 @@ export class McpServer {
       registeredTool.disable();
     }
 
-    this.#tools.set(tool.name, {handler, registeredTool});
+    this.#tools.set(tool.name, {tool, handler, registeredTool});
   }
 }
 

@@ -12,6 +12,12 @@ import sinon from 'sinon';
 
 import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
+import {
+  HTTP_ONLY_OPTION_KEYS,
+  isLoopbackHost,
+} from '../../src/config/http-options.js';
+import {getCliOptions} from '../../src/config/mcp-options.js';
+import {redactDaemonArgsForLogging} from '../../src/utils/logger.js';
 import {createTempFile} from '../utils.js';
 
 describe('mcp-options steps', () => {
@@ -28,6 +34,84 @@ describe('mcp-options steps', () => {
         headless: true,
       });
     });
+
+    it('accepts --transport http with valid --host and --port bounds', () => {
+      const zeroPort = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--transport',
+        'http',
+        '--host',
+        ' localhost ',
+        '--port',
+        '0',
+      ]).parseCliArgs();
+      assert.deepStrictEqual(zeroPort, {
+        transport: 'http',
+        host: 'localhost',
+        port: 0,
+      });
+
+      const maxPort = new ConfigParser('0.0.0', [
+        'node',
+        'main.js',
+        '--transport',
+        'http',
+        '--port',
+        '65535',
+      ]).parseCliArgs();
+      assert.strictEqual(maxPort.port, 65535);
+    });
+
+    for (const invalidPort of ['-1', '65536', '3.5']) {
+      it(`rejects invalid --port ${invalidPort}`, () => {
+        assert.throws(
+          () =>
+            new ConfigParser('0.0.0', [
+              'node',
+              'main.js',
+              '--transport',
+              'http',
+              `--port=${invalidPort}`,
+            ]).parseCliArgs(),
+          /Invalid port .*Expected an integer between 0 and 65535/,
+        );
+      });
+    }
+
+    it('rejects empty or whitespace-only --host', () => {
+      assert.throws(
+        () =>
+          new ConfigParser('0.0.0', [
+            'node',
+            'main.js',
+            '--transport',
+            'http',
+            '--host',
+            '   ',
+          ]).parseCliArgs(),
+        /Invalid host: expected a non-empty hostname or IP address/,
+      );
+    });
+
+    for (const argv of [
+      ['--httpToken', 'secret'],
+      ['--httpToken=secret'],
+      ['--http-token', 'secret'],
+      ['--http-token=secret'],
+    ]) {
+      it(`rejects ${argv.join(' ')} on the command line`, () => {
+        assert.throws(
+          () =>
+            new ConfigParser('0.0.0', [
+              'node',
+              'main.js',
+              ...argv,
+            ]).parseCliArgs(),
+          /CHROME_DEVTOOLS_MCP_HTTP_TOKEN.*"httpToken"/,
+        );
+      });
+    }
   });
 
   describe('parseConfigFile', () => {
@@ -98,6 +182,31 @@ describe('mcp-options steps', () => {
       assert.throws(
         () => parser.parseConfigFile(invalidFile.path),
         /Header "Authorization" must have a string value/,
+      );
+    });
+
+    it('accepts httpToken in a config file and rejects empty values', () => {
+      using validFile = createTempFile(
+        JSON.stringify({
+          transport: 'http',
+          httpToken: 'file-secret',
+        }),
+        'cd4a.http-token.valid.json',
+      );
+      const args = parser.parseConfigFile(validFile.path);
+      assert.strictEqual(args.transport, 'http');
+      assert.strictEqual(args.httpToken, 'file-secret');
+
+      using emptyFile = createTempFile(
+        JSON.stringify({
+          transport: 'http',
+          httpToken: '   ',
+        }),
+        'cd4a.http-token.empty.json',
+      );
+      assert.throws(
+        () => parser.parseConfigFile(emptyFile.path),
+        /Invalid httpToken: expected a non-empty Bearer token/,
       );
     });
 
@@ -220,6 +329,76 @@ describe('mcp-options steps', () => {
       fs.writeFileSync(configFile.path, '{');
 
       assert.throws(() => parser.reload(), /Invalid JSON config file/);
+    });
+  });
+
+  describe('isLoopbackHost', () => {
+    for (const host of [
+      '127.0.0.1',
+      '127.1.2.3',
+      'localhost',
+      'LOCALHOST.',
+      '::1',
+      '[::1]',
+      '0:0:0:0:0:0:0:1',
+      '::ffff:127.0.0.1',
+      '[::ffff:127.0.0.1]',
+      '::ffff:7f00:1',
+    ]) {
+      it(`recognizes ${JSON.stringify(host)} as loopback`, () => {
+        assert.strictEqual(isLoopbackHost(host), true);
+      });
+    }
+
+    for (const host of [
+      '0.0.0.0',
+      '::',
+      '[::]',
+      '192.168.1.1',
+      '::ffff:192.168.1.1',
+      'example.com',
+      '',
+      '   ',
+      '[localhost]',
+      '[127.0.0.1]',
+      '127.0.0.999',
+    ]) {
+      it(`rejects ${JSON.stringify(host)} as non-loopback`, () => {
+        assert.strictEqual(isLoopbackHost(host), false);
+      });
+    }
+  });
+
+  describe('getCliOptions', () => {
+    it('omits transport and all HTTP-only options', () => {
+      const cliOptions = getCliOptions();
+      assert.strictEqual('transport' in cliOptions, false);
+      for (const key of HTTP_ONLY_OPTION_KEYS) {
+        assert.strictEqual(key in cliOptions, false);
+      }
+    });
+  });
+
+  describe('redactDaemonArgsForLogging', () => {
+    it('redacts --httpToken and --http-token arguments', () => {
+      const args = [
+        '--httpToken',
+        'SECRET_1',
+        '--http-token=SECRET_2',
+        '--httpToken=SECRET_3',
+        '--http-token',
+        'SECRET_4',
+      ];
+      const redacted = redactDaemonArgsForLogging(args);
+      assert.deepStrictEqual(redacted, [
+        '--httpToken',
+        '[REDACTED]',
+        '--http-token=[REDACTED]',
+        '--httpToken=[REDACTED]',
+        '--http-token',
+        '[REDACTED]',
+      ]);
+      assert.strictEqual(args[1], 'SECRET_1');
     });
   });
 });

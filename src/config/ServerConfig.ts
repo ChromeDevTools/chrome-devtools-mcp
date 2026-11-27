@@ -9,6 +9,11 @@ import {isDeepStrictEqual} from 'node:util';
 import {yargs} from '../third_party/cli.js';
 
 import {
+  HTTP_ONLY_OPTION_KEYS,
+  HTTP_TOKEN_ENV_VAR,
+  isLoopbackHost,
+} from './http-options.js';
+import {
   CONFLICTING_ARGS,
   DEFAULT_FILESYSTEM_ROOT,
   IMPLICATIONS,
@@ -144,6 +149,19 @@ export class ServerConfig implements ReadonlyServerConfig {
         );
       }
     }
+
+    if (explicitArgs.transport !== 'http') {
+      const invalidHttpOptions = HTTP_ONLY_OPTION_KEYS.filter(
+        key => explicitArgs[key] !== undefined && explicitArgs[key] !== false,
+      );
+      if (invalidHttpOptions.length > 0) {
+        const label = invalidHttpOptions.length === 1 ? 'option' : 'options';
+        const verb = invalidHttpOptions.length === 1 ? 'requires' : 'require';
+        throw new Error(
+          `HTTP ${label} ${invalidHttpOptions.join(', ')} ${verb} --transport http.`,
+        );
+      }
+    }
   }
 
   static validateImplications(explicitArgs: Partial<ParsedArguments>): void {
@@ -229,7 +247,27 @@ export class ServerConfig implements ReadonlyServerConfig {
       resolvedArgs.categoryExperimentalThirdParty = true;
     }
 
+    if (resolvedArgs.transport === 'http') {
+      const envHttpToken = env[HTTP_TOKEN_ENV_VAR]?.trim();
+      if (envHttpToken) {
+        resolvedArgs.httpToken = envHttpToken;
+      }
+    }
+
     return resolvedArgs;
+  }
+
+  static validateHttpConfig(resolved: ParsedArguments): void {
+    if (
+      resolved.transport === 'http' &&
+      !isLoopbackHost(resolved.host) &&
+      !resolved.httpToken &&
+      !resolved.allowUnauthenticatedHttp
+    ) {
+      throw new Error(
+        `Binding HTTP server to non-loopback host "${resolved.host}" requires authentication. Set ${HTTP_TOKEN_ENV_VAR}, configure "httpToken" in the JSON config file, or pass --allowUnauthenticatedHttp.`,
+      );
+    }
   }
 
   /**
@@ -248,6 +286,7 @@ export class ServerConfig implements ReadonlyServerConfig {
       env: options.env,
       suppressUsageStatisticsNotice: options.suppressUsageStatisticsNotice,
     });
+    ServerConfig.validateHttpConfig(resolved);
     return new ServerConfig({
       cliArgs: options.cliArgs,
       fileArgs: options.fileArgs,

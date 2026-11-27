@@ -264,6 +264,13 @@ function routedPageId(
     : undefined;
 }
 
+export interface ToolHandleOptions {
+  viaMcp?: boolean;
+  signal?: AbortSignal;
+  clientName?: string;
+  waitForRoots?: boolean;
+}
+
 export class ToolHandler {
   #tool: AnyToolDefinition;
   #config: ReadonlyServerConfig;
@@ -274,7 +281,7 @@ export class ToolHandler {
   constructor(
     tool: AnyToolDefinition,
     config: ReadonlyServerConfig,
-    private readonly getContext: () => Promise<McpContext>,
+    private readonly getContext: (waitForRoots: boolean) => Promise<McpContext>,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
   ) {
     this.#tool = tool;
@@ -514,11 +521,12 @@ export class ToolHandler {
    */
   async handle(
     rawArgs: Record<string, unknown> = {},
-    options?: {viaMcp?: boolean; signal?: AbortSignal},
+    options?: ToolHandleOptions,
   ): Promise<CallToolResult> {
     const signal = options?.signal ?? new AbortController().signal;
     signal.throwIfAborted();
-    const context = await raceWithSignal(this.getContext(), signal);
+    const waitForRoots = options?.waitForRoots ?? true;
+    const context = await raceWithSignal(this.getContext(waitForRoots), signal);
     // Loaded before the call takes its queue, so waiting never holds a queue.
     const createResponse = await raceWithSignal(loadResponseFactory(), signal);
     let queueGuard: Disposable | undefined;
@@ -626,6 +634,9 @@ export class ToolHandler {
         latencyMs: Date.now() - startTime,
         devToolsData,
         pageUrl,
+        ...(options?.clientName !== undefined
+          ? {clientName: options.clientName}
+          : {}),
       });
     }
   }

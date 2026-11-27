@@ -9,6 +9,7 @@ import '../utils/polyfill.js';
 import process from 'node:process';
 
 import {BrowserManager} from '../BrowserManager.js';
+import {HttpServer} from '../http/HttpServer.js';
 import {McpServer} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
@@ -44,10 +45,11 @@ const serverPromise = McpServer.from(serverConfig, {
   browserManager,
 });
 
-// Shutdown on stdin EOF (stdio MCP convention — the client closes the
-// transport to signal exit) and on standard termination signals. Without
-// this, an active Chrome subprocess keeps the Node event loop ref'd after
-// stdin closes and the server hangs until something else kills it.
+// Shutdown on standard termination signals (and on stdin EOF in stdio mode,
+// where the client closes the transport to signal exit). Without this, an
+// active Chrome subprocess keeps the Node event loop ref'd and the server
+// hangs until something else kills it.
+let httpServer: HttpServer | undefined;
 let shuttingDown = false;
 async function shutdown(reason: string): Promise<void> {
   if (shuttingDown) {
@@ -63,16 +65,11 @@ async function shutdown(reason: string): Promise<void> {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 5000).unref();
+  await httpServer?.close();
   const server = await serverPromise;
   await server.close();
   process.exit(0);
 }
-process.stdin.on('end', () => {
-  void shutdown('stdin end');
-});
-process.stdin.on('close', () => {
-  void shutdown('stdin close');
-});
 process.on('SIGTERM', () => {
   void shutdown('SIGTERM');
 });
@@ -82,11 +79,45 @@ process.on('SIGINT', () => {
 process.on('SIGHUP', () => {
   void shutdown('SIGHUP');
 });
+if (args.transport !== 'http') {
+  process.stdin.on('end', () => {
+    void shutdown('stdin end');
+  });
+  process.stdin.on('close', () => {
+    void shutdown('stdin close');
+  });
+}
 
 const server = await serverPromise;
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger?.('Chrome DevTools MCP Server connected');
+if (args.transport === 'http') {
+  if (args.watchConfig) {
+    server.watchConfig();
+  }
+  httpServer = new HttpServer(server, {
+    host: args.host,
+    port: args.port,
+    allowedHosts: args.allowedHosts,
+    allowedOrigins: args.allowedOrigins,
+    httpToken: args.httpToken,
+    allowUnauthenticatedHttp: args.allowUnauthenticatedHttp,
+    onerror: err => {
+      logger?.('HTTP transport error:', err);
+    },
+  });
+  const address = await httpServer.start();
+  if (shuttingDown) {
+    await httpServer.close();
+  } else {
+    logger?.(`Chrome DevTools MCP HTTP server listening on ${address.url}`);
+    console.error(
+      `Chrome DevTools MCP HTTP server listening on ${address.url}`,
+    );
+  }
+} else {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  logger?.('Chrome DevTools MCP Server connected');
+}
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));

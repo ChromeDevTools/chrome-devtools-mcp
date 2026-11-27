@@ -63,6 +63,7 @@
     "@google/genai": "^3.0.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",
+    "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
     "@stylistic/eslint-plugin": "^6.0.0",
     "@toon-format/toon": "^4.1.0",

@@ -120,11 +120,11 @@ export function redactConnectOptionsForLogging<
  * Spawn still receives the original arguments unchanged.
  */
 export function redactDaemonArgsForLogging(args: readonly string[]): string[] {
-  const headersFlag = /^--ws-?headers$/i;
+  const secretFlag = /^--(?:ws-?headers|http-?token)$/i;
   const endpointFlag = /^--(?:ws-?endpoint|browser-?url)$/i;
   return args.map((arg, index) => {
     const previous = args[index - 1] ?? '';
-    if (headersFlag.test(previous)) {
+    if (secretFlag.test(previous)) {
       return '[REDACTED]';
     }
     if (endpointFlag.test(previous)) {
@@ -136,7 +136,7 @@ export function redactDaemonArgsForLogging(args: readonly string[]): string[] {
     }
     const flag = arg.slice(0, equalsAt);
     const value = arg.slice(equalsAt + 1);
-    if (headersFlag.test(flag)) {
+    if (secretFlag.test(flag)) {
       return `${flag}=[REDACTED]`;
     }
     if (endpointFlag.test(flag)) {

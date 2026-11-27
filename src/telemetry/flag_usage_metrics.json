@@ -506,5 +506,42 @@
   {
     "name": "background_new_pages",
     "flagType": "boolean"
+  },
+  {
+    "name": "transport_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "transport",
+    "flagType": "enum",
+    "choices": ["TRANSPORT_UNSPECIFIED", "TRANSPORT_STDIO", "TRANSPORT_HTTP"]
+  },
+  {
+    "name": "host_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "port_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_hosts_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_origins_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allow_unauthenticated_http_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allow_unauthenticated_http",
+    "flagType": "boolean"
+  },
+  {
+    "name": "http_token_present",
+    "flagType": "boolean"
   }
 ]

@@ -25,6 +25,7 @@ function verifyPackageContents() {
       'out/Default/gen/src/third_party/index.js',
       'out/Default/gen/src/third_party/browser.js',
       'out/Default/gen/src/third_party/cli.js',
+      'out/Default/gen/src/third_party/http.js',
       'out/Default/gen/src/third_party/devtools-formatter-worker.js',
       'out/Default/gen/src/third_party/devtools-heap-snapshot-worker.js',
       'out/Default/gen/src/third_party/lighthouse-devtools-mcp-bundle.js',

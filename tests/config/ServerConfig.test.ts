@@ -12,7 +12,15 @@ import sinon from 'sinon';
 
 import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
-import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
+import {
+  DEFAULT_HTTP_HOST,
+  DEFAULT_HTTP_PORT,
+  HTTP_TOKEN_ENV_VAR,
+} from '../../src/config/http-options.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  type ParsedArguments,
+} from '../../src/config/mcp-options.js';
 import {
   type ReadonlyServerConfig,
   ServerConfig,
@@ -466,6 +474,108 @@ describe('ServerConfig', () => {
       assert.deepStrictEqual(previous.getRestartRequiredChanges(next), [
         'browserUrl',
       ]);
+    });
+  });
+
+  describe('HTTP transport configuration', () => {
+    it('defaults to stdio transport and ignores env HTTP token in stdio mode', () => {
+      const config = parseConfig([], {[HTTP_TOKEN_ENV_VAR]: 'env-secret'});
+      assert.strictEqual(config.resolved.transport, 'stdio');
+      assert.strictEqual(config.resolved.httpToken, undefined);
+    });
+
+    it('applies default host and port for --transport http', () => {
+      const config = parseConfig(['--transport', 'http']);
+      assert.strictEqual(config.resolved.transport, 'http');
+      assert.strictEqual(config.resolved.host, DEFAULT_HTTP_HOST);
+      assert.strictEqual(config.resolved.port, DEFAULT_HTTP_PORT);
+      assert.strictEqual(config.resolved.allowUnauthenticatedHttp, false);
+      assert.strictEqual(config.resolved.httpToken, undefined);
+    });
+
+    it('gives CHROME_DEVTOOLS_MCP_HTTP_TOKEN precedence over config-file httpToken', () => {
+      const withEnv = ServerConfig.create({
+        cliArgs: {transport: 'http'},
+        fileArgs: {httpToken: 'file-secret'},
+        env: {[HTTP_TOKEN_ENV_VAR]: 'env-secret'},
+        suppressUsageStatisticsNotice: true,
+      });
+      assert.strictEqual(withEnv.resolved.httpToken, 'env-secret');
+
+      const withEmptyEnv = ServerConfig.create({
+        cliArgs: {transport: 'http'},
+        fileArgs: {httpToken: 'file-secret'},
+        env: {[HTTP_TOKEN_ENV_VAR]: '   '},
+        suppressUsageStatisticsNotice: true,
+      });
+      assert.strictEqual(withEmptyEnv.resolved.httpToken, 'file-secret');
+    });
+
+    const httpOnlyCases: Array<[string, Partial<ParsedArguments>]> = [
+      ['host', {host: '127.0.0.1'}],
+      ['port', {port: 0}],
+      ['allowedHosts', {allowedHosts: ['example.com']}],
+      ['allowedOrigins', {allowedOrigins: ['example.com']}],
+      ['allowUnauthenticatedHttp', {allowUnauthenticatedHttp: true}],
+      ['httpToken', {httpToken: 'file-secret'}],
+    ];
+    for (const [label, fileArgs] of httpOnlyCases) {
+      it(`rejects HTTP-only option ${label} when transport is stdio`, () => {
+        assert.throws(
+          () =>
+            ServerConfig.create({
+              cliArgs: {},
+              fileArgs,
+              env: {},
+              suppressUsageStatisticsNotice: true,
+            }),
+          /require.*--transport http/,
+        );
+      });
+    }
+
+    it('rejects non-loopback host without a token or --allowUnauthenticatedHttp', () => {
+      for (const host of ['0.0.0.0', '::', '192.168.1.1']) {
+        assert.throws(
+          () => parseConfig(['--transport', 'http', '--host', host]),
+          /non-loopback host.*CHROME_DEVTOOLS_MCP_HTTP_TOKEN.*--allowUnauthenticatedHttp/,
+        );
+      }
+    });
+
+    it('allows non-loopback host with env token, config-file token, or --allowUnauthenticatedHttp', () => {
+      const withEnvToken = parseConfig(
+        ['--transport', 'http', '--host', '0.0.0.0'],
+        {[HTTP_TOKEN_ENV_VAR]: 'env-secret'},
+      );
+      assert.strictEqual(withEnvToken.resolved.host, '0.0.0.0');
+      assert.strictEqual(withEnvToken.resolved.httpToken, 'env-secret');
+
+      const withFileToken = ServerConfig.create({
+        cliArgs: {transport: 'http', host: '0.0.0.0'},
+        fileArgs: {httpToken: 'file-secret'},
+        env: {},
+        suppressUsageStatisticsNotice: true,
+      });
+      assert.strictEqual(withFileToken.resolved.host, '0.0.0.0');
+      assert.strictEqual(withFileToken.resolved.httpToken, 'file-secret');
+
+      const withOptIn = parseConfig([
+        '--transport',
+        'http',
+        '--host',
+        '0.0.0.0',
+        '--allowUnauthenticatedHttp',
+      ]);
+      assert.strictEqual(withOptIn.resolved.host, '0.0.0.0');
+      assert.strictEqual(withOptIn.resolved.allowUnauthenticatedHttp, true);
+    });
+
+    it('allows loopback hosts without authentication', () => {
+      for (const host of ['127.0.0.1', 'localhost', '::1']) {
+        const config = parseConfig(['--transport', 'http', '--host', host]);
+        assert.strictEqual(config.resolved.host, host);
+      }
     });
   });
 });

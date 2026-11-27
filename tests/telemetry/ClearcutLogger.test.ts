@@ -151,6 +151,98 @@ describe('ClearcutLogger', () => {
         },
       });
     });
+
+    it('records per-call clientName override without mutating default client', async () => {
+      mockPersistence.loadState.resolves({
+        lastToolCall: new Date(NOW_MS).toISOString(),
+      });
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        createWatchdogClient: () => mockWatchdogClient,
+        sendToClearcut: mockSendToClearcut,
+      });
+      await Promise.resolve();
+      logger.setClientName('gemini-cli');
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+        clientName: 'claude-code',
+      });
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+        clientName: 'custom-http-client',
+      });
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+      });
+      await logger.logServerError({
+        errorCode: ErrorCode.ERROR_CODE_UNSPECIFIED,
+      });
+
+      sinon.assert.callCount(mockWatchdogClient.send, 4);
+      sinon.assert.calledWithExactly(mockWatchdogClient.send.firstCall, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_CLAUDE_CODE,
+          tool_invocation: {
+            tool_name: 'test_tool',
+            success: true,
+            latency_ms: 100,
+            context: {is_devtools_open: false},
+          },
+        },
+      });
+      sinon.assert.calledWithExactly(mockWatchdogClient.send.secondCall, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_OTHER,
+          raw_mcp_client_info: {
+            raw_client_name: 'custom-http-client',
+          },
+          tool_invocation: {
+            tool_name: 'test_tool',
+            success: true,
+            latency_ms: 100,
+            context: {is_devtools_open: false},
+          },
+        },
+      });
+      sinon.assert.calledWithExactly(mockWatchdogClient.send.thirdCall, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_GEMINI_CLI,
+          tool_invocation: {
+            tool_name: 'test_tool',
+            success: true,
+            latency_ms: 100,
+            context: {is_devtools_open: false},
+          },
+        },
+      });
+      sinon.assert.calledWithExactly(mockWatchdogClient.send.getCall(3), {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_GEMINI_CLI,
+          server_error: {
+            tool_name: '',
+            error_code: ErrorCode.ERROR_CODE_UNSPECIFIED,
+          },
+        },
+      });
+    });
   });
 
   describe('setClientName', () => {

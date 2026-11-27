@@ -18,6 +18,11 @@ import {
 } from './category-options.js';
 import {getBrowserOptions, type BrowserArguments} from './browser-options.js';
 import {
+  HTTP_ONLY_OPTION_KEYS,
+  httpOptions,
+  type HttpArguments,
+} from './http-options.js';
+import {
   puppeteerOptions,
   type PuppeteerArguments,
 } from './puppeteer-options.js';
@@ -28,7 +33,8 @@ export interface McpArguments
     CategoryArguments,
     BrowserArguments,
     PuppeteerArguments,
-    ToolArguments {
+    ToolArguments,
+    HttpArguments {
   logFile?: string;
   pageIdRouting: boolean;
   devtoolsComments: boolean;
@@ -78,6 +84,7 @@ export const mcpOptions: McpOptions = {
   ...getBrowserOptions(),
   ...puppeteerOptions,
   ...toolOptions,
+  ...httpOptions,
   logFile: {
     type: 'string',
     describe:
@@ -364,6 +371,12 @@ export function getCliOptions(): Partial<
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
 
+  // The CLI daemon uses stdio rather than the HTTP server transport.
+  delete options.transport;
+  for (const key of HTTP_ONLY_OPTION_KEYS) {
+    delete options[key];
+  }
+
   return options;
 }
 
@@ -426,6 +439,10 @@ export const CLI_EXAMPLES: Array<[string, string]> = [
   [
     '$0 --slim',
     'Only 3 tools: navigation, JavaScript execution and screenshot',
+  ],
+  [
+    '$0 --transport http --port 3000',
+    'Start a stateless HTTP MCP server on http://127.0.0.1:3000/mcp',
   ],
 ];
 

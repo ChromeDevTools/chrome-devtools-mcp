@@ -15,6 +15,7 @@ import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 
 import type * as BrowserBundle from './browser.js';
+import type * as HttpBundle from './http.js';
 import type * as LighthouseBundle from './lighthouse-devtools-mcp-bundle.js';
 import * as zod from './zod.js';
 
@@ -23,10 +24,20 @@ export type {Flags, Result, RunnerResult, OutputMode};
 export type {YargsOptions, InferredOptionTypes} from './cli.js';
 export {yargs, hideBin, semver, PipeTransport} from './cli.js';
 export {
+  createMcpHandler,
+  hostHeaderValidationResponse,
+  localhostAllowedHostnames,
+  localhostAllowedOrigins,
   McpServer,
+  originValidationResponse,
   ProtocolError,
   ProtocolErrorCode,
+  type AuthInfo,
+  type CreateMcpHandlerOptions,
+  type McpHandlerRequestOptions,
+  type McpHttpHandler,
   type RegisteredTool,
+  type ServerNotifier,
 } from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
@@ -82,6 +93,17 @@ let browserBundle: Promise<typeof BrowserBundle> | undefined;
 export function loadBrowser(): Promise<typeof BrowserBundle> {
   browserBundle ??= import('./browser.js');
   return browserBundle;
+}
+
+let httpBundle: Promise<typeof HttpBundle> | undefined;
+
+/**
+ * Loads the Node HTTP adapter bundle on first use, so stdio startup never
+ * pulls in `@modelcontextprotocol/node` or Hono.
+ */
+export function loadHttp(): Promise<typeof HttpBundle> {
+  httpBundle ??= import('./http.js');
+  return httpBundle;
 }
 
 let lighthouseBundle: Promise<typeof LighthouseBundle> | undefined;

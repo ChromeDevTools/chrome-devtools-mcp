@@ -18,6 +18,10 @@ import {getErrorMessage} from '../utils/errorHandling.js';
 
 import {ConfigLocator} from './ConfigLocator.js';
 import {
+  CONFIG_FILE_ONLY_OPTION_KEYS,
+  HTTP_TOKEN_ENV_VAR,
+} from './http-options.js';
+import {
   mcpOptions,
   CLI_EXAMPLES,
   stripYargsPositionalArgs,
@@ -28,6 +32,16 @@ import {ServerConfig} from './ServerConfig.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getCliParserOptions(
+  options: Record<string, YargsOptions>,
+): Record<string, YargsOptions> {
+  const copy: Record<string, YargsOptions> = {...options};
+  for (const key of CONFIG_FILE_ONLY_OPTION_KEYS) {
+    delete copy[key];
+  }
+  return copy;
 }
 
 export class ConfigParser {
@@ -54,7 +68,7 @@ export class ConfigParser {
   }
 
   buildCliParser(
-    options: Record<string, YargsOptions> = mcpOptions,
+    options: Record<string, YargsOptions> = getCliParserOptions(mcpOptions),
   ): Argv<InferredOptionTypes<Record<string, YargsOptions>>> {
     const yargsInstance = yargs(hideBin(this.argv));
     return yargsInstance
@@ -77,10 +91,18 @@ export class ConfigParser {
    * process; parse errors throw.
    */
   parseCliArgs(): Partial<ParsedArguments> {
-    const parsed = this.buildCliParser(withoutDefaults(mcpOptions))
-      .fail(false)
-      .parseSync();
-    return stripYargsPositionalArgs(parsed);
+    const cliOptions = getCliParserOptions(withoutDefaults(mcpOptions));
+    const parsed = this.buildCliParser(cliOptions).fail(false).parseSync();
+    const cliArgs = stripYargsPositionalArgs(parsed);
+    for (const key of Object.keys(cliArgs)) {
+      const normalized = key.toLowerCase();
+      if (normalized === 'httptoken' || normalized === 'http-token') {
+        throw new Error(
+          `The --httpToken CLI flag is not supported because command-line arguments can leak secrets to process listings. Set ${HTTP_TOKEN_ENV_VAR} or "httpToken" in the JSON config file instead.`,
+        );
+      }
+    }
+    return cliArgs;
   }
 
   /**
