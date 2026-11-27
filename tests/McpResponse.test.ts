@@ -2076,6 +2076,48 @@ describe('McpResponse heap snapshot formatting', () => {
     );
   });
 
+  it('keeps order and total for a worker-paginated heap query', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    const first = createMockHeapSnapshotNode({
+      id: 3,
+      name: 'FirstNode',
+      retainedSize: 10,
+    });
+    const second = createMockHeapSnapshotNode({
+      id: 4,
+      name: 'SecondNode',
+      retainedSize: 100,
+    });
+    const range = new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+      2,
+      4,
+      5,
+      [first, second],
+    );
+    response.setHeapSnapshotNodes(range, {
+      pageIdx: 1,
+      pageSize: 2,
+      pageFromWorker: true,
+    });
+
+    const {content, structuredContent} = await response.handle(
+      createMockMcpContext(),
+    );
+    const text = getTextContent(content[0]);
+    assert.match(text, /Showing 3-4 of 5 \(Page 2 of 3\)/);
+    assert.ok(text.indexOf('FirstNode') < text.indexOf('SecondNode'));
+    assert.ok(structuredContent);
+    assert.deepStrictEqual(Reflect.get(structuredContent, 'pagination'), {
+      currentPage: 1,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPreviousPage: true,
+      startIndex: 2,
+      endIndex: 4,
+      invalidPage: false,
+    });
+  });
+
   it('formats edge nodes correctly', async () => {
     const response = new McpResponse(createMockServerConfig());
     const edge = createMockHeapSnapshotEdge({

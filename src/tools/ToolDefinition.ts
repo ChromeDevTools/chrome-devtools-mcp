@@ -254,7 +254,8 @@ export interface Response {
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions & HeapSnapshotFormatOptions,
+    options?: PaginationOptions &
+      HeapSnapshotFormatOptions & {pageFromWorker?: boolean},
   ): void;
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
@@ -483,6 +484,7 @@ export type BrowserlessContext = Readonly<{
   queryHeapSnapshotObjects(
     filePath: string,
     options: HeapQueryOptions,
+    pagination?: PaginationOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 

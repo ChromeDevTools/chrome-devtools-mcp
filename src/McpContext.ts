@@ -55,7 +55,7 @@ import {
   type SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
-import type {Logger} from './types.js';
+import type {Logger, PaginationOptions} from './types.js';
 import {McpWorker} from './McpWorker.js';
 import {
   fileUrlToPathWithPosixFallback,
@@ -1188,8 +1188,13 @@ export class McpContext implements Context, BrowserlessContext {
   async queryHeapSnapshotObjects(
     filePath: string,
     options: HeapQueryOptions,
+    pagination?: PaginationOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    return await this.#heapSnapshotManager.queryObjects(filePath, options);
+    return await this.#heapSnapshotManager.queryObjects(
+      filePath,
+      options,
+      pagination,
+    );
   }
 
   async getHeapSnapshotStats(

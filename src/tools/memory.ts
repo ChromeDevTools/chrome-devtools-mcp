@@ -628,12 +628,17 @@ export const queryHeapSnapshotObjects: BrowserlessToolFactory =
           isDetached: request.params.isDetached,
           sortBy: request.params.sortBy,
         },
+        {
+          pageIdx: request.params.pageIdx,
+          pageSize: request.params.pageSize,
+        },
       );
 
       response.setHeapSnapshotNodes(range, {
         pageIdx: request.params.pageIdx,
         pageSize: request.params.pageSize,
         maxNameLength: request.params.maxNameLength,
+        pageFromWorker: true,
       });
     },
   }));

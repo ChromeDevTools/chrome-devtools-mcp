@@ -125,6 +125,7 @@ export class McpResponse implements Response {
     nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
     retainedByContextSummary?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
+    pageFromWorker?: boolean;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
     diff?: HeapSnapshotDiff;
@@ -444,12 +445,14 @@ export class McpResponse implements Response {
 
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions & HeapSnapshotFormatOptions,
+    options?: PaginationOptions &
+      HeapSnapshotFormatOptions & {pageFromWorker?: boolean},
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       nodes,
+      pageFromWorker: options?.pageFromWorker,
       pagination: options,
       formatOptions: options,
     };
@@ -1506,21 +1509,26 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
-        let items = Array.from(nodes.items);
-        const firstItem = nodes.items[0];
-        if (firstItem) {
-          if (isNodeLike(firstItem)) {
-            items = items
-              .filter(isNodeLike)
-              .sort((a, b) => b.retainedSize - a.retainedSize);
-          } else if (isEdgeLike(firstItem)) {
-            items = items.filter(isEdgeLike);
+        const pageFromWorker = this.#heapSnapshotOptions.pageFromWorker;
+        let items = nodes.items;
+        if (!pageFromWorker) {
+          items = Array.from(nodes.items);
+          const firstItem = nodes.items[0];
+          if (firstItem) {
+            if (isNodeLike(firstItem)) {
+              items = items
+                .filter(isNodeLike)
+                .sort((a, b) => b.retainedSize - a.retainedSize);
+            } else if (isEdgeLike(firstItem)) {
+              items = items.filter(isEdgeLike);
+            }
           }
         }
 
         const paginationData = this.#dataWithPagination(
           items,
           this.#heapSnapshotOptions.pagination,
+          pageFromWorker ? nodes : undefined,
         );
 
         response.push(
@@ -1954,6 +1962,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
   #dataWithPagination<T>(
     data: readonly T[],
     pagination?: PaginationOptions,
+    page?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
   ): {
     info: string[];
     items: readonly T[];
@@ -1968,15 +1977,35 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
     };
   } {
     const response = [];
-    const paginationResult = paginate<T>(data, pagination);
+    const total = page?.totalLength ?? data.length;
+    const pageSize = pagination?.pageSize;
+    const pageCount = Math.max(1, Math.ceil(total / (pageSize ?? 20)));
+    const resolvedPageIndex = pageSize
+      ? Math.floor((page?.startPosition ?? 0) / pageSize)
+      : 0;
+    const paginationResult = page
+      ? {
+          items: data,
+          currentPage: resolvedPageIndex,
+          totalPages: pageCount,
+          hasNextPage: resolvedPageIndex < pageCount - 1,
+          hasPreviousPage: resolvedPageIndex > 0,
+          startIndex: page.startPosition,
+          endIndex: page.endPosition,
+          invalidPage:
+            pagination?.pageIdx !== undefined &&
+            pagination.pageIdx >= pageCount,
+        }
+      : paginate<T>(data, pagination);
     if (paginationResult.invalidPage) {
       response.push('Invalid page number provided. Showing first page.');
     }
 
     const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
-    const displayStartIndex = data.length === 0 ? 0 : startIndex + 1;
+    const displayStartIndex = total === 0 ? 0 : startIndex + 1;
     response.push(
-      `Showing ${displayStartIndex}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
+      `Showing ${displayStartIndex}-${endIndex} of ${total} ` +
+        `(Page ${currentPage + 1} of ${totalPages}).`,
     );
     if (pagination) {
       if (paginationResult.hasNextPage) {
