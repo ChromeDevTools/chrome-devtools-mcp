@@ -64,9 +64,9 @@ Use this mode automatically after `open_devtools` or `reveal_in_devtools`, and w
 
 Watcher lifecycle and rules:
 
-1. **Prevent duplicates**: Keep at most one active watcher sub-agent per `pageId`. Never spawn a second watcher for the same `pageId`; after resolving a batch of comments in the main thread, message or resume the existing watcher to keep listening.
+1. **Prevent duplicates**: Keep at most one active watcher sub-agent per `pageId`. Never spawn a second watcher for the same `pageId`; after resolving a batch of comments in the main thread, message or resume the existing watcher to keep listening. Because `get_devtools_comments` returns each thread only once, do not call `get_devtools_comments` from the main agent while a watcher is active for `pageId`.
 2. **Require MCP tool access**: The background watcher sub-agent must have access to the `chrome-devtools` MCP tools (do not use a read-only or tool-restricted sub-agent that cannot call `get_devtools_comments`). If your harness lets you pick a lighter or faster model for sub-agents, prefer it since the watcher only polls.
-3. **Split responsibilities**: The watcher **only** calls `get_devtools_comments(pageId, timeout: 10000)` and reports any new threads (or unsupported-Chrome errors) back to the main agent. The main agent, which has full conversation and workspace context, inspects targets, edits files, verifies changes, resolves threads, and resumes the watcher.
+3. **Split responsibilities**: The watcher **only** calls `get_devtools_comments(pageId, timeout: 10000)` and passes the full tool output unchanged (thread id, comment, `uid`, `reqid`), or any unsupported-Chrome error, back to the main agent so no threads are lost or rewritten. The main agent, which has full conversation and workspace context, inspects targets, edits files, verifies changes, resolves threads, and resumes the watcher.
 4. **Polling cadence and timeout notice**:
    - Keep `timeout: 10000` (the 10s default) rather than a longer wait so interactive browser tool calls from the main agent do not stall behind an active poll in MCP clients that serialize requests per server. Never pass `timeout: 0` while polling (it returns immediately without waiting).
    - While the result has no threads (`"Waited <n>ms for new DevTools comments."` or `"No open DevTools comments found."`), call `get_devtools_comments` again.
@@ -79,7 +79,7 @@ Watcher lifecycle and rules:
 
 Use this mode only when the user explicitly asks not to keep watching (for example, "check once" or "don't poll").
 
-1. Call `get_devtools_comments` once.
+1. Call `get_devtools_comments` once with `timeout: 0`.
 2. Process and resolve each returned thread.
 3. Post a brief summary in chat and end your turn without polling.
 
@@ -92,9 +92,9 @@ For each `### Thread: <id>`:
    - `Related network reqid`: Use `get_network_request` with the `reqid`.
    - Optionally call `reveal_in_devtools` to bring the user's eye to the target.
 2. **Address the comment**:
-   - For a code or styling request, apply the fix in the workspace and verify the page. DevTools comments survive page reloads in the Comments drawer (only closing DevTools clears them), while HMR/live updates preserve anchored DOM nodes cleanly without marking them `(removed)`. Prefer HMR when available; reload only when needed.
+   - For a code or styling request, apply the fix in the workspace and verify the page. Edits the user makes directly in DevTools (for example, CSS changes in the Styles pane) arrive as comment threads too; apply the same change to the workspace source files. Inspect the anchored element before any full reload (reloading invalidates `backendNodeId` / `uid`). DevTools comments survive page reloads in the Comments drawer (only closing DevTools clears them), while HMR/live updates preserve anchored DOM nodes cleanly without marking them `(removed)`. Prefer HMR when available; reload only when needed.
    - For a question or root-cause investigation, collect diagnostic data without making unnecessary code edits.
-   - **Ambiguous comments**: `resolve_devtools_comment` replies and resolves in one action. If a comment is genuinely ambiguous and needs clarification, leave the thread unresolved and ask the user in chat rather than closing it prematurely.
+   - **Ambiguous comments**: `resolve_devtools_comment` replies and resolves in one action, and `get_devtools_comments` will not return the same thread again. If a comment is genuinely ambiguous and needs clarification, leave the thread unresolved, ask the user in chat, keep the `threadId`, and resolve the thread after the user answers.
 3. **Resolve and summarize**:
    - Call `resolve_devtools_comment` with `pageId`, `threadId`, and a concise `replyText`: 1-2 sentences stating the change and file for fixes, or a direct root-cause answer for questions.
    - In chat, post a brief non-duplicative summary (mentioning the resolved thread and files changed) and confirm that you are continuing to watch for DevTools comments in the background.
