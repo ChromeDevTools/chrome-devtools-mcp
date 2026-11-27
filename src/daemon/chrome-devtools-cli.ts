@@ -182,6 +182,22 @@ export async function runCli(
     y =>
       y
         .options(getCliOptions())
+        .requiresArg('filesystemRoot')
+        .check(argv => {
+          const roots = argv.filesystemRoot;
+          if (
+            Array.isArray(roots) &&
+            (roots.length === 0 ||
+              roots.some(
+                root => typeof root === 'string' && root.trim() === '',
+              ))
+          ) {
+            throw new Error(
+              'Invalid --filesystemRoot: at least one non-empty path is required.',
+            );
+          }
+          return true;
+        })
         .example(
           '$0 start --browserUrl http://localhost:9222',
           'Start the server connecting to an existing browser',
