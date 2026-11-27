@@ -26,6 +26,48 @@ function isLayoutOnlyNode(node: SerializedAXNode): boolean {
   return node.role === 'InlineTextBox';
 }
 
+async function findDescendantNodes(
+  page: McpPage,
+  backendNodeId?: number,
+): Promise<Set<number>> {
+  const descendantIds = new Set<number>();
+  if (!backendNodeId) {
+    return descendantIds;
+  }
+  try {
+    // @ts-expect-error internal API
+    const client = page.pptrPage._client();
+    if (client) {
+      const {node}: {node: Protocol.DOM.Node} = await client.send(
+        'DOM.describeNode',
+        {
+          backendNodeId,
+          depth: -1,
+          pierce: true,
+        },
+      );
+      const collect = (node: Protocol.DOM.Node): void => {
+        if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
+          descendantIds.add(node.backendNodeId);
+        }
+        for (const child of node.children ?? []) {
+          collect(child);
+        }
+        for (const shadow of node.shadowRoots ?? []) {
+          collect(shadow);
+        }
+      };
+      collect(node);
+    }
+  } catch (e) {
+    logger?.(
+      `Failed to collect descendants for backend node ${backendNodeId}`,
+      e,
+    );
+  }
+  return descendantIds;
+}
+
 export class TextSnapshot {
   static nextSnapshotId = 1;
 
@@ -59,12 +101,19 @@ export class TextSnapshot {
   static async create(
     page: McpPage,
     options: {
+      selector?: string;
       verbose?: boolean;
       devtoolsData?: DevToolsData;
       extraHandles?: ElementHandle[];
     } = {},
   ): Promise<TextSnapshot> {
     const verbose = options.verbose ?? false;
+    await using root = options.selector
+      ? await page.pptrPage.$(options.selector)
+      : undefined;
+    if (options.selector && !root) {
+      throw new Error(`No element matches selector "${options.selector}".`);
+    }
     const rootNode = await withTimeout(
       page.pptrPage.accessibility.snapshot({
         includeIframes: true,
@@ -146,8 +195,51 @@ export class TextSnapshot {
       options.extraHandles ?? [],
     );
 
+    let outputRoot = rootNodeWithId;
+    if (root) {
+      const backendNodeId = await root.backendNodeId();
+      const selected = idToNode
+        .values()
+        .find(
+          node =>
+            node.backendNodeId === backendNodeId &&
+            (node.loaderId === rootNodeWithId.loaderId ||
+              node.loaderId === undefined),
+        );
+      if (selected) {
+        outputRoot = selected;
+      } else {
+        // Compact trees can promote several children past an uninteresting container.
+        const descendants = await findDescendantNodes(page, backendNodeId);
+        const children: TextSnapshotNode[] = [];
+        const collect = (node: TextSnapshotNode): void => {
+          if (node !== rootNodeWithId && node.role === 'RootWebArea') {
+            return;
+          }
+          if (node.backendNodeId && descendants.has(node.backendNodeId)) {
+            children.push(node);
+            return;
+          }
+          for (const child of node.children) {
+            collect(child);
+          }
+        };
+        collect(rootNodeWithId);
+        if (!children.length) {
+          throw new Error(
+            `No accessibility nodes for selector "${options.selector}".`,
+          );
+        }
+        outputRoot = {
+          id: '',
+          role: 'generic',
+          children,
+          elementHandle: async () => null,
+        };
+      }
+    }
     const snapshot = new TextSnapshot({
-      root: rootNodeWithId,
+      root: outputRoot,
       snapshotId: String(snapshotId),
       idToNode,
       hasSelectedElement: false,
@@ -156,10 +248,11 @@ export class TextSnapshot {
 
     const data = options.devtoolsData ?? (await page.getDevToolsData());
     if (data?.cdpBackendNodeId) {
-      snapshot.hasSelectedElement = true;
       snapshot.selectedElementUid = snapshot.resolveCdpElementId(
         data.cdpBackendNodeId,
       );
+      snapshot.hasSelectedElement =
+        !root || Boolean(snapshot.selectedElementUid);
     }
 
     // Clean up unique IDs that we did not see anymore.
@@ -275,46 +368,6 @@ export class TextSnapshot {
       return null;
     };
 
-    const findDescendantNodes = async (
-      backendNodeId?: number,
-    ): Promise<Set<number>> => {
-      const descendantIds = new Set<number>();
-      if (!backendNodeId) {
-        return descendantIds;
-      }
-      try {
-        // @ts-expect-error internal API
-        const client = page.pptrPage._client();
-        if (client) {
-          const {node}: {node: Protocol.DOM.Node} = await client.send(
-            'DOM.describeNode',
-            {
-              backendNodeId,
-              depth: -1,
-              pierce: true,
-            },
-          );
-          const collect = (node: Protocol.DOM.Node): void => {
-            if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
-              descendantIds.add(node.backendNodeId);
-            }
-            if (node.children) {
-              for (const child of node.children) {
-                collect(child);
-              }
-            }
-          };
-          collect(node);
-        }
-      } catch (e) {
-        logger?.(
-          `Failed to collect descendants for backend node ${backendNodeId}`,
-          e,
-        );
-      }
-      return descendantIds;
-    };
-
     const moveChildNodes = (
       attachTarget: TextSnapshotNode,
       extraNode: TextSnapshotNode,
@@ -358,7 +411,10 @@ export class TextSnapshot {
       }
       idToNode.set(extraNode.id, extraNode);
       const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
-      const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
+      const descendantIds = await findDescendantNodes(
+        page,
+        extraNode.backendNodeId,
+      );
       reorgInfo.push({extraNode, attachTarget, descendantIds});
     }
 

@@ -492,6 +492,7 @@ export function createMockElementHandle(): {
 } {
   const handle =
     sinon.createStubInstance<ElementHandle<Element>>(ElementHandle);
+  handle.backendNodeId = sinon.stub();
   handle.remoteObject.returns({type: 'object', objectId: '<mock-object-id>'});
   handle.dispose.resolves();
   const locator = sinon.createStubInstance<Locator<Element>>(Locator);

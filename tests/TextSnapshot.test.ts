@@ -12,7 +12,11 @@ import sinon from 'sinon';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 
-import {createMockAXNode, createMockMcpPage} from './mocks.js';
+import {
+  createMockAXNode,
+  createMockMcpPage,
+  createMockElementHandle,
+} from './mocks.js';
 import {html, withMcpContext} from './utils.js';
 
 describe('TextSnapshot', () => {
@@ -31,6 +35,99 @@ describe('TextSnapshot', () => {
     );
     await clock.tickAsync(10_000);
     await assertion;
+  });
+
+  it('filters the full compact snapshot to the selected root and releases its handle', async () => {
+    const page = createMockMcpPage();
+    page.uniqueBackendNodeIdToMcpId = new Map();
+    page.extraHandles = [];
+    const {handle} = createMockElementHandle();
+    handle.backendNodeId.resolves(1);
+    page.pptrPage.$.resolves(handle);
+    page.pptrPage.accessibility.snapshot.resolves(
+      createMockAXNode('RootWebArea', {
+        loaderId: '1',
+        children: [
+          createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+        ],
+      }),
+    );
+
+    const snapshot = await TextSnapshot.create(page, {selector: '#main-nav'});
+
+    assert.strictEqual(snapshot.root.role, 'navigation');
+    sinon.assert.calledOnceWithExactly(page.pptrPage.$, '#main-nav');
+    sinon.assert.calledOnceWithExactly(page.pptrPage.accessibility.snapshot, {
+      includeIframes: true,
+      interestingOnly: true,
+    });
+    sinon.assert.calledOnceWithExactly(handle.dispose);
+  });
+
+  it('does not suggest verbose mode for a selected element outside the subtree', async () => {
+    const page = createMockMcpPage();
+    page.uniqueBackendNodeIdToMcpId = new Map();
+    page.extraHandles = [];
+    const {handle} = createMockElementHandle();
+    handle.backendNodeId.resolves(1);
+    page.pptrPage.$.resolves(handle);
+    page.pptrPage.accessibility.snapshot.resolves(
+      createMockAXNode('RootWebArea', {
+        loaderId: '1',
+        children: [
+          createMockAXNode('navigation', {backendNodeId: 1, loaderId: '1'}),
+        ],
+      }),
+    );
+
+    const snapshot = await TextSnapshot.create(page, {
+      selector: '#main-nav',
+      verbose: true,
+      devtoolsData: {cdpBackendNodeId: 2},
+    });
+
+    sinon.assert.calledOnceWithExactly(page.pptrPage.accessibility.snapshot, {
+      includeIframes: true,
+      interestingOnly: false,
+    });
+    assert.strictEqual(snapshot.verbose, true);
+    assert.strictEqual(snapshot.hasSelectedElement, false);
+    assert.strictEqual(snapshot.selectedElementUid, undefined);
+  });
+
+  it('rejects a missing selector without taking a full-page snapshot', async () => {
+    const page = createMockMcpPage();
+    page.pptrPage.$.resolves(null);
+    await assert.rejects(
+      TextSnapshot.create(page, {selector: '#missing'}),
+      /No element matches selector "#missing"/,
+    );
+    sinon.assert.notCalled(page.pptrPage.accessibility.snapshot);
+  });
+
+  it('releases the root handle when the accessibility snapshot fails', async () => {
+    const page = createMockMcpPage();
+    const {handle} = createMockElementHandle();
+    page.pptrPage.$.resolves(handle);
+    const error = new Error('Target closed');
+    page.pptrPage.accessibility.snapshot.rejects(error);
+    await assert.rejects(
+      TextSnapshot.create(page, {selector: '#main-nav'}),
+      error,
+    );
+    sinon.assert.calledOnceWithExactly(handle.dispose);
+  });
+
+  it('rejects a missing full accessibility tree', async () => {
+    const page = createMockMcpPage();
+    const {handle} = createMockElementHandle();
+    page.pptrPage.$.resolves(handle);
+    page.pptrPage.accessibility.snapshot.resolves(null);
+    await assert.rejects(
+      TextSnapshot.create(page, {selector: '#container'}),
+      /Failed to create accessibility snapshot/,
+    );
+    sinon.assert.calledOnceWithExactly(handle.dispose);
   });
 
   it('does not assign uids to nodes without backendNodeId', async () => {
@@ -175,6 +272,49 @@ describe('TextSnapshot', () => {
         ),
         '2',
       );
+    });
+  });
+
+  it('keeps retained extra handles outside the selected subtree out of the snapshot', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <div
+          id="outside"
+          role="none"
+          ><button>Outside</button></div
+        >
+        <div id="component">
+          <div
+            id="inside"
+            role="none"
+            ><button>Inside</button></div
+          >
+          <button>Sibling</button></div
+        >
+      `);
+      const outside = await page.pptrPage.$('#outside');
+      const inside = await page.pptrPage.$('#inside');
+      assert.ok(outside);
+      assert.ok(inside);
+      page.extraHandles = [outside, inside];
+      const outsideId = await outside.backendNodeId();
+      const insideId = await inside.backendNodeId();
+
+      const snapshot = await TextSnapshot.create(page, {
+        selector: '#component',
+      });
+
+      const output = JSON.stringify(snapshot.root);
+      assert.match(output, /Sibling/);
+      assert.match(output, /Inside/);
+      assert.doesNotMatch(output, /Outside/);
+      assert.strictEqual(snapshot.resolveCdpElementId(outsideId), undefined);
+      assert.ok(snapshot.resolveCdpElementId(insideId));
+      assert.deepStrictEqual(page.extraHandles, [outside, inside]);
+      assert.strictEqual(await outside.evaluate(el => el.id), 'outside');
+      const full = await TextSnapshot.create(page);
+      assert.ok(full.resolveCdpElementId(outsideId));
     });
   });
 

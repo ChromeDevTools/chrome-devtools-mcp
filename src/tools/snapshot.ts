@@ -24,6 +24,14 @@ in the DevTools Elements panel (if any).`,
     readOnlyHint: false,
   },
   schema: {
+    selector: zod
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Return the accessibility subtree of the first main-frame element matching a Puppeteer selector (CSS, ::-p-text, ::-p-xpath, or >>>). Omit for the whole page. Returns an error if the element or its accessibility content is missing.',
+      ),
     verbose: zod
       .boolean()
       .optional()
@@ -44,6 +52,7 @@ in the DevTools Elements panel (if any).`,
   },
   handler: async (request, response) => {
     response.includeSnapshot({
+      selector: request.params.selector,
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
     });

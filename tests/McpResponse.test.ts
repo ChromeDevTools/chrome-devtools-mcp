@@ -296,6 +296,21 @@ describe('McpResponse', () => {
     t.assert.snapshot(stabilizeResponseOutput(content));
   });
 
+  it('forwards the snapshot selector and verbosity to TextSnapshot.create', async () => {
+    const page = createMockMcpPage();
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    response.includeSnapshot({selector: '#component', verbose: true});
+    const error = new Error('snapshot failed');
+    const create = sinon.stub(TextSnapshot, 'create').rejects(error);
+    await assert.rejects(response.handle(createMockMcpContext()), error);
+    sinon.assert.calledOnceWithExactly(create, page, {
+      selector: '#component',
+      verbose: true,
+      devtoolsData: undefined,
+    });
+  });
+
   it('preserves mapping ids across multiple snapshots', async () => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedMcpPage().pptrPage;

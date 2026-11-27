@@ -180,6 +180,7 @@ export interface ImageContentData {
 }
 
 export interface SnapshotParams {
+  selector?: string;
   verbose?: boolean;
   filePath?: string;
 }

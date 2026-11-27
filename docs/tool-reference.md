@@ -524,6 +524,7 @@ in the DevTools Elements panel (if any).
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **selector** (string) _(optional)_: Return the accessibility subtree of the first main-frame element matching a Puppeteer selector (CSS, ::-p-text, ::-p-xpath, or >>>). Omit for the whole page. Returns an error if the element or its accessibility content is missing.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---

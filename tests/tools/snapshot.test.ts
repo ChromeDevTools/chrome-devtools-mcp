@@ -16,10 +16,21 @@ import {createHandlerMocks, createMockServerConfig} from '../mocks.js';
 
 describe('snapshot', () => {
   describe('take_snapshot', () => {
+    it('rejects whitespace-only selectors and trims Puppeteer selectors', () => {
+      const {args} = createHandlerMocks();
+      const {selector} = takeSnapshot(args).schema;
+      assert.strictEqual(selector.safeParse('   ').success, false);
+      assert.strictEqual(
+        selector.parse('  ::-p-text(Save)  '),
+        '::-p-text(Save)',
+      );
+    });
+
     it('includes a snapshot', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await takeSnapshot(args).handler({params: {}, page}, response, context);
       sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        selector: undefined,
         verbose: false,
         filePath: undefined,
       });
@@ -28,11 +39,19 @@ describe('snapshot', () => {
     it('includes a snapshot with parameters', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await takeSnapshot(args).handler(
-        {params: {verbose: true, filePath: 'custom/path.txt'}, page},
+        {
+          params: {
+            selector: '#main-nav',
+            verbose: true,
+            filePath: 'custom/path.txt',
+          },
+          page,
+        },
         response,
         context,
       );
       sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        selector: '#main-nav',
         verbose: true,
         filePath: 'custom/path.txt',
       });

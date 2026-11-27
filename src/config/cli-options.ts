@@ -2181,6 +2181,14 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
+      selector: {
+        name: 'selector',
+        type: 'string',
+        description:
+          'Return the accessibility subtree of the first main-frame element matching a Puppeteer selector (CSS, ::-p-text, ::-p-xpath, or >>>). Omit for the whole page. Returns an error if the element or its accessibility content is missing.',
+        required: false,
+        positional: false,
+      },
       verbose: {
         name: 'verbose',
         type: 'boolean',
