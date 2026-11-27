@@ -24,7 +24,12 @@ import {PipeTransport} from '../third_party/index.js';
 import {parseDurationMs} from '../utils/duration.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {IdleTimer} from '../utils/IdleTimer.js';
-import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+  saveLogsToFile,
+} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
@@ -195,7 +200,7 @@ async function handleRequest(msg: DaemonMessage): Promise<{
         socketPath,
         startDate: startDate.toISOString(),
         version: VERSION,
-        args: mcpServerArgs,
+        args: redactDaemonArgsForLogging(mcpServerArgs),
       };
       return {
         success: true,
