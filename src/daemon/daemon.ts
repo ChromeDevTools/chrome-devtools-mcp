@@ -150,7 +150,10 @@ async function setupMCPServer(): Promise<void> {
   idleTimer?.schedule();
 }
 
-async function handleRequest(msg: DaemonMessage): Promise<{
+async function handleRequest(
+  msg: DaemonMessage,
+  signal?: AbortSignal,
+): Promise<{
   success: boolean;
   result?: string;
   message?: string;
@@ -167,9 +170,9 @@ async function handleRequest(msg: DaemonMessage): Promise<{
 
       const result = active.idleTimer
         ? await active.idleTimer.track(() =>
-            active.mcpServer.callTool(tool, args),
+            active.mcpServer.callTool(tool, args, {signal}),
           )
-        : await active.mcpServer.callTool(tool, args);
+        : await active.mcpServer.callTool(tool, args, {signal});
 
       return {
         success: true,
@@ -229,13 +232,26 @@ async function startSocketServer(): Promise<void> {
 
   return await new Promise<void>((resolve, reject) => {
     server = createServer(socket => {
+      const controller = new AbortController();
+      let completed = false;
       const transport = new PipeTransport(socket, socket, puppeteerLogger);
       transport.onmessage = async (message: string) => {
         logger?.('onmessage', message);
-        const response = await handleRequest(JSON.parse(message));
-        transport.send(JSON.stringify(response));
-        socket.end();
+        const response = await handleRequest(
+          JSON.parse(message),
+          controller.signal,
+        );
+        completed = true;
+        if (!socket.destroyed && socket.writable) {
+          transport.send(JSON.stringify(response));
+          socket.end();
+        }
       };
+      socket.on('close', () => {
+        if (!completed && !controller.signal.aborted) {
+          controller.abort(new Error('Daemon client disconnected'));
+        }
+      });
       socket.on('error', error => {
         logger?.('Socket error:', error);
       });

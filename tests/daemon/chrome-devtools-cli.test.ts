@@ -174,6 +174,55 @@ describe('chrome-devtools CLI', () => {
         error,
       );
     });
+
+    it('passes --rpc-timeout in ms to sendCommand without forwarding it in tool args', async () => {
+      const mocks = createCliMocks();
+      mocks.isDaemonRunning.returns(true);
+
+      const exitCode = await runCli(
+        [
+          'emulate',
+          '1',
+          '--viewport',
+          '500x400x1',
+          '--rpc-timeout',
+          '5m',
+          '--sessionId',
+          SESSION_ID,
+        ],
+        mocks.options,
+      );
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.calledOnceWithExactly(
+        mocks.sendCommand,
+        {
+          method: 'invoke_tool',
+          tool: 'emulate',
+          args: {
+            pageId: 1,
+            viewport: '500x400x1',
+          },
+        },
+        SESSION_ID,
+        300_000,
+      );
+    });
+
+    for (const invalid of ['0', 'invalid']) {
+      it(`returns exit code 1 when --rpc-timeout is ${invalid}`, async () => {
+        const mocks = createCliMocks();
+        mocks.isDaemonRunning.returns(true);
+
+        const exitCode = await runCli(
+          ['emulate', '1', '--rpc-timeout', invalid, '--sessionId', SESSION_ID],
+          mocks.options,
+        );
+
+        assert.strictEqual(exitCode, 1);
+        sinon.assert.notCalled(mocks.sendCommand);
+      });
+    }
   });
 
   describe('start', () => {
