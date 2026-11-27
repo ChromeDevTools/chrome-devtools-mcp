@@ -14,6 +14,10 @@ import type {ResourceType} from '../third_party/browser.js';
 import {validateUrlPatterns} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
+import {
+  getNetworkRequestOutputSchema,
+  listNetworkRequestsOutputSchema,
+} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type FilterableResourceType = Exclude<ResourceType, 'websocket'>;
@@ -91,6 +95,7 @@ export const listNetworkRequests: PageToolFactory = definePageTool(
           }
         : {}),
     },
+    outputSchema: listNetworkRequestsOutputSchema,
     blockedByDialog: false,
     concurrency: 'page',
     verifyFilesSchema: {},
@@ -159,6 +164,7 @@ export const getNetworkRequest: PageToolFactory = definePageTool(
           }
         : {}),
     },
+    outputSchema: getNetworkRequestOutputSchema,
     blockedByDialog: true,
     concurrency: 'page',
     verifyFilesSchema: {

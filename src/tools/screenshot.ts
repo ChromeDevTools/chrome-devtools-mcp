@@ -14,6 +14,7 @@ import type {
 } from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
+import {messageOutputSchema} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
@@ -140,6 +141,47 @@ function computeDownscaleClip(
   };
 }
 
+async function captureScreenshotBytes(options: {
+  page: Page;
+  element: ElementHandle | undefined;
+  clip: ScreenshotClip | undefined;
+  fullPage: boolean;
+  type: ScreenshotFormat;
+  quality: number | undefined;
+  omitBackground: boolean | undefined;
+}): Promise<Uint8Array> {
+  const {page, element, clip, fullPage, type, quality, omitBackground} =
+    options;
+  if (clip) {
+    // page.screenshot with clip lets the CDP scale param downscale the
+    // capture for viewport, full-page and element shots alike. We rely on
+    // Puppeteer's default of captureBeyondViewport=true when a clip is
+    // present so element/full-page captures below the fold still work.
+    return await page.screenshot({
+      type,
+      quality,
+      optimizeForSpeed: true,
+      omitBackground,
+      clip,
+    });
+  }
+  if (element) {
+    return await element.screenshot({
+      type,
+      quality,
+      optimizeForSpeed: true,
+      omitBackground,
+    });
+  }
+  return await page.screenshot({
+    type,
+    fullPage,
+    quality,
+    optimizeForSpeed: true,
+    omitBackground,
+  });
+}
+
 export const screenshot: PageToolFactory = definePageTool(
   (args: ParsedArguments) => {
     const {
@@ -199,6 +241,7 @@ export const screenshot: PageToolFactory = definePageTool(
             'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
           ),
       },
+      outputSchema: messageOutputSchema,
       blockedByDialog: true,
       concurrency: 'page',
       verifyFilesSchema: {
@@ -222,11 +265,6 @@ export const screenshot: PageToolFactory = definePageTool(
             ? undefined
             : (request.params.quality ?? screenshotQuality);
         const fullPage = request.params.fullPage ?? false;
-
-        // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
-        // once the capture is done to avoid leaking a remote object for the life
-        // of the page's execution context.
-        let screenshot: Uint8Array;
 
         // Compute a downscale clip when --screenshot-max-width or
         // --screenshot-max-height is set and the source exceeds either bound.
@@ -255,34 +293,15 @@ export const screenshot: PageToolFactory = definePageTool(
           );
         }
 
-        if (clip) {
-          // page.screenshot with clip lets the CDP scale param downscale the
-          // capture for viewport, full-page and element shots alike. We rely on
-          // Puppeteer's default of captureBeyondViewport=true when a clip is
-          // present so element/full-page captures below the fold still work.
-          screenshot = await page.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-            omitBackground: request.params.omitBackground,
-            clip,
-          });
-        } else if (element) {
-          screenshot = await element.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-            omitBackground: request.params.omitBackground,
-          });
-        } else {
-          screenshot = await page.screenshot({
-            type: format,
-            fullPage,
-            quality,
-            optimizeForSpeed: true,
-            omitBackground: request.params.omitBackground,
-          });
-        }
+        const screenshot = await captureScreenshotBytes({
+          page,
+          element,
+          clip,
+          fullPage,
+          type: format,
+          quality,
+          omitBackground: request.params.omitBackground,
+        });
 
         if (request.params.uid) {
           response.appendResponseLine(
@@ -314,11 +333,32 @@ export const screenshot: PageToolFactory = definePageTool(
             `Saved screenshot to ${result.filename}.`,
           );
         } else if (screenshot.length >= 2_000_000) {
-          const {filepath} = await context.saveTemporaryFile(
-            screenshot,
-            `screenshot${extension}`,
-          );
-          response.appendResponseLine(`Saved screenshot to ${filepath}.`);
+          if (args.codeMode) {
+            const webpFallback = await captureScreenshotBytes({
+              page,
+              element,
+              clip,
+              fullPage,
+              type: 'webp',
+              quality: 80,
+              omitBackground: request.params.omitBackground,
+            });
+            if (webpFallback.length >= 2_000_000) {
+              throw new Error(
+                'Screenshot exceeds 2 MB inline limit in Code Mode. Pass format: "webp" with a lower quality, target a specific element, or configure --screenshot-max-width.',
+              );
+            }
+            response.attachImage({
+              mimeType: 'image/webp',
+              data: Buffer.from(webpFallback).toString('base64'),
+            });
+          } else {
+            const {filepath} = await context.saveTemporaryFile(
+              screenshot,
+              `screenshot${extension}`,
+            );
+            response.appendResponseLine(`Saved screenshot to ${filepath}.`);
+          }
         } else {
           response.attachImage({
             mimeType: `image/${format}`,

@@ -17,6 +17,10 @@ import {
 import {UncaughtError} from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/browser.js';
 import type {ConsoleMessage, Protocol} from '../third_party/browser.js';
+import type {
+  ConsoleMessageConcise,
+  ConsoleMessageDetailed,
+} from '../tools/codeMode/codeModeSchema.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';
@@ -35,23 +39,6 @@ export interface ConsoleFormatterOptions {
 
 export type IgnoreCheck = (frame: FormattableFrame) => boolean;
 
-interface ConsoleMessageConcise {
-  type: string;
-  text: string;
-  argsCount: number;
-  id: number;
-  count?: number;
-  // pre-formatted stacktrace.
-  stackTrace?: string;
-}
-
-interface ConsoleMessageDetailed extends ConsoleMessageConcise {
-  // pre-formatted args.
-  args: string[];
-  // pre-formatted stacktrace.
-  stackTrace?: string;
-}
-
 function isSession(value: unknown): value is SessionLike {
   return (
     typeof value === 'object' &&
@@ -60,7 +47,6 @@ function isSession(value: unknown): value is SessionLike {
     typeof value.send === 'function'
   );
 }
-
 // JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
 // on symbols and cyclic objects. Those are formatted from their preview.
 function isJsonLike(remoteObject: Protocol.Runtime.RemoteObject): boolean {

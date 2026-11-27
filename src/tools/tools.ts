@@ -7,6 +7,8 @@
 import {mcpOptions, type ParsedArguments} from '../config/mcp-options.js';
 import type {YargsOptions} from '../third_party/index.js';
 
+import {createCodeModeEvaluateTool} from './codeMode/codeMode.js';
+import {partitionToolsForCodeMode} from './codeMode/codeModePartition.js';
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
 import * as cssTools from './css.js';
@@ -61,6 +63,14 @@ export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
   }
 
   tools.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (args.codeMode && !args.slim) {
+    const {outerTools, innerTools} = partitionToolsForCodeMode(tools, args);
+    const codeModeTool = createCodeModeEvaluateTool(args, innerTools, tools);
+    return outerTools.map(tool =>
+      tool.name === 'evaluate_script' ? codeModeTool : tool,
+    );
+  }
 
   return tools;
 };

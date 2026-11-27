@@ -9,6 +9,10 @@ import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/browser.js';
 
 import {ToolCategory} from './categories.js';
+import {
+  getConsoleMessageOutputSchema,
+  listConsoleMessagesOutputSchema,
+} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 import {
   GET_CONSOLE_MESSAGE_TOOL_NAME,
@@ -99,6 +103,7 @@ export const listConsoleMessages: PageToolFactory = definePageTool(
             }
           : {}),
       },
+      outputSchema: listConsoleMessagesOutputSchema,
       blockedByDialog: false,
       concurrency: 'page',
       verifyFilesSchema: {},
@@ -143,6 +148,7 @@ export const getConsoleMessage: PageToolFactory = definePageTool(
           }
         : {}),
     },
+    outputSchema: getConsoleMessageOutputSchema,
     blockedByDialog: false,
     concurrency: 'page',
     verifyFilesSchema: {},

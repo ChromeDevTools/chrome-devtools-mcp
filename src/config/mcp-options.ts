@@ -55,6 +55,8 @@ export interface McpArguments
   clearcutForceFlushIntervalMs?: number;
   clearcutIncludePidHeader: boolean;
   slim: boolean;
+  codeMode: boolean;
+  codeModeMainWorld: boolean;
   viaCli: boolean;
   idleTimeout?: string;
   redactNetworkHeaders: boolean;
@@ -272,6 +274,19 @@ export const mcpOptions: McpOptions = {
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
     reloadable: true,
   },
+  codeMode: {
+    type: 'boolean',
+    default: false,
+    alias: 'experimentalCodeMode',
+    describe:
+      'Enable Code Mode: keep lifecycle, session, dialog, and file tools on the outer MCP surface while exposing in-page interaction and inspection tools as an mcp.* API inside evaluate_script in an isolated CDP world.',
+  },
+  codeModeMainWorld: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Run evaluate_script Code Mode in the page main world instead of an isolated CDP world (implies --code-mode). Use only on trusted pages.',
+  },
   viaCli: {
     type: 'boolean',
     default: false,
@@ -370,8 +385,10 @@ export function getCliOptions(): Partial<
   // Missing CLI serialization.
   delete options.viewport;
 
-  // The CLI is generated for the full mode with pageId routing, not slim mode.
+  // The CLI is generated for the full mode with pageId routing, not slim or Code Mode.
   delete options.slim;
+  delete options.codeMode;
+  delete options.codeModeMainWorld;
   delete options.pageIdRouting;
 
   // Change the defaults for the CLI.
@@ -453,11 +470,15 @@ export const CONFLICTING_ARGS: Array<Array<keyof McpOptions>> = [
   ['allowUnrestrictedPaths', 'filesystemRoot'],
   ['categoryPwa', 'autoConnect'],
   ['categoryPwa', 'browserUrl', 'wsEndpoint'],
+  ['codeMode', 'slim'],
+  ['codeModeMainWorld', 'slim'],
 ];
 
 export const IMPLICATIONS: Array<[keyof McpOptions, keyof McpOptions]> = [
   ['wsHeaders', 'wsEndpoint'],
   ['experimentalFfmpegPath', 'experimentalScreencast'],
+  ['codeMode', 'javascriptEvaluation'],
+  ['codeModeMainWorld', 'javascriptEvaluation'],
 ];
 
 export function withoutDefaults(

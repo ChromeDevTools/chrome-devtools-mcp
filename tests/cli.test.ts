@@ -79,6 +79,8 @@ describe('cli args parsing', () => {
     clearcutIncludePidHeader: false,
     screenshotFormat: 'png',
     slim: false,
+    codeMode: false,
+    codeModeMainWorld: false,
     viaCli: false,
     devtoolsComments: false,
     watchConfig: false,

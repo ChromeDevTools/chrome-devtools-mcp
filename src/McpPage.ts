@@ -34,9 +34,11 @@ import {
   type RunnerResult,
 } from './third_party/index.js';
 import {
+  CdpFrame,
+  ElementHandle,
+  type CDPSession,
   type Locator,
   type Dialog,
-  type ElementHandle,
   type Frame,
   type Viewport,
   type WebMCPTool,
@@ -51,6 +53,7 @@ import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
+  DomEventListenerSummary,
   ElementCssStyles,
   Response,
   ScreenRecorderData,
@@ -67,6 +70,7 @@ import type {
 } from './types.js';
 import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
+import {isPlainRecord} from './utils/objects.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
@@ -183,6 +187,134 @@ function isBackendNodeId(
   return typeof id === 'number';
 }
 
+// Tests in `tests/utils.ts` launch unbundled `puppeteer` while `src/` bundles
+// `puppeteer-core`, so fall back when `instanceof` crosses the bundle boundary.
+function isCdpFrame(frame: unknown): frame is CdpFrame {
+  return (
+    frame instanceof CdpFrame ||
+    (isPlainRecord(frame) && typeof frame.mainRealm === 'function')
+  );
+}
+
+function isElementHandle(handle: unknown): handle is ElementHandle<Element> {
+  return (
+    handle instanceof ElementHandle ||
+    (isPlainRecord(handle) &&
+      typeof handle.asElement === 'function' &&
+      handle.asElement() !== null)
+  );
+}
+
+function getFrameCdpClient(frame: unknown): CdpFrame['client'] | undefined {
+  if (!isCdpFrame(frame)) {
+    return undefined;
+  }
+  try {
+    return frame.client;
+  } catch {
+    return undefined;
+  }
+}
+
+function getHandleFrame(handle: ElementHandle<Element>): Frame | undefined {
+  try {
+    return handle.frame;
+  } catch {
+    return undefined;
+  }
+}
+
+async function probeBackendNodeInFrame(
+  frameClient: Pick<CDPSession, 'send'>,
+  frameId: string,
+  backendNodeId: number,
+): Promise<{belongs: boolean; isClobbered: boolean}> {
+  const {executionContextId} = await frameClient.send(
+    'Page.createIsolatedWorld',
+    {
+      frameId,
+      worldName: 'cd4a_dom_probe',
+      grantUniveralAccess: false,
+    },
+  );
+  const {object} = await frameClient.send('DOM.resolveNode', {
+    backendNodeId,
+    executionContextId,
+  });
+  if (!object.objectId) {
+    return {belongs: false, isClobbered: false};
+  }
+  try {
+    const callRes = await frameClient.send('Runtime.callFunctionOn', {
+      objectId: object.objectId,
+      functionDeclaration: `function() {
+        const nt = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeType')?.get?.call(this);
+        const od = Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this);
+        const dv = typeof od === 'object' && od !== null && 'defaultView' in od ? od.defaultView : undefined;
+        const belongs = nt === 1 && dv === window;
+        const isClobbered = belongs && (typeof Reflect.get(this, 'nodeType') !== 'number' || typeof Reflect.get(this, 'isConnected') !== 'boolean');
+        return { belongs, isClobbered };
+      }`,
+      returnByValue: true,
+    });
+    const val: unknown = callRes.result.value;
+    if (
+      isPlainRecord(val) &&
+      typeof val.belongs === 'boolean' &&
+      typeof val.isClobbered === 'boolean'
+    ) {
+      return {belongs: val.belongs, isClobbered: val.isClobbered};
+    }
+    return {belongs: false, isClobbered: false};
+  } finally {
+    await frameClient
+      .send('Runtime.releaseObject', {objectId: object.objectId})
+      .catch(() => undefined);
+  }
+}
+
+function patchDomClobberSafeElementHandle(
+  handle: ElementHandle<Element>,
+): void {
+  Object.defineProperty(handle, 'assertConnectedElement', {
+    configurable: true,
+    writable: true,
+    value: async function (this: ElementHandle<Element>): Promise<void> {
+      const error = await this.evaluate((element: Element) => {
+        if (typeof Node === 'function') {
+          const isConnectedGetter = Object.getOwnPropertyDescriptor(
+            Node.prototype,
+            'isConnected',
+          )?.get;
+          const nodeTypeGetter = Object.getOwnPropertyDescriptor(
+            Node.prototype,
+            'nodeType',
+          )?.get;
+          if (isConnectedGetter && nodeTypeGetter) {
+            if (!isConnectedGetter.call(element)) {
+              return 'Node is detached from document';
+            }
+            if (nodeTypeGetter.call(element) !== 1) {
+              return 'Node is not of type HTMLElement';
+            }
+            return undefined;
+          }
+        }
+        if (!element.isConnected) {
+          return 'Node is detached from document';
+        }
+        if (element.nodeType !== 1) {
+          return 'Node is not of type HTMLElement';
+        }
+        return undefined;
+      });
+      if (error) {
+        throw new Error(error);
+      }
+    },
+  });
+}
+
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
  * and metadata that were previously scattered across Maps in McpContext.
@@ -221,6 +353,23 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
+  #codeModeDialogAction?: DialogAction;
+  #activeWaitForHelperCount = 0;
+
+  // Code Mode isolated world & ephemeral DOM bridge
+  #codeModeSession?: CDPSession;
+  #codeModeSessionPromise?: Promise<CDPSession>;
+  #codeModeMainWorldContexts = new Map<string, number>();
+  #codeModeIsolatedWorld?: {
+    frameId: string;
+    loaderId: string;
+    contextId: number;
+  };
+  #ephemeralNodes = new Map<
+    string,
+    {backendNodeId: number; frameId?: string; role?: string}
+  >();
+  #nextEphemeralNodeId = 1;
 
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
@@ -254,6 +403,24 @@ export class McpPage implements ContextPage {
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
+      if (
+        this.#codeModeDialogAction !== undefined &&
+        this.#activeWaitForHelperCount === 0
+      ) {
+        const action = this.#codeModeDialogAction;
+        this.#dialog = undefined;
+        const onDialogError = (err: unknown): void => {
+          logger?.('Failed to handle Code Mode dialog', err);
+        };
+        if (action === 'dismiss') {
+          void dialog.dismiss().catch(onDialogError);
+        } else if (action === 'accept') {
+          void dialog.accept().catch(onDialogError);
+        } else {
+          void dialog.accept(action).catch(onDialogError);
+        }
+        return;
+      }
       this.#dialog = dialog;
     };
   }
@@ -918,7 +1085,7 @@ export class McpPage implements ContextPage {
     return new WaitForHelper(this.pptrPage, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(
+  async waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
@@ -932,7 +1099,24 @@ export class McpPage implements ContextPage {
       this.cpuThrottlingRate,
       getNetworkMultiplierFromString(this.networkConditions),
     );
-    return helper.waitForEventsAfterAction(action, options);
+    const effectiveOptions =
+      this.#codeModeDialogAction !== undefined &&
+      options?.handleDialog === undefined
+        ? {...options, handleDialog: this.#codeModeDialogAction}
+        : options;
+    this.#activeWaitForHelperCount++;
+    try {
+      const result = await helper.waitForEventsAfterAction(
+        action,
+        effectiveOptions,
+      );
+      if (result.dialogHandled) {
+        this.clearDialog();
+      }
+      return result;
+    } finally {
+      this.#activeWaitForHelperCount--;
+    }
   }
 
   dispose(): void {
@@ -952,6 +1136,16 @@ export class McpPage implements ContextPage {
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
     this.#logpointManager = undefined;
+    const codeModeSession = this.#codeModeSession;
+    this.#codeModeSession = undefined;
+    this.#codeModeSessionPromise = undefined;
+    this.#codeModeMainWorldContexts.clear();
+    this.#codeModeIsolatedWorld = undefined;
+    this.#ephemeralNodes.clear();
+    this.#codeModeDialogAction = undefined;
+    void codeModeSession?.detach().catch(e => {
+      logger?.('Failed to detach Code Mode session', e);
+    });
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     this.#webAuthnAuthenticator = undefined;
@@ -1230,7 +1424,342 @@ export class McpPage implements ContextPage {
     }
   }
 
+  setCodeModeDialogAction(action: DialogAction | undefined): void {
+    this.#codeModeDialogAction = action;
+  }
+
+  registerEphemeralBackendNode(entry: {
+    backendNodeId: number;
+    frameId?: string;
+    role?: string;
+  }): {uid: string} & Disposable {
+    const uid = `__code_mode_el_${this.#nextEphemeralNodeId++}`;
+    this.#ephemeralNodes.set(uid, entry);
+    return {
+      uid,
+      [Symbol.dispose]: (): void => {
+        this.#ephemeralNodes.delete(uid);
+      },
+    };
+  }
+
+  isOptionUid(uid: string): boolean {
+    return (
+      (this.#ephemeralNodes.get(uid)?.role ??
+        this.getAXNodeByUid(uid)?.role) === 'option'
+    );
+  }
+
+  async #getCodeModeCdpSession(): Promise<CDPSession> {
+    if (this.#codeModeSession && !this.#codeModeSession.detached) {
+      return this.#codeModeSession;
+    }
+    this.#codeModeSession = undefined;
+    if (!this.#codeModeSessionPromise) {
+      this.#codeModeSessionPromise = (async () => {
+        const session = await this.pptrPage.createCDPSession();
+        this.#codeModeMainWorldContexts.clear();
+        this.#codeModeIsolatedWorld = undefined;
+        session.on('Runtime.executionContextCreated', event => {
+          const auxData: unknown = event.context.auxData;
+          if (
+            isPlainRecord(auxData) &&
+            auxData.isDefault === true &&
+            typeof auxData.frameId === 'string'
+          ) {
+            this.#codeModeMainWorldContexts.set(
+              auxData.frameId,
+              event.context.id,
+            );
+          }
+        });
+        session.on('Runtime.executionContextDestroyed', event => {
+          for (const [frameId, ctxId] of this.#codeModeMainWorldContexts) {
+            if (ctxId === event.executionContextId) {
+              this.#codeModeMainWorldContexts.delete(frameId);
+            }
+          }
+          if (
+            this.#codeModeIsolatedWorld?.contextId === event.executionContextId
+          ) {
+            this.#codeModeIsolatedWorld = undefined;
+          }
+        });
+        session.on('Runtime.executionContextsCleared', () => {
+          this.#codeModeMainWorldContexts.clear();
+          this.#codeModeIsolatedWorld = undefined;
+        });
+        session.on('Page.frameNavigated', event => {
+          if (!event.frame.parentId) {
+            this.#codeModeIsolatedWorld = undefined;
+          }
+        });
+        await Promise.all([
+          session.send('Page.enable'),
+          session.send('Runtime.enable'),
+          session.send('DOM.enable'),
+        ]);
+        this.#codeModeSession = session;
+        return session;
+      })().finally(() => {
+        this.#codeModeSessionPromise = undefined;
+      });
+    }
+    return await this.#codeModeSessionPromise;
+  }
+
+  async getCodeModeExecutionContext(options: {mainWorld: boolean}): Promise<{
+    session: CDPSession;
+    contextId: number;
+    frameId: string;
+    loaderId: string;
+  }> {
+    const session = await this.#getCodeModeCdpSession();
+    const {frameTree} = await session.send('Page.getFrameTree');
+    const frameId = frameTree.frame.id;
+    const loaderId = frameTree.frame.loaderId;
+
+    if (options.mainWorld) {
+      let contextId = this.#codeModeMainWorldContexts.get(frameId);
+      if (contextId === undefined) {
+        await this.pptrPage.mainFrame().evaluate(() => undefined);
+        contextId = this.#codeModeMainWorldContexts.get(frameId);
+      }
+      if (contextId === undefined) {
+        throw new Error(
+          `Cannot find default execution context for frame ${frameId}.`,
+        );
+      }
+      return {session, contextId, frameId, loaderId};
+    }
+
+    if (
+      this.#codeModeIsolatedWorld &&
+      this.#codeModeIsolatedWorld.frameId === frameId &&
+      this.#codeModeIsolatedWorld.loaderId === loaderId
+    ) {
+      return {
+        session,
+        contextId: this.#codeModeIsolatedWorld.contextId,
+        frameId,
+        loaderId,
+      };
+    }
+
+    const {executionContextId} = await session.send(
+      'Page.createIsolatedWorld',
+      {
+        frameId,
+        worldName: 'cd4a_code_mode',
+        grantUniveralAccess: false,
+      },
+    );
+    this.#codeModeIsolatedWorld = {
+      frameId,
+      loaderId,
+      contextId: executionContextId,
+    };
+    return {
+      session,
+      contextId: executionContextId,
+      frameId,
+      loaderId,
+    };
+  }
+
+  async getElementByBackendNodeId(
+    backendNodeId: number,
+    frameId?: string,
+  ): Promise<ElementHandle<Element>> {
+    const rawMainFrame = this.pptrPage.mainFrame();
+    const mainFrameClient = getFrameCdpClient(rawMainFrame);
+    const frames: CdpFrame[] = [];
+    for (const frame of this.pptrPage.frames()) {
+      if (!isCdpFrame(frame)) {
+        continue;
+      }
+      const frameClient = getFrameCdpClient(frame);
+      if (mainFrameClient && frameClient && frameClient !== mainFrameClient) {
+        continue;
+      }
+      frames.push(frame);
+    }
+    const candidateFrames: CdpFrame[] = [];
+    const pushUniqueFrame = (frame: CdpFrame | undefined): void => {
+      if (frame && !candidateFrames.includes(frame)) {
+        candidateFrames.push(frame);
+      }
+    };
+    if (frameId !== undefined) {
+      pushUniqueFrame(frames.find(frame => frame._id === frameId));
+    }
+    if (isCdpFrame(rawMainFrame)) {
+      pushUniqueFrame(rawMainFrame);
+    }
+    for (const frame of frames) {
+      pushUniqueFrame(frame);
+    }
+    if (candidateFrames.length === 0) {
+      throw new Error('Failed to resolve frame for target DOM element.');
+    }
+
+    for (const candidateFrame of candidateFrames) {
+      let isolatedAdopted: Awaited<
+        ReturnType<ReturnType<CdpFrame['mainRealm']>['adoptBackendNode']>
+      > | null = null;
+      let mainAdopted: Awaited<
+        ReturnType<ReturnType<CdpFrame['mainRealm']>['adoptBackendNode']>
+      > | null = null;
+      try {
+        const frameClient = getFrameCdpClient(candidateFrame);
+        if (frameClient && typeof candidateFrame._id === 'string') {
+          const probe = await probeBackendNodeInFrame(
+            frameClient,
+            candidateFrame._id,
+            backendNodeId,
+          );
+          if (probe.belongs) {
+            mainAdopted = await candidateFrame
+              .mainRealm()
+              .adoptBackendNode(backendNodeId);
+            if (isElementHandle(mainAdopted)) {
+              if (probe.isClobbered) {
+                const isolated =
+                  typeof candidateFrame.isolatedRealm === 'function'
+                    ? candidateFrame.isolatedRealm()
+                    : undefined;
+                if (isolated) {
+                  isolatedAdopted =
+                    await isolated.adoptBackendNode(backendNodeId);
+                  if (isElementHandle(isolatedAdopted)) {
+                    patchDomClobberSafeElementHandle(isolatedAdopted);
+                    Reflect.set(mainAdopted, 'isolatedHandle', isolatedAdopted);
+                    isolatedAdopted = null;
+                  }
+                }
+                patchDomClobberSafeElementHandle(mainAdopted);
+              }
+              return mainAdopted;
+            }
+          }
+        } else {
+          mainAdopted = await candidateFrame
+            .mainRealm()
+            .adoptBackendNode(backendNodeId);
+          if (isElementHandle(mainAdopted)) {
+            const belongsToCandidateFrame = await mainAdopted.evaluate(
+              (node: Element) =>
+                node.nodeType === 1 &&
+                node.ownerDocument?.defaultView === window,
+            );
+            if (belongsToCandidateFrame) {
+              return mainAdopted;
+            }
+          }
+        }
+      } catch {
+        // Detached frame or cross-world resolution failure; continue searching other frames.
+      }
+      if (isolatedAdopted) {
+        await isolatedAdopted.dispose().catch(() => undefined);
+      }
+      if (mainAdopted) {
+        await mainAdopted.dispose().catch(() => undefined);
+      }
+    }
+
+    throw new Error('Target node is not a DOM Element or is detached.');
+  }
+
+  async resolveUidInCodeModeContext(
+    uid: string,
+    contextId: number,
+  ): Promise<string | null> {
+    try {
+      using handle = await this.getElementByUid(uid);
+      const handleFrame = getHandleFrame(handle);
+      const mainFrameClient = getFrameCdpClient(this.pptrPage.mainFrame());
+      const handleFrameClient = getFrameCdpClient(handleFrame);
+      if (
+        mainFrameClient &&
+        handleFrameClient &&
+        handleFrameClient !== mainFrameClient
+      ) {
+        return null;
+      }
+      const backendNodeId = await handle.backendNodeId();
+      if (!backendNodeId) {
+        return null;
+      }
+      const session = await this.#getCodeModeCdpSession();
+      const {object} = await session.send('DOM.resolveNode', {
+        backendNodeId,
+        executionContextId: contextId,
+      });
+      return object.objectId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getDomEventListenersForUid(
+    uid: string,
+    options: {mainWorld: boolean},
+  ): Promise<DomEventListenerSummary[]> {
+    using handle = await this.getElementByUid(uid);
+    const mainFrame = this.pptrPage.mainFrame();
+    const handleFrame = getHandleFrame(handle);
+    if (options.mainWorld && handleFrame && handleFrame !== mainFrame) {
+      try {
+        if (
+          new URL(handleFrame.url()).origin !== new URL(mainFrame.url()).origin
+        ) {
+          return [];
+        }
+      } catch {
+        return [];
+      }
+    }
+    const backendNodeId = await handle.backendNodeId();
+    if (!backendNodeId) {
+      return [];
+    }
+    const targetSession: Pick<CDPSession, 'send'> =
+      getFrameCdpClient(handleFrame) ?? (await this.#getCodeModeCdpSession());
+    const {object} = await targetSession.send('DOM.resolveNode', {
+      backendNodeId,
+    });
+    if (!object.objectId) {
+      return [];
+    }
+    try {
+      const {listeners} = await targetSession.send(
+        'DOMDebugger.getEventListeners',
+        {objectId: object.objectId},
+      );
+      return listeners.map(listener => ({
+        type: listener.type,
+        useCapture: listener.useCapture,
+        passive: listener.passive,
+        once: listener.once,
+        lineNumber: listener.lineNumber,
+        columnNumber: listener.columnNumber,
+      }));
+    } finally {
+      await targetSession
+        .send('Runtime.releaseObject', {objectId: object.objectId})
+        .catch(() => undefined);
+    }
+  }
+
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return await this.getElementByBackendNodeId(
+        ephemeral.backendNodeId,
+        ephemeral.frameId,
+      );
+    }
     if (!this.textSnapshot) {
       throw new Error(
         `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
@@ -1295,6 +1824,10 @@ export class McpPage implements ContextPage {
       typeof target._targetId === 'string'
         ? target._targetId
         : undefined;
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return {backendNodeId: ephemeral.backendNodeId, targetId};
+    }
     const node = this.getAXNodeByUid(uid);
     if (node?.backendNodeId !== undefined) {
       return {backendNodeId: node.backendNodeId, targetId};
@@ -1308,21 +1841,13 @@ export class McpPage implements ContextPage {
     }
   }
 
-  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
-    if (!this.textSnapshot) {
-      throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
-      );
-    }
-    const node = this.textSnapshot.idToNode.get(uid);
-    if (!node) {
-      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
-    }
-
-    const backendNodeId = node.backendNodeId;
+  async getCssStylesForBackendNodeId(
+    backendNodeId: number,
+    elementLabel = `backendNodeId=${backendNodeId}`,
+  ): Promise<ElementCssStyles> {
     if (!isBackendNodeId(backendNodeId)) {
       throw new Error(
-        `Failed to resolve backend node ID for element with uid "${uid}".`,
+        `Failed to resolve backend node ID for element with ${elementLabel}.`,
       );
     }
 
@@ -1352,14 +1877,14 @@ export class McpPage implements ContextPage {
 
     if (!domNode || !cssModel) {
       throw new Error(
-        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
+        `Element with ${elementLabel} was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
       );
     }
 
     const targetElement = domNode.enclosingElementOrSelf();
     if (!targetElement) {
       throw new Error(
-        `Element with uid "${uid}" is not an element node and has no parent element.`,
+        `Element with ${elementLabel} is not an element node and has no parent element.`,
       );
     }
 
@@ -1369,16 +1894,48 @@ export class McpPage implements ContextPage {
     ]);
     if (!matchedStyles) {
       throw new Error(
-        `Could not retrieve matched styles for element with uid "${uid}".`,
+        `Could not retrieve matched styles for element with ${elementLabel}.`,
       );
     }
     if (!computedStyles) {
       logger?.(
-        `Could not retrieve computed styles for element with uid ${uid}.`,
+        `Could not retrieve computed styles for element with ${elementLabel}.`,
       );
     }
 
     return {matchedStyles, computedStyles};
+  }
+
+  async getCssStylesForUid(uid: string): Promise<ElementCssStyles> {
+    const ephemeral = this.#ephemeralNodes.get(uid);
+    if (ephemeral) {
+      return await this.getCssStylesForBackendNodeId(
+        ephemeral.backendNodeId,
+        `uid "${uid}"`,
+      );
+    }
+
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+
+    const backendNodeId = node.backendNodeId;
+    if (!isBackendNodeId(backendNodeId)) {
+      throw new Error(
+        `Failed to resolve backend node ID for element with uid "${uid}".`,
+      );
+    }
+
+    return await this.getCssStylesForBackendNodeId(
+      backendNodeId,
+      `uid "${uid}"`,
+    );
   }
 
   async getDevToolsData(): Promise<DevToolsData> {
@@ -1636,20 +2193,20 @@ export class McpPage implements ContextPage {
     const observedFrames = new Set(initialFrames);
     const controller = new AbortController();
 
-    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
-      this.#locatorClass.race(
-        frames.flatMap(frame =>
-          text.flatMap(value => {
-            const locators = [
-              frame.locator(`aria/${value}`),
-              frame.locator(`text/${value}`),
-            ];
-            return visible
-              ? locators.map(locator => locator.setVisibility('visible'))
-              : locators;
-          }),
-        ),
+    const locatorForFrames = (frames: Frame[]): Locator<Element> => {
+      const candidates = frames.flatMap(frame =>
+        text.flatMap(value => {
+          const locators = [
+            frame.locator(`aria/${value}`),
+            frame.locator(`text/${value}`),
+          ];
+          return visible
+            ? locators.map(locator => locator.setVisibility('visible'))
+            : locators;
+        }),
       );
+      return this.#locatorClass.race(candidates);
+    };
 
     let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {

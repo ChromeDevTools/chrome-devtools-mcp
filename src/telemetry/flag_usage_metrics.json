@@ -510,5 +510,21 @@
   {
     "name": "idle_timeout_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "code_mode_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "code_mode",
+    "flagType": "boolean"
+  },
+  {
+    "name": "code_mode_main_world_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "code_mode_main_world",
+    "flagType": "boolean"
   }
 ]

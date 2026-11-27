@@ -16,6 +16,7 @@ import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {
+  CdpFrame,
   DevTools,
   Frame,
   Locator,
@@ -25,7 +26,10 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
   createMockCDPSession,
+  createMockCSSMatchedStyles,
+  createMockDOMNode,
   createMockDialog,
+  createMockElementHandle,
   createMockMcpResponse,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
@@ -36,7 +40,7 @@ import {
   createMockWebMCPTool,
 } from './mocks.js';
 import {serverHooks} from './server.js';
-import {getMockRequest, html, withMcpContext} from './utils.js';
+import {getMockRequest, html, settle, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -2822,6 +2826,312 @@ describe('McpPage', () => {
         model.getCredentials.secondCall,
         createMockAuthenticatorId('auth-2'),
       );
+    });
+  });
+
+  describe('Code Mode execution context, ephemeral nodes, and dialog handling', () => {
+    it('creates, caches, and invalidates the cd4a_code_mode isolated world and resolves mainWorld contexts in getCodeModeExecutionContext()', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {config: createMockServerConfig(), locatorClass: Locator},
+      );
+      await mcpPage.init();
+
+      const cdpSession = createMockCDPSession();
+      pptrPage.createCDPSession.resolves(cdpSession);
+
+      let currentLoaderId = 'loader-1';
+      let nextIsolatedContextId = 77;
+      const sendStub = sinon
+        .stub<[string, Record<string, unknown>?], Promise<unknown>>()
+        .callsFake(async (method: string) => {
+          if (method === 'Page.getFrameTree') {
+            return {
+              frameTree: {
+                frame: {
+                  id: 'frame-1',
+                  loaderId: currentLoaderId,
+                  url: 'https://example.com',
+                  domainAndRegistry: '',
+                  securityOrigin: '',
+                  mimeType: 'text/html',
+                  secureContextType: 'Secure',
+                  crossOriginIsolatedContextType: 'NotIsolated',
+                  gatedAPIFeatures: [],
+                },
+              },
+            };
+          }
+          if (method === 'Page.createIsolatedWorld') {
+            return {executionContextId: nextIsolatedContextId++};
+          }
+          return {};
+        });
+      Object.assign(cdpSession, {send: sendStub});
+
+      const first = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
+      assert.strictEqual(first.contextId, 77);
+      assert.strictEqual(first.frameId, 'frame-1');
+      assert.strictEqual(first.loaderId, 'loader-1');
+      sinon.assert.calledOnceWithExactly(
+        sendStub.withArgs('Page.createIsolatedWorld'),
+        'Page.createIsolatedWorld',
+        {
+          frameId: 'frame-1',
+          worldName: 'cd4a_code_mode',
+          grantUniveralAccess: false,
+        },
+      );
+
+      const secondCached = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
+      assert.strictEqual(secondCached.contextId, 77);
+      assert.strictEqual(
+        sendStub.withArgs('Page.createIsolatedWorld').callCount,
+        1,
+      );
+
+      cdpSession.emit('Runtime.executionContextDestroyed', {
+        executionContextId: 77,
+      });
+      const afterDestroyed = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
+      assert.strictEqual(afterDestroyed.contextId, 78);
+      assert.strictEqual(
+        sendStub.withArgs('Page.createIsolatedWorld').callCount,
+        2,
+      );
+
+      currentLoaderId = 'loader-2';
+      cdpSession.emit('Page.frameNavigated', {
+        frame: {id: 'frame-1', loaderId: 'loader-2'},
+      });
+      const afterNavigated = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
+      assert.strictEqual(afterNavigated.contextId, 79);
+      assert.strictEqual(afterNavigated.loaderId, 'loader-2');
+      assert.strictEqual(
+        sendStub.withArgs('Page.createIsolatedWorld').callCount,
+        3,
+      );
+
+      cdpSession.emit('Runtime.executionContextsCleared', undefined);
+      const afterCleared = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: false,
+      });
+      assert.strictEqual(afterCleared.contextId, 80);
+      assert.strictEqual(
+        sendStub.withArgs('Page.createIsolatedWorld').callCount,
+        4,
+      );
+
+      cdpSession.emit('Runtime.executionContextCreated', {
+        context: {
+          id: 11,
+          origin: '',
+          name: '',
+          uniqueId: 'u1',
+          auxData: {isDefault: true, frameId: 'frame-1'},
+        },
+      });
+      const mainCtx = await mcpPage.getCodeModeExecutionContext({
+        mainWorld: true,
+      });
+      assert.strictEqual(mainCtx.contextId, 11);
+      assert.strictEqual(
+        sendStub.withArgs('Page.createIsolatedWorld').callCount,
+        4,
+      );
+    });
+
+    it('resolves getCssStylesForUid via registerEphemeralBackendNode and cleans up on dispose', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      pptrPage.createCDPSession.resolves(createMockCDPSession());
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {config: createMockServerConfig(), locatorClass: Locator},
+      );
+      await mcpPage.init();
+
+      const domNode = createMockDOMNode({
+        selector: 'button#ephemeral',
+        backendNodeId: 55,
+      });
+      Object.assign(domNode, {id: 501});
+      domNode.enclosingElementOrSelf.returns(domNode);
+
+      const matchedStyles = createMockCSSMatchedStyles({node: domNode});
+      const computedStyles = new Map([['display', 'block']]);
+      const cssModel = sinon.createStubInstance(DevTools.CSSModel.CSSModel);
+      cssModel.getMatchedStyles.resolves(matchedStyles);
+      cssModel.getComputedStyle.resolves(computedStyles);
+
+      const sdkTarget = sinon.createStubInstance(DevTools.Target);
+      sdkTarget.model.withArgs(DevTools.CSSModel.CSSModel).returns(cssModel);
+
+      const domModel = sinon.createStubInstance(DevTools.DOMModel.DOMModel);
+      domModel.target.returns(sdkTarget);
+      domModel.pushNodesByBackendIdsToFrontend.resolves(
+        new Map([[domNode.backendNodeId(), domNode]]),
+      );
+
+      const targetManager = sinon.createStubInstance(DevTools.TargetManager);
+      targetManager.models
+        .withArgs(DevTools.DOMModel.DOMModel)
+        .returns([domModel]);
+
+      assert.ok(mcpPage.devtoolsUniverse);
+      sinon
+        .stub(mcpPage.devtoolsUniverse.universe.context, 'get')
+        .withArgs(DevTools.TargetManager)
+        .returns(targetManager);
+
+      const reg = mcpPage.registerEphemeralBackendNode({
+        backendNodeId: 55,
+        frameId: 'frame-1',
+      });
+      const resolvedStyles = await mcpPage.getCssStylesForUid(reg.uid);
+      assert.strictEqual(resolvedStyles.matchedStyles, matchedStyles);
+      assert.strictEqual(resolvedStyles.computedStyles, computedStyles);
+      sinon.assert.calledOnceWithExactly(cssModel.getMatchedStyles, domNode.id);
+
+      reg[Symbol.dispose]();
+      await assert.rejects(
+        () => mcpPage.getCssStylesForUid(reg.uid),
+        /No snapshot found/,
+      );
+    });
+
+    it('adopts attached frame elements and rejects detached elements with null defaultView in getElementByBackendNodeId()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      const mainFrame = pptrPage.mainFrame();
+      const childFrame = createMockPuppeteerPage().mainFrame();
+      assert.ok(mainFrame instanceof CdpFrame);
+      assert.ok(childFrame instanceof CdpFrame);
+
+      Object.assign(mainFrame, {
+        _id: 'main-frame',
+        mainRealm: () => ({
+          adoptBackendNode: sinon.stub().rejects(new Error('Wrong frame')),
+        }),
+      });
+
+      const {handle: attachedHandle} = createMockElementHandle();
+      attachedHandle.evaluate.resolves(true);
+      const adoptStub = sinon.stub().resolves(attachedHandle);
+      Object.assign(childFrame, {
+        _id: 'child-frame',
+        mainRealm: () => ({adoptBackendNode: adoptStub}),
+      });
+      pptrPage.frames.returns([mainFrame, childFrame]);
+
+      const resolved = await mcpPage.getElementByBackendNodeId(
+        42,
+        'child-frame',
+      );
+      assert.strictEqual(resolved, attachedHandle);
+      sinon.assert.calledOnceWithExactly(adoptStub, 42);
+      sinon.assert.notCalled(attachedHandle.dispose);
+
+      const hadWindow = 'window' in globalThis;
+      const previousWindow: unknown = Reflect.get(globalThis, 'window');
+      Reflect.set(globalThis, 'window', globalThis);
+      try {
+        const {handle: detachedHandle} = createMockElementHandle();
+        detachedHandle.evaluate.callsFake(async fn => {
+          if (typeof fn === 'function') {
+            return Boolean(
+              Reflect.apply(fn, undefined, [
+                {nodeType: 1, ownerDocument: {defaultView: null}},
+              ]),
+            );
+          }
+          return false;
+        });
+        adoptStub.resetHistory();
+        adoptStub.resolves(detachedHandle);
+
+        await assert.rejects(
+          () => mcpPage.getElementByBackendNodeId(99, 'child-frame'),
+          /detached|not a DOM Element/,
+        );
+        sinon.assert.calledOnce(detachedHandle.dispose);
+      } finally {
+        if (hadWindow) {
+          Reflect.set(globalThis, 'window', previousWindow);
+        } else {
+          Reflect.deleteProperty(globalThis, 'window');
+        }
+      }
+    });
+
+    it('auto-handles dialogs via setCodeModeDialogAction and suppresses unhandled rejections when dialog handling rejects', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      const acceptDialog = createMockDialog({type: 'confirm', message: 'Ok?'});
+      acceptDialog.accept.resolves();
+      mcpPage.setCodeModeDialogAction('accept');
+      pptrPage.emit('dialog', acceptDialog);
+      sinon.assert.calledOnceWithExactly(acceptDialog.accept);
+      assert.strictEqual(mcpPage.getDialog(), undefined);
+
+      const dismissDialog = createMockDialog({type: 'confirm', message: 'No?'});
+      dismissDialog.dismiss.resolves();
+      mcpPage.setCodeModeDialogAction('dismiss');
+      pptrPage.emit('dialog', dismissDialog);
+      sinon.assert.calledOnceWithExactly(dismissDialog.dismiss);
+      assert.strictEqual(mcpPage.getDialog(), undefined);
+
+      const promptDialog = createMockDialog({
+        type: 'prompt',
+        message: 'Name?',
+      });
+      promptDialog.accept.resolves();
+      mcpPage.setCodeModeDialogAction('prompt-answer');
+      pptrPage.emit('dialog', promptDialog);
+      sinon.assert.calledOnceWithExactly(promptDialog.accept, 'prompt-answer');
+      assert.strictEqual(mcpPage.getDialog(), undefined);
+
+      const unhandled: unknown[] = [];
+      const onUnhandled = (err: unknown): void => {
+        unhandled.push(err);
+      };
+      process.on('unhandledRejection', onUnhandled);
+      try {
+        const rejectingAccept = createMockDialog({
+          type: 'alert',
+          message: 'Closed accept',
+        });
+        rejectingAccept.accept.rejects(new Error('Target closed'));
+        mcpPage.setCodeModeDialogAction('accept');
+        pptrPage.emit('dialog', rejectingAccept);
+
+        const rejectingDismiss = createMockDialog({
+          type: 'alert',
+          message: 'Closed dismiss',
+        });
+        rejectingDismiss.dismiss.rejects(new Error('No dialog is showing'));
+        mcpPage.setCodeModeDialogAction('dismiss');
+        pptrPage.emit('dialog', rejectingDismiss);
+
+        await settle();
+        assert.deepStrictEqual(unhandled, []);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+        mcpPage.setCodeModeDialogAction(undefined);
+      }
     });
   });
 });

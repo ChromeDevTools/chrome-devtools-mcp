@@ -244,6 +244,16 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--codeMode`/ `--code-mode`, `--experimentalCodeMode`**
+  Enable Code Mode: keep lifecycle, session, dialog, and file tools on the outer MCP surface while exposing in-page interaction and inspection tools as an mcp.* API inside evaluate_script in an isolated CDP world.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--codeModeMainWorld`/ `--code-mode-main-world`**
+  Run evaluate_script Code Mode in the page main world instead of an isolated CDP world (implies --code-mode). Use only on trusted pages.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--idleTimeout`/ `--idle-timeout`**
   Close or disconnect an idle browser after this duration without a tool call, as an integer followed by s, m or h, for example `90s`, `30m` or `2h` (at most 596h). Closes a launched browser (closing all open pages), or disconnects when using `--browserUrl`, `--wsEndpoint` or `--autoConnect` while leaving that browser open; the next tool call relaunches or reconnects automatically. In the `chrome-devtools` CLI, the background daemon also exits shortly afterwards. Disabled by default.
   - **Type:** string

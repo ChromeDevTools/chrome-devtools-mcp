@@ -146,17 +146,41 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
   }
 
-  static validateImplications(explicitArgs: Partial<ParsedArguments>): void {
+  static validateImplications(
+    explicitArgs: Partial<ParsedArguments>,
+    options?: {relaxCodeModeJavaScriptEvaluation?: boolean},
+  ): void {
     for (const [key, implied] of IMPLICATIONS) {
+      if (
+        options?.relaxCodeModeJavaScriptEvaluation &&
+        implied === 'javascriptEvaluation' &&
+        (key === 'codeMode' || key === 'codeModeMainWorld')
+      ) {
+        continue;
+      }
       const isKeySet =
         explicitArgs[key] !== undefined && explicitArgs[key] !== false;
+      const defaultVal =
+        'default' in mcpOptions[implied]
+          ? mcpOptions[implied].default
+          : undefined;
+      const effectiveImplied =
+        implied in explicitArgs && explicitArgs[implied] !== undefined
+          ? explicitArgs[implied]
+          : defaultVal;
       const isImpliedSet =
-        explicitArgs[implied] !== undefined && explicitArgs[implied] !== false;
+        effectiveImplied !== undefined && effectiveImplied !== false;
       if (isKeySet && !isImpliedSet) {
         throw new Error(
           `Implications failed:\n  ${String(key)} -> ${String(implied)}`,
         );
       }
+    }
+    if (
+      explicitArgs.codeModeMainWorld === true &&
+      explicitArgs.codeMode === false
+    ) {
+      throw new Error('Implications failed:\n  codeModeMainWorld -> codeMode');
     }
   }
 
@@ -190,8 +214,14 @@ export class ServerConfig implements ReadonlyServerConfig {
       delete resolvedArgs.channel;
     }
 
+    if (resolvedArgs.codeModeMainWorld) {
+      resolvedArgs.codeMode = true;
+    }
+
     if (isViaCli) {
       resolvedArgs.slim = false;
+      resolvedArgs.codeMode = false;
+      resolvedArgs.codeModeMainWorld = false;
       resolvedArgs.pageIdRouting = true;
       if (
         resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
@@ -237,13 +267,24 @@ export class ServerConfig implements ReadonlyServerConfig {
    * validates conflicts and implications, and applies defaults.
    */
   static create(options: ServerConfigCreateOptions): ServerConfig {
+    return ServerConfig.#createInternal(options);
+  }
+
+  static #createInternal(
+    options: ServerConfigCreateOptions & {
+      relaxCodeModeReloadImplications?: boolean;
+    },
+  ): ServerConfig {
     const explicitArgs: Partial<ParsedArguments> = {
       ...options.fileArgs,
       ...options.cliArgs,
       ...(options.configPath ? {config: options.configPath} : {}),
     };
     ServerConfig.validateConflicts(explicitArgs);
-    ServerConfig.validateImplications(explicitArgs);
+    ServerConfig.validateImplications(explicitArgs, {
+      relaxCodeModeJavaScriptEvaluation:
+        options.relaxCodeModeReloadImplications,
+    });
     const resolved = ServerConfig.applyDefaults(explicitArgs, {
       env: options.env,
       suppressUsageStatisticsNotice: options.suppressUsageStatisticsNotice,
@@ -278,12 +319,23 @@ export class ServerConfig implements ReadonlyServerConfig {
    * preserving this config's CLI arguments, config path, and environment.
    */
   withFileArgs(fileArgs: Partial<ParsedArguments>): ServerConfig {
-    return ServerConfig.create({
+    const cliHasCodeMode =
+      this.#cliArgs.codeMode === true ||
+      this.#cliArgs.codeModeMainWorld === true;
+    const effectiveFileArgs =
+      cliHasCodeMode && fileArgs.slim === true
+        ? {...fileArgs, slim: undefined}
+        : fileArgs;
+    if (cliHasCodeMode && fileArgs.slim === true) {
+      delete effectiveFileArgs.slim;
+    }
+    return ServerConfig.#createInternal({
       cliArgs: {...this.#cliArgs},
-      fileArgs,
+      fileArgs: effectiveFileArgs,
       configPath: this.#configPath,
       env: this.#env,
       suppressUsageStatisticsNotice: true,
+      relaxCodeModeReloadImplications: cliHasCodeMode,
     });
   }
 
@@ -298,12 +350,17 @@ export class ServerConfig implements ReadonlyServerConfig {
   ): ServerConfig {
     const mergedFileArgs = mergeLayer(this.#fileArgs, next.#fileArgs);
     const mergedCliArgs = mergeLayer(this.#cliArgs, next.#cliArgs);
-    return ServerConfig.create({
+    if (this.#resolved.codeMode) {
+      copyOption(mergedFileArgs, this.#fileArgs, 'slim');
+      copyOption(mergedCliArgs, this.#cliArgs, 'slim');
+    }
+    return ServerConfig.#createInternal({
       cliArgs: mergedCliArgs,
       fileArgs: mergedFileArgs,
       configPath: this.#configPath,
       env: options?.env ?? this.#env,
       suppressUsageStatisticsNotice: true,
+      relaxCodeModeReloadImplications: this.#resolved.codeMode,
     });
   }
 
@@ -323,6 +380,13 @@ export class ServerConfig implements ReadonlyServerConfig {
       ) {
         changed.push(name);
       }
+    }
+    if (
+      this.#resolved.codeMode &&
+      Boolean(this.#resolved.slim) !== Boolean(next.#resolved.slim) &&
+      !changed.includes('slim')
+    ) {
+      changed.push('slim');
     }
     return changed;
   }

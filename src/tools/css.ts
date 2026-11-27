@@ -7,6 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {cssStylesOutputSchema} from './codeMode/codeModeSchema.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export const getCssStyles: PageToolFactory = definePageTool(() => ({
@@ -49,6 +50,7 @@ Results are paginated (10 entries per page by default); use pageIdx to page thro
         'Additional CSS property names (in kebab-case, e.g. "position", "z-index", "overflow") to include in Computed styles even when not matched by any CSS rule.',
       ),
   },
+  outputSchema: cssStylesOutputSchema,
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},

@@ -136,7 +136,9 @@ exports[`McpResponse > adds a message when no console messages exist 1`] = `
 `;
 
 exports[`McpResponse > adds a message when no console messages exist 2`] = `
-{}
+{
+  "consoleMessages": []
+}
 `;
 
 exports[`McpResponse > adds a prompt dialog 1`] = `
@@ -310,7 +312,9 @@ exports[`McpResponse > does not include throttling setting when it is null 2`] =
 `;
 
 exports[`McpResponse > doesn't list the issue message if mapping returns null 1`] = `
-{}
+{
+  "consoleMessages": []
+}
 `;
 
 exports[`McpResponse > list pages 1`] = `
@@ -1286,7 +1290,9 @@ No requests found.
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 2`] = `
-{}
+{
+  "networkRequests": []
+}
 `;
 
 exports[`extensions > lists extensions 1`] = `
