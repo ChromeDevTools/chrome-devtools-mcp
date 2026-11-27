@@ -36,6 +36,7 @@ import {getErrorMessage, toError} from './utils/errorHandling.js';
 import {fileUrlToPathWithPosixFallback} from './utils/files.js';
 import {logger} from './utils/logger.js';
 import {raceWithSignal} from './utils/raceWithSignal.js';
+import {raceWithTimeout} from './utils/raceWithTimeout.js';
 import type {TaskQueue} from './utils/TaskRunner.js';
 import {pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -339,35 +340,13 @@ export class ToolHandler {
   }
 
   /**
-   * Races a promise against TOOL_CALL_TIMEOUT_MS and signal abort, calling
-   * onTimeout() only if the timer wins, never on abort.
-   * The loser of the race is left running — there is no way to
-   * cancel a pending connect/launch — but since nothing is left awaiting it,
-   * it cannot block subsequent tool calls.
+   * The timeout error `#runBrowserTool` reports when the browser connection
+   * deadline wins. Kept on the instance because the message names the tool.
    */
-  async #raceWithTimeout<T>(
-    promise: Promise<T>,
-    onTimeout: () => void,
-    signal: AbortSignal,
-  ): Promise<T> {
-    const timeoutError = new ToolCallTimeoutError(
+  #connectionTimeoutError(): ToolCallTimeoutError {
+    return new ToolCallTimeoutError(
       `Tool "${this.#tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`,
     );
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(timeoutError), TOOL_CALL_TIMEOUT_MS);
-      timer.unref?.();
-    });
-    try {
-      return await raceWithSignal(Promise.race([promise, timeout]), signal);
-    } catch (err) {
-      if (err === timeoutError) {
-        onTimeout();
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
   }
 
   #dataFormat(serverArgs: ParsedArguments): DataFormat {
@@ -422,11 +401,12 @@ export class ToolHandler {
     // discard that attempt if it succeeds later instead of handing it to a
     // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
     // comment for the full mechanism.
-    const browser = await this.#raceWithTimeout(
-      context.ensureBrowser(),
-      () => this.abandonPendingBrowserAttemptOnTimeout(),
+    const browser = await raceWithTimeout(context.ensureBrowser(), {
+      timeoutMs: TOOL_CALL_TIMEOUT_MS,
+      error: this.#connectionTimeoutError(),
       signal,
-    );
+      onTimeout: () => this.abandonPendingBrowserAttemptOnTimeout(),
+    });
     logger?.(`${tool.name} browser: resolved`);
     if (context.consumeReconnectNotice()) {
       response.setReconnectNotice();

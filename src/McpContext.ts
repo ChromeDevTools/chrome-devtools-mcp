@@ -67,6 +67,7 @@ import {
   fetchWithValidatedRedirects,
   validateUrlNotBlocked,
 } from './utils/network.js';
+import {raceWithTimeout} from './utils/raceWithTimeout.js';
 import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
 import {isAllowedUrl} from './utils/url.js';
 
@@ -143,6 +144,45 @@ const FEATURE_CONTROLLERS: readonly FeatureController[] = [
 // before a reconnect then fails to resolve instead of hitting an unrelated
 // page of the reconnected browser.
 let nextPageId = 1;
+
+// Chrome's Extensions domain has no cancel command: once
+// `Extensions.loadUnpacked` or `Extensions.uninstall` is sent, the browser
+// finishes the work whether or not this server keeps waiting. The deadline
+// below therefore bounds only our wait, and the message it produces says so.
+const EXTENSION_OPERATION_TIMEOUT_MS = 30_000;
+
+function extensionTimeoutError(
+  action: 'install' | 'uninstall',
+  timeoutMs: number,
+): Error {
+  if (action === 'install') {
+    return new Error(
+      `Timed out after ${timeoutMs}ms waiting for Chrome to install the ` +
+        `extension. Chrome cannot cancel an in-flight install, so it is ` +
+        `still running and may still complete. Check list_extensions before ` +
+        `retrying: an existing entry does not prove this install finished.`,
+    );
+  }
+  return new Error(
+    `Timed out after ${timeoutMs}ms waiting for Chrome to uninstall the ` +
+      `extension. Chrome cannot cancel an in-flight uninstall, so it may ` +
+      `still complete. Check list_extensions before retrying: if the ` +
+      `extension is already gone, a retry fails with "could not find ` +
+      `extension".`,
+  );
+}
+
+// The loser keeps running: Chrome has no cancel command for either operation,
+// so the deadline bounds only our wait (see utils/raceWithTimeout.ts).
+function raceExtensionOperation<T>(
+  operation: Promise<T>,
+  action: 'install' | 'uninstall',
+): Promise<T> {
+  return raceWithTimeout(operation, {
+    timeoutMs: EXTENSION_OPERATION_TIMEOUT_MS,
+    error: extensionTimeoutError(action, EXTENSION_OPERATION_TIMEOUT_MS),
+  });
+}
 
 export class McpContext implements Context, BrowserlessContext {
   logger: Logger;
@@ -1127,25 +1167,17 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    const id = await Promise.race([
+    return await raceExtensionOperation(
       this.browser.installExtension(extensionPath),
-      new Promise<string>((_, rej) =>
-        setTimeout(() => rej(new Error('Timeout installing extension')), 30000),
-      ),
-    ]);
-    return id;
+      'install',
+    );
   }
 
   async uninstallExtension(id: string): Promise<void> {
-    await Promise.race([
+    await raceExtensionOperation(
       this.browser.uninstallExtension(id),
-      new Promise<void>((_, rej) =>
-        setTimeout(
-          () => rej(new Error('Timeout uninstalling extension')),
-          30000,
-        ),
-      ),
-    ]);
+      'uninstall',
+    );
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
