@@ -81,9 +81,73 @@ describe('comments tools', () => {
         page.ensureDevToolsCommentBridge,
         devtoolsPage,
       );
-      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage, {});
       sinon.assert.notCalled(bridge.waitForCommentEvent);
       sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
+        mockThread,
+      ]);
+    });
+
+    it('includeTransmitted skips the wait for open threads', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      const mockThread: CommentThreadPayload = {
+        id: 'comment-1',
+        text: 'Fix the color contrast here',
+        previouslyTransmitted: true,
+      };
+      bridge.getComments.resolves([mockThread]);
+
+      await getDevtoolsComments(args).handler(
+        {params: {includeTransmitted: true}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage, {
+        includeTransmitted: true,
+      });
+      sinon.assert.notCalled(bridge.waitForCommentEvent);
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
+        mockThread,
+      ]);
+    });
+
+    it('passes includeTransmitted after a comment event', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      const mockThread: CommentThreadPayload = {
+        id: 'comment-2',
+        text: 'Align the header',
+      };
+      bridge.getComments.onFirstCall().resolves([]);
+      bridge.getComments.onSecondCall().resolves([mockThread]);
+      bridge.waitForCommentEvent.resolves(true);
+
+      await getDevtoolsComments(args).handler(
+        {params: {timeout: 5_000, includeTransmitted: true}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledTwice(bridge.getComments);
+      sinon.assert.calledWithExactly(
+        bridge.getComments.firstCall,
+        devtoolsPage,
+        {includeTransmitted: true},
+      );
+      sinon.assert.calledWithExactly(
+        bridge.getComments.secondCall,
+        devtoolsPage,
+        {includeTransmitted: true},
+      );
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
         mockThread,
       ]);
@@ -180,7 +244,7 @@ describe('comments tools', () => {
         context,
       );
 
-      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage, {});
       sinon.assert.calledOnceWithExactly(bridge.waitForCommentEvent, 10_000);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -230,7 +294,7 @@ describe('comments tools', () => {
         context,
       );
 
-      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage, {});
       sinon.assert.notCalled(bridge.waitForCommentEvent);
       sinon.assert.notCalled(response.appendResponseLine);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);

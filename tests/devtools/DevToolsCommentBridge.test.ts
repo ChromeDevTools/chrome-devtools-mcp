@@ -194,10 +194,28 @@ describe('DevToolsCommentBridge', () => {
     ];
     devtoolsPage.evaluate.resolves(mockThreads);
 
-    const threads = await bridge.getComments(devtoolsPage);
+    const threads = await bridge.getComments(devtoolsPage, {});
 
-    sinon.assert.calledOnce(devtoolsPage.evaluate);
+    sinon.assert.calledOnceWithExactly(
+      devtoolsPage.evaluate,
+      sinon.match.func,
+      {},
+    );
     assert.deepStrictEqual(threads, mockThreads);
+  });
+
+  it('passes includeTransmitted to evaluate', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    const bridge = new DevToolsCommentBridge();
+    devtoolsPage.evaluate.resolves([]);
+
+    await bridge.getComments(devtoolsPage, {includeTransmitted: true});
+
+    sinon.assert.calledOnceWithExactly(
+      devtoolsPage.evaluate,
+      sinon.match.func,
+      {includeTransmitted: true},
+    );
   });
 
   describe('waitForCommentEvent', () => {

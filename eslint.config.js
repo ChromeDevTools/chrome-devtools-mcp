@@ -16,7 +16,8 @@ import tseslint from 'typescript-eslint';
 import localPlugin from './scripts/eslint_rules/local-plugin.js';
 
 const RESTRICTED_IMPORT_DEVTOOLS_MCP = {
-  regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
+  regex:
+    '(.*devtools-frontend/(?!mcp/mcp\\.js$).*|^(?:\\.\\./)+(?:front_end/.*|mcp/(?!mcp\\.js$).*))',
   message:
     'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
 };
@@ -589,6 +590,7 @@ export default defineConfig([
     files: ['src/tools/**/*.ts'],
     rules: {
       '@local/enforce-zod-schema': 'error',
+      '@local/max-tool-name-length': 'error',
       '@local/require-parsed-arguments': 'error',
     },
   },

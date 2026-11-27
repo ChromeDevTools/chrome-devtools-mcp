@@ -10,7 +10,6 @@ import '../utils/polyfill.js';
 
 import fs, {constants, openSync, writeSync, closeSync} from 'node:fs';
 import {createServer, type Server} from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -31,6 +30,7 @@ import {VERSION} from '../version.js';
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
 import {
   DAEMON_CLIENT_NAME,
+  assertSecureRuntimeDir,
   getPidFilePath,
   getSocketPath,
   IS_WINDOWS,
@@ -41,57 +41,28 @@ import {
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
 assertValidSessionId(sessionId);
 logger?.(`Daemon sessionId: ${sessionId}`);
-if (isDaemonRunning(sessionId)) {
-  logger?.('Another daemon process is running.');
-  process.exit(1);
-}
 const pidFilePath = getPidFilePath(sessionId);
 const pidDir = path.dirname(pidFilePath);
-const currentUserUid = os.userInfo().uid;
 
 try {
   fs.mkdirSync(pidDir, {recursive: true, mode: 0o700});
-  if (os.platform() !== 'win32') {
-    // POSIX specific checks
-    try {
-      const stats = fs.lstatSync(pidDir);
-
-      // 1. Reject symlinked runtime directories before checking ownership.
-      if (stats.isSymbolicLink()) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} must not be a symbolic link. Possible tampering.`,
-        );
-        process.exit(1);
-      }
-
-      // 2. Check Ownership: Ensure the directory is owned by the current user.
-      if (stats.uid !== currentUserUid) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
-        );
-        process.exit(1);
-      }
-
-      // 3. Check Permissions: Ensure the directory is not group or world-writable.
-      // Mode is a number, e.g., 0o700. We check if bits for group/world write are set.
-      const mode = stats.mode;
-      if (mode & constants.S_IWGRP || mode & constants.S_IWOTH) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} has insecure permissions (Mode: ${mode.toString(8)}). It should not be writable by group or others.`,
-        );
-        process.exit(1);
-      }
-    } catch (statErr) {
-      console.error(
-        `[MCP Daemon] Critical error stating PID directory ${pidDir}:`,
-        statErr,
-      );
-      process.exit(1);
-    }
-  }
+  assertSecureRuntimeDir(pidDir);
 } catch (err) {
   console.error(
     `[MCP Daemon] Critical error creating/validating PID directory: ${pidDir}`,
+    err,
+  );
+  process.exit(1);
+}
+
+try {
+  if (isDaemonRunning(sessionId)) {
+    logger?.('Another daemon process is running.');
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(
+    `[MCP Daemon] Critical error validating PID file: ${pidFilePath}`,
     err,
   );
   process.exit(1);

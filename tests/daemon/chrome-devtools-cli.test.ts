@@ -412,4 +412,252 @@ describe('chrome-devtools CLI', () => {
       sinon.assert.calledOnceWithExactly(mocks.consoleError, error);
     });
   });
+
+  describe('sessionId', () => {
+    const FLAG_SESSION_ID = '11111111-2222-3333-4444-555555555555';
+    const ENV_SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const LEGACY_SESSION_ID = 'deadbeef-cafe-babe-0123-456789abcdef';
+
+    it('lists --sessionId and $CHROME_DEVTOOLS_SESSION_ID in --help', async () => {
+      const mocks = createCliMocks();
+
+      const exitCode = await runCli(['--help'], mocks.options);
+
+      assert.strictEqual(exitCode, 0);
+      sinon.assert.notCalled(mocks.isDaemonRunning);
+      sinon.assert.notCalled(mocks.startDaemon);
+      sinon.assert.calledOnceWithMatch(
+        mocks.consoleLog,
+        sinon
+          .match('--sessionId')
+          .and(sinon.match('[default: $CHROME_DEVTOOLS_SESSION_ID]')),
+      );
+    });
+
+    const invalidCases: Array<{
+      name: string;
+      args: string[];
+      env: NodeJS.ProcessEnv;
+    }> = [
+      {
+        name: '--sessionId',
+        args: ['status', '--sessionId', 'not_a_session_id'],
+        env: {},
+      },
+      {
+        name: 'CHROME_DEVTOOLS_SESSION_ID',
+        args: ['status'],
+        env: {CHROME_DEVTOOLS_SESSION_ID: 'not_a_session_id'},
+      },
+      {
+        name: 'CD4A_INTERNAL_DAEMON_SESSION_ID',
+        args: ['status'],
+        env: {CD4A_INTERNAL_DAEMON_SESSION_ID: 'not_a_session_id'},
+      },
+    ];
+
+    for (const invalidCase of invalidCases) {
+      it(`rejects an invalid ${invalidCase.name} without invoking daemon commands`, async () => {
+        const mocks = createCliMocks();
+
+        const exitCode = await runCli(invalidCase.args, {
+          ...mocks.options,
+          env: invalidCase.env,
+        });
+
+        assert.strictEqual(exitCode, 1);
+        sinon.assert.notCalled(mocks.isDaemonRunning);
+        sinon.assert.notCalled(mocks.startDaemon);
+        sinon.assert.notCalled(mocks.stopDaemon);
+        sinon.assert.notCalled(mocks.sendCommand);
+        sinon.assert.calledOnceWithExactly(
+          mocks.consoleError,
+          'Error:',
+          'Invalid sessionId: not_a_session_id',
+        );
+      });
+    }
+
+    const precedenceCases: Array<{
+      name: string;
+      extraArgs: string[];
+      env: NodeJS.ProcessEnv;
+      expectedSessionId: string;
+    }> = [
+      {
+        name: 'defaults to empty session ID when neither flag nor env is set',
+        extraArgs: [],
+        env: {},
+        expectedSessionId: '',
+      },
+      {
+        name: 'uses CD4A_INTERNAL_DAEMON_SESSION_ID when set alone',
+        extraArgs: [],
+        env: {CD4A_INTERNAL_DAEMON_SESSION_ID: LEGACY_SESSION_ID},
+        expectedSessionId: LEGACY_SESSION_ID,
+      },
+      {
+        name: 'falls back to CD4A_INTERNAL_DAEMON_SESSION_ID when CHROME_DEVTOOLS_SESSION_ID is empty',
+        extraArgs: [],
+        env: {
+          CHROME_DEVTOOLS_SESSION_ID: '',
+          CD4A_INTERNAL_DAEMON_SESSION_ID: LEGACY_SESSION_ID,
+        },
+        expectedSessionId: LEGACY_SESSION_ID,
+      },
+      {
+        name: 'prefers CHROME_DEVTOOLS_SESSION_ID over CD4A_INTERNAL_DAEMON_SESSION_ID',
+        extraArgs: [],
+        env: {
+          CHROME_DEVTOOLS_SESSION_ID: ENV_SESSION_ID,
+          CD4A_INTERNAL_DAEMON_SESSION_ID: LEGACY_SESSION_ID,
+        },
+        expectedSessionId: ENV_SESSION_ID,
+      },
+      {
+        name: 'prefers --sessionId over CHROME_DEVTOOLS_SESSION_ID and CD4A_INTERNAL_DAEMON_SESSION_ID',
+        extraArgs: ['--sessionId', FLAG_SESSION_ID],
+        env: {
+          CHROME_DEVTOOLS_SESSION_ID: ENV_SESSION_ID,
+          CD4A_INTERNAL_DAEMON_SESSION_ID: LEGACY_SESSION_ID,
+        },
+        expectedSessionId: FLAG_SESSION_ID,
+      },
+    ];
+
+    for (const testCase of precedenceCases) {
+      describe(testCase.name, () => {
+        it('scopes start to the resolved session ID', async () => {
+          const mocks = createCliMocks();
+          mocks.isDaemonRunning.returns(true);
+
+          const exitCode = await runCli(['start', ...testCase.extraArgs], {
+            ...mocks.options,
+            env: testCase.env,
+          });
+
+          assert.strictEqual(exitCode, 0);
+          sinon.assert.calledOnceWithExactly(
+            mocks.isDaemonRunning,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.stopDaemon,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.startDaemon,
+            ['--viaCli'],
+            testCase.expectedSessionId,
+          );
+        });
+
+        it('scopes status to the resolved session ID', async () => {
+          const mocks = createCliMocks();
+          mocks.isDaemonRunning.returns(true);
+          const statusResult: DaemonStatusResult = {
+            pid: 4242,
+            socketPath: '/tmp/server.sock',
+            startDate: '2026-01-01T00:00:00.000Z',
+            version: VERSION,
+            args: ['--viaCli'],
+          };
+          mocks.sendCommand.resolves({
+            success: true,
+            result: JSON.stringify(statusResult),
+            error: null,
+          });
+
+          const exitCode = await runCli(['status', ...testCase.extraArgs], {
+            ...mocks.options,
+            env: testCase.env,
+          });
+
+          assert.strictEqual(exitCode, 0);
+          sinon.assert.calledOnceWithExactly(
+            mocks.isDaemonRunning,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.sendCommand,
+            {method: 'status'},
+            testCase.expectedSessionId,
+          );
+        });
+
+        it('scopes stop to the resolved session ID', async () => {
+          const mocks = createCliMocks();
+          mocks.isDaemonRunning.returns(true);
+
+          const exitCode = await runCli(['stop', ...testCase.extraArgs], {
+            ...mocks.options,
+            env: testCase.env,
+          });
+
+          assert.strictEqual(exitCode, 0);
+          sinon.assert.calledOnceWithExactly(
+            mocks.isDaemonRunning,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.stopDaemon,
+            testCase.expectedSessionId,
+          );
+        });
+
+        it('scopes tool auto-start and invocation to the resolved session ID', async () => {
+          const mocks = createCliMocks();
+
+          const exitCode = await runCli(['list_pages', ...testCase.extraArgs], {
+            ...mocks.options,
+            env: testCase.env,
+          });
+
+          assert.strictEqual(exitCode, 0);
+          sinon.assert.calledOnceWithExactly(
+            mocks.isDaemonRunning,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.startDaemon,
+            ['--viaCli'],
+            testCase.expectedSessionId,
+          );
+          sinon.assert.notCalled(mocks.verifyDaemonVersion);
+          sinon.assert.calledOnceWithExactly(
+            mocks.sendCommand,
+            {method: 'invoke_tool', tool: 'list_pages', args: {}},
+            testCase.expectedSessionId,
+          );
+        });
+
+        it('scopes tool invocation on a running daemon to the resolved session ID', async () => {
+          const mocks = createCliMocks();
+          mocks.isDaemonRunning.returns(true);
+
+          const exitCode = await runCli(['list_pages', ...testCase.extraArgs], {
+            ...mocks.options,
+            env: testCase.env,
+          });
+
+          assert.strictEqual(exitCode, 0);
+          sinon.assert.calledOnceWithExactly(
+            mocks.isDaemonRunning,
+            testCase.expectedSessionId,
+          );
+          sinon.assert.notCalled(mocks.startDaemon);
+          sinon.assert.calledOnceWithExactly(
+            mocks.verifyDaemonVersion,
+            testCase.expectedSessionId,
+            VERSION,
+          );
+          sinon.assert.calledOnceWithExactly(
+            mocks.sendCommand,
+            {method: 'invoke_tool', tool: 'list_pages', args: {}},
+            testCase.expectedSessionId,
+          );
+        });
+      });
+    }
+  });
 });

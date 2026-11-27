@@ -78,6 +78,34 @@ function isJsonLike(remoteObject: Protocol.Runtime.RemoteObject): boolean {
   );
 }
 
+// An object other than an error or null has an identity, so like DevTools,
+// a message that logs one is never grouped.
+function areArgsEqual(
+  a: Protocol.Runtime.RemoteObject[],
+  b: Protocol.Runtime.RemoteObject[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((arg, i) => {
+      if (
+        arg.type === 'object' &&
+        arg.subtype !== 'error' &&
+        arg.subtype !== 'null'
+      ) {
+        return false;
+      }
+      const other = b[i];
+      return (
+        arg.type === other.type &&
+        arg.subtype === other.subtype &&
+        arg.value === other.value &&
+        arg.unserializableValue === other.unserializableValue &&
+        arg.description === other.description
+      );
+    })
+  );
+}
+
 export class ConsoleFormatter {
   readonly #id: number;
   readonly #type: string;
@@ -85,6 +113,7 @@ export class ConsoleFormatter {
 
   readonly #argCount: number;
   readonly #resolvedArgs: unknown[];
+  readonly #args: Protocol.Runtime.RemoteObject[];
 
   readonly #stack?: FormattableStackTrace;
   readonly #cause?: SymbolizedError;
@@ -99,6 +128,7 @@ export class ConsoleFormatter {
     isIgnored: IgnoreCheck;
     argCount?: number;
     resolvedArgs?: unknown[];
+    args?: Protocol.Runtime.RemoteObject[];
     stack?: FormattableStackTrace;
     cause?: SymbolizedError;
     includeStackInConcise?: boolean;
@@ -108,6 +138,7 @@ export class ConsoleFormatter {
     this.#text = params.text;
     this.#argCount = params.argCount ?? 0;
     this.#resolvedArgs = params.resolvedArgs ?? [];
+    this.#args = params.args ?? [];
     this.#stack = params.stack;
     this.#cause = params.cause;
     this.#includeStackInConcise = params.includeStackInConcise ?? false;
@@ -228,6 +259,7 @@ export class ConsoleFormatter {
       text: msg.text(),
       argCount: resolvedArgs.length || msg.args().length,
       resolvedArgs,
+      args: msg.args().map(arg => arg.remoteObject()),
       stack,
       includeStackInConcise: options.fetchStackTrace,
       isIgnored,
@@ -282,7 +314,7 @@ export class ConsoleFormatter {
   }
 
   /**
-   * Groups consecutive messages with the same type, text, and argument count.
+   * Groups consecutive messages with the same type, text, and arguments.
    * Similar to Chrome DevTools' console grouping behavior.
    */
   static groupConsecutive(
@@ -300,7 +332,8 @@ export class ConsoleFormatter {
         msg instanceof ConsoleFormatter &&
         prev.message.#type === msg.#type &&
         prev.message.#getText() === msg.#getText() &&
-        prev.message.#argCount === msg.#argCount
+        prev.message.#argCount === msg.#argCount &&
+        areArgsEqual(prev.message.#args, msg.#args)
       ) {
         prev.count++;
       } else {
