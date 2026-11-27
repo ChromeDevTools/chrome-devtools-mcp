@@ -31,6 +31,7 @@ export interface McpArguments
     PuppeteerArguments,
     ToolArguments {
   logFile?: string;
+  downloadsDir?: string;
   pageIdRouting: boolean;
   devtoolsComments: boolean;
   experimentalDevtools: boolean;
@@ -84,6 +85,20 @@ export const mcpOptions: McpOptions = {
     type: 'string',
     describe:
       'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+  },
+  downloadsDir: {
+    type: 'string',
+    describe: `Directory where Chrome saves downloaded files without a save prompt. Created when the browser starts if missing. Refused if the path exists and is not a directory. Applied with Puppeteer downloadBehavior to the default browser context on launch or connect, and to isolated contexts this server creates. Omit to keep Chrome's default prompt and location.`,
+    coerce: (dir: string | undefined): string | undefined => {
+      if (dir === undefined) {
+        return;
+      }
+      const trimmed = dir.trim();
+      if (trimmed === '') {
+        throw new Error('Invalid downloadsDir. Expected a directory path.');
+      }
+      return path.resolve(trimmed);
+    },
   },
   pageIdRouting: {
     type: 'boolean',
@@ -399,6 +414,10 @@ export const CLI_EXAMPLES: Array<[string, string]> = [
   ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
   ['$0 --channel stable', 'Use stable Chrome installed on this system'],
   ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
+  [
+    '$0 --downloadsDir /tmp/downloads',
+    'Save downloads to /tmp/downloads without prompting',
+  ],
   ['$0 --help', 'Print CLI options'],
   [
     '$0 --viewport 1280x720',

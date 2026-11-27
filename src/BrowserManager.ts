@@ -14,6 +14,7 @@ import type {
   Browser,
   ChromeReleaseChannel,
   ConnectOptions,
+  DownloadBehavior,
   LaunchOptions,
   PuppeteerNode,
 } from './third_party/browser.js';
@@ -24,6 +25,10 @@ import {
   puppeteerLogger,
   redactConnectOptionsForLogging,
 } from './utils/logger.js';
+import {
+  downloadBehaviorFor,
+  prepareDownloadsDir,
+} from './utils/downloadsDir.js';
 import {isAllowedUrl} from './utils/url.js';
 
 export interface BrowserManagerOptions {
@@ -235,17 +240,24 @@ export class BrowserManager {
   }
 
   async #initBrowser(): Promise<Browser> {
+    const {downloadsDir} = this.#config.resolved;
+    if (downloadsDir) {
+      prepareDownloadsDir(downloadsDir);
+    }
+    const downloadBehavior = downloadBehaviorFor(downloadsDir);
     if (
       this.#config.resolved.browserUrl ||
       this.#config.resolved.wsEndpoint ||
       this.#config.resolved.autoConnect
     ) {
-      return await this.#connect();
+      return await this.#connect(downloadBehavior);
     }
-    return await this.#launch();
+    return await this.#launch(downloadBehavior);
   }
 
-  async #launch(): Promise<Browser> {
+  async #launch(
+    downloadBehavior: DownloadBehavior | undefined,
+  ): Promise<Browser> {
     const {
       channel,
       executablePath,
@@ -323,6 +335,7 @@ export class BrowserManager {
         acceptInsecureCerts,
         handleDevToolsAsPage: true,
         enableExtensions,
+        downloadBehavior,
         blocklist,
         allowlist,
         logger: puppeteerLogger,
@@ -384,7 +397,9 @@ export class BrowserManager {
     }
   }
 
-  async #connect(): Promise<Browser> {
+  async #connect(
+    downloadBehavior: DownloadBehavior | undefined,
+  ): Promise<Browser> {
     const {
       browserUrl: browserURL,
       wsEndpoint,
@@ -402,6 +417,7 @@ export class BrowserManager {
       targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
       defaultViewport: null,
       handleDevToolsAsPage: true,
+      downloadBehavior,
       blocklist,
       allowlist,
       logger: puppeteerLogger,

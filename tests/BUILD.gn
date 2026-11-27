@@ -115,6 +115,7 @@ ts_library("tests") {
     "utils/WaitForHelper.test.ts",
     "utils/bytes.test.ts",
     "utils/check-for-updates.test.ts",
+    "utils/downloadsDir.test.ts",
     "utils/duration.test.ts",
     "utils/errorHandling.test.ts",
     "utils/files.test.ts",

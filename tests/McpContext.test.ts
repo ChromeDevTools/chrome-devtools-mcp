@@ -39,6 +39,7 @@ import {stableIdSymbol} from '../src/utils/id.js';
 
 import type {ServerConfig} from '../src/config/ServerConfig.js';
 import {
+  createMockBrowserContext,
   createMockHTTPRequest,
   createMockMcpWorker,
   createMockPuppeteerBrowser,
@@ -291,6 +292,42 @@ describe('McpContext', () => {
         request,
       );
       context.dispose();
+    });
+  });
+
+  describe('downloadsDir', () => {
+    async function openIsolatedPage(downloadsDir?: string) {
+      const browser = createMockPuppeteerBrowser();
+      const context = await createMockContext({
+        browser,
+        targets: [],
+        config: createMockServerConfig({downloadsDir}),
+      });
+      const {page, target} = createPageTarget();
+      const isolated = createMockBrowserContext();
+      isolated.newPage.resolves(page);
+      page.target.returns(target);
+      target.browserContext.returns(isolated);
+      browser.createBrowserContext.resolves(isolated);
+      await context.newPage(false, 'session-a');
+      context.dispose();
+      return browser;
+    }
+
+    it('passes downloadBehavior to a new isolated context', async () => {
+      const downloadsDir = path.resolve('downloads-isolated');
+      const browser = await openIsolatedPage(downloadsDir);
+      sinon.assert.calledOnceWithExactly(browser.createBrowserContext, {
+        downloadBehavior: {policy: 'allow', downloadPath: downloadsDir},
+      });
+      sinon.assert.notCalled(browser.newPage);
+    });
+
+    it('passes an undefined downloadBehavior to a new isolated context when the flag is unset', async () => {
+      const browser = await openIsolatedPage();
+      sinon.assert.calledOnceWithMatch(browser.createBrowserContext, {
+        downloadBehavior: undefined,
+      });
     });
   });
   it('list pages', async () => {
