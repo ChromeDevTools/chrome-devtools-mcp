@@ -678,6 +678,7 @@ export async function spawnReadyProcess(extraArgs: string[] = []): Promise<{
     [
       '-e',
       "process.stdout.write('1'); setInterval(() => {}, 1000)",
+      '--',
       ...extraArgs,
     ],
     {
