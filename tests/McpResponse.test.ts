@@ -169,6 +169,46 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reports a same-document navigation by the attached action', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    response.attachWaitForResult({
+      navigatedToUrl: 'https://example.com/#top',
+      sameDocument: true,
+    });
+
+    const result = await response.handle(createMockMcpContext());
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        'Page navigated to https://example.com/#top within the same document.',
+      ),
+    );
+    assert.deepStrictEqual(result.structuredContent, {
+      navigatedToUrl: 'https://example.com/#top',
+      sameDocument: true,
+    });
+  });
+
+  it('reports a page load by the attached action', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    response.attachWaitForResult({
+      navigatedToUrl: 'https://example.com/next',
+      sameDocument: false,
+    });
+
+    const result = await response.handle(createMockMcpContext());
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        'Page navigated to https://example.com/next.',
+      ),
+    );
+    assert.deepStrictEqual(result.structuredContent, {
+      navigatedToUrl: 'https://example.com/next',
+      sameDocument: false,
+    });
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);

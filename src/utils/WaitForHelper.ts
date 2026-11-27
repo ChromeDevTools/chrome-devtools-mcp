@@ -320,7 +320,10 @@ export class WaitForHelper {
     const urlAfterAction = this.#page.url();
     return {
       ...(urlAfterAction !== this.#initialUrl || this.#loadedNewDocument
-        ? {navigatedToUrl: urlAfterAction}
+        ? {
+            navigatedToUrl: urlAfterAction,
+            sameDocument: !this.#loadedNewDocument,
+          }
         : {}),
       dialogHandled: this.#dialogHandled,
       ...(this.#openedPages.size ? {openedPages: this.#openedPages} : {}),
@@ -334,6 +337,11 @@ export interface WaitForEventsResult {
    * occurred.
    */
   navigatedToUrl?: string;
+  /**
+   * Whether that navigation stayed within the same document (History API or
+   * fragment), so the page did not load a new document.
+   */
+  sameDocument?: boolean;
   /**
    * Whether a dialog was automatically handled during the action.
    */
