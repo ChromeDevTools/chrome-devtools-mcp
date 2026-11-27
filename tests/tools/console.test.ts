@@ -596,6 +596,25 @@ logFromOld();
           }
         });
       });
+
+      it('formats console template messages with %c, %s, and %d', async () => {
+        await withMcpContext(async (response, context, args) => {
+          const page = context.getSelectedMcpPage();
+          await page.pptrPage.setContent(
+            `<script>console.log('%cHello %s %d', 'color: red', 'world', 42.9);</script>`,
+          );
+          await listConsoleMessages(args).handler(
+            {params: {}, page},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle(context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('msgid=1 [log] Hello world 42'));
+          assert.ok(!textContent.includes('%c'));
+          assert.ok(!textContent.includes('color: red'));
+        });
+      });
     });
   });
 

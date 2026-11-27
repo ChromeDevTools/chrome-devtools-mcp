@@ -19,6 +19,10 @@ import * as DevTools from '../third_party/browser.js';
 import type {ConsoleMessage, Protocol} from '../third_party/browser.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
+import {
+  formatConsoleTemplate,
+  hasConsoleFormatSpecifier,
+} from './ConsoleFormat.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';
 
 export interface ConsoleFormatterOptions {
@@ -253,11 +257,29 @@ export class ConsoleFormatter {
       }
     }
 
+    const msgArgs = msg.args();
+    const firstArg = msgArgs[0];
+    const firstRemote =
+      firstArg && typeof firstArg.remoteObject === 'function'
+        ? firstArg.remoteObject()
+        : undefined;
+    let text = msg.text();
+    if (
+      firstRemote?.type === 'string' &&
+      typeof firstRemote.value === 'string' &&
+      hasConsoleFormatSpecifier(firstRemote.value)
+    ) {
+      text = formatConsoleTemplate(
+        firstRemote.value,
+        msgArgs.slice(1).map(arg => arg.remoteObject()),
+      ).text;
+    }
+
     return new ConsoleFormatter({
       id: options.id,
       type: msg.type(),
-      text: msg.text(),
-      argCount: resolvedArgs.length || msg.args().length,
+      text,
+      argCount: resolvedArgs.length || msgArgs.length,
       resolvedArgs,
       args: msg.args().map(arg => arg.remoteObject()),
       stack,

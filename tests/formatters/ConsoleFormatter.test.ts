@@ -1094,4 +1094,34 @@ describe('ConsoleFormatter arguments', () => {
       '<error: Argument 0 is no longer available>',
     ]);
   });
+
+  it('formats console template strings using ConsoleFormat', async () => {
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => '%cHello %s %d color: red world 42.9',
+      args: () => [
+        {
+          jsonValue: async () => '%cHello %s %d',
+          remoteObject: () => ({type: 'string', value: '%cHello %s %d'}),
+        },
+        {
+          jsonValue: async () => 'color: red',
+          remoteObject: () => ({type: 'string', value: 'color: red'}),
+        },
+        {
+          jsonValue: async () => 'world',
+          remoteObject: () => ({type: 'string', value: 'world'}),
+        },
+        {
+          jsonValue: async () => 42.9,
+          remoteObject: () => ({type: 'number', value: 42.9}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {id: 1});
+    assert.strictEqual(
+      formatter.toString(),
+      'msgid=1 [log] Hello world 42 (4 args)',
+    );
+  });
 });
