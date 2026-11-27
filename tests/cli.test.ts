@@ -1621,7 +1621,9 @@ describe('cli command parsing', () => {
 
 describe('cli literal args', () => {
   const getSpec = (name: string) =>
-    name in commands ? getCommandArgSpec(commands[name].args) : undefined;
+    Object.hasOwn(commands, name)
+      ? getCommandArgSpec(commands[name].args)
+      : undefined;
 
   function shield(argv: string[]) {
     const {argv: shielded, restore} = shieldLiteralArgs(argv, getSpec);
@@ -1784,9 +1786,76 @@ describe('cli literal args', () => {
     assert.deepStrictEqual(shield(input).shielded, input);
   });
 
+  it('does not treat a tool-named option value after a non-tool command as a tool command', () => {
+    const input = [
+      '--sessionId',
+      'abc',
+      'start',
+      '--workspace',
+      'click',
+      '--no-javascript-evaluation',
+    ];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield a lone hyphen for non-tool commands', () => {
+    const input = ['start', '--userDataDir', '-'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield tokens after -- for non-tool or missing commands', () => {
+    for (const input of [
+      ['start', '--', '--workspace', 'foo'],
+      ['--', 'start'],
+      ['--', 'click', '--no-javascript-evaluation'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
+  });
+
+  it('stops scanning when a leading lone hyphen precedes a tool name', () => {
+    const input = ['-', 'click', '--no-javascript-evaluation'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield when non-global or malformed flags precede a tool name', () => {
+    for (const input of [
+      ['--workspace', 'click', '--no-javascript-evaluation', 'start'],
+      ['--unknown', 'click', '--bar'],
+      ['--sessionId', '-abc', 'click', '1', '--weird'],
+      ['--sessionId', '-', 'click', '1', '--weird'],
+      ['--sessionId', '--', 'click', '1', '--weird'],
+      ['-sessionId', 'abc', 'click', '1', '--weird'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
+  });
+
+  it('handles negated global options and negative-number global values before a tool command', () => {
+    for (const input of [
+      ['--no-sessionId', 'click', '1', '--weird'],
+      ['--no-help', 'click', '1', '--weird'],
+      ['--sessionId', '-5', 'click', '1', '--weird'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+    // `--no-help` does not consume `true`, so `true` is the command token (not a tool).
+    const negatedBoolWithValue = ['--no-help', 'true', 'click', '1', '--weird'];
+    assert.deepStrictEqual(
+      shield(negatedBoolWithValue).shielded,
+      negatedBoolWithValue,
+    );
+  });
+
   it('restores values nested in arrays and leaves other values alone', () => {
     const {argv, restore} = shieldLiteralArgs(
-      ['cmd', '--', '-a', '-b'],
+      ['fill', '--', '-a', '-b'],
       getSpec,
     );
     assert.deepStrictEqual(restore([argv[1], argv[2], 'x']), ['-a', '-b', 'x']);

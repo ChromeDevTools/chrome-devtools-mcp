@@ -106,7 +106,9 @@ export async function runCli(
   const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
     rawArgs,
     commandName => {
-      const commandDef = commands[commandName];
+      const commandDef = Object.hasOwn(commands, commandName)
+        ? commands[commandName]
+        : undefined;
       return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
     },
   );
