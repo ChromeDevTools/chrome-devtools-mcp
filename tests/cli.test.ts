@@ -1030,6 +1030,85 @@ describe('cli args parsing', () => {
     assert.match(help, /--browserUrl http:\/\/127\.0\.0\.1:9222/);
   });
 
+  describe('help script name', () => {
+    async function getHelp(
+      argv: string[],
+      env: NodeJS.ProcessEnv = {},
+    ): Promise<string> {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const parser = new ConfigParser('0.0.0', argv, env, false, locator);
+      return await parser.buildCliParser().getHelp();
+    }
+
+    for (const {label, argv} of [
+      {
+        label: 'direct binary invocation',
+        argv: ['node', '/usr/local/bin/chrome-devtools-mcp'],
+      },
+      {
+        label: 'custom Node runtime and .js entrypoint',
+        argv: ['/opt/runtime/custom_node', '/opt/pkg/chrome-devtools-mcp.js'],
+      },
+      {
+        label: 'short argv without script path',
+        argv: ['node'],
+      },
+    ]) {
+      it(`uses chrome-devtools-mcp for ${label}`, async () => {
+        const help = await getHelp(argv);
+        assert.match(help, /^\s+chrome-devtools-mcp --slim\s/m);
+        assert.doesNotMatch(help, /npx chrome-devtools-mcp@latest/);
+      });
+    }
+
+    for (const event of ['npx', 'start']) {
+      it(`uses chrome-devtools-mcp for local bin (${event})`, async () => {
+        const help = await getHelp(
+          ['node', '/project/node_modules/.bin/chrome-devtools-mcp'],
+          {npm_lifecycle_event: event},
+        );
+        assert.match(help, /^\s+chrome-devtools-mcp --slim\s/m);
+        assert.doesNotMatch(help, /npx chrome-devtools-mcp@latest/);
+      });
+    }
+
+    for (const {platform, argv} of [
+      {
+        platform: 'POSIX',
+        argv: [
+          '/usr/bin/node',
+          '/home/user/.npm/_npx/1234/node_modules/.bin/chrome-devtools-mcp',
+        ],
+      },
+      {
+        platform: 'Windows',
+        argv: [
+          'C:\\Program Files\\nodejs\\node.exe',
+          path.win32.join(
+            'C:\\Users\\user\\AppData\\Local\\npm-cache',
+            '_npx',
+            '1234',
+            'node_modules',
+            'chrome-devtools-mcp',
+            'out',
+            'Default',
+            'gen',
+            'src',
+            'bin',
+            'chrome-devtools-mcp.js',
+          ),
+        ],
+      },
+    ]) {
+      it(`uses npx script name for ${platform} _npx path`, async () => {
+        const help = await getHelp(argv);
+        assert.match(help, /^\s+npx chrome-devtools-mcp@latest --slim\s/m);
+        assert.doesNotMatch(help, /^\s+chrome-devtools-mcp --slim\s/m);
+      });
+    }
+  });
+
   it('clears default values and populates defaultDescription in getCliOptions', () => {
     const cliOptions = getCliOptions();
 
