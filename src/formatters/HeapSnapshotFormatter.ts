@@ -15,7 +15,10 @@ import {DevTools} from '../third_party/browser.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
 import {truncateText} from '../utils/text.js';
 
-import {HEAP_SNAPSHOT_MAX_NAME_LENGTH} from './constants.js';
+import {
+  DEFAULT_MAX_NODE_IDS,
+  HEAP_SNAPSHOT_MAX_NAME_LENGTH,
+} from './constants.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -26,6 +29,8 @@ export interface HeapSnapshotFormatOptions {
    * values.
    */
   maxNameLength?: number;
+  /** Maximum node IDs shown per duplicate string group. Defaults to `DEFAULT_MAX_NODE_IDS`. */
+  maxNodeIds?: number;
 }
 
 /**
@@ -200,18 +205,32 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  static formatDuplicateStrings(
+  static summarizeDuplicateStrings(
     groups: readonly DuplicateStringGroup[],
+    maxNodeIds: number = DEFAULT_MAX_NODE_IDS,
+  ): Array<DuplicateStringGroup & {omittedNodeIds: number}> {
+    return groups.map(group => ({
+      ...group,
+      nodes: group.nodes.slice(0, maxNodeIds),
+      omittedNodeIds: Math.max(0, group.nodes.length - maxNodeIds),
+    }));
+  }
+
+  static formatDuplicateStrings(
+    groups: ReadonlyArray<DuplicateStringGroup & {omittedNodeIds?: number}>,
     options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
     lines.push('value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds');
     for (const group of groups) {
       const nodeIds = group.nodes.map(n => `@${n.id}`).join(' ');
+      const omitted = group.omittedNodeIds
+        ? ` (+${group.omittedNodeIds} omitted)`
+        : '';
       const truncated = group.truncated ?? false;
       const displayValue = truncateValue(group.value, options.maxNameLength);
       lines.push(
-        `${JSON.stringify(displayValue)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
+        `${JSON.stringify(displayValue)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}${omitted}`,
       );
     }
     return lines.join('\n');

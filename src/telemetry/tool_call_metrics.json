@@ -1134,6 +1134,10 @@
       {
         "name": "max_name_length",
         "argType": "number"
+      },
+      {
+        "name": "max_node_ids",
+        "argType": "number"
       }
     ]
   },

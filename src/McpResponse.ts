@@ -1640,13 +1640,17 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 
-        const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
+        const groups = HeapSnapshotFormatter.summarizeDuplicateStrings(
           paginationData.items,
+          formatOptions.maxNodeIds,
+        );
+        const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
+          groups,
           formatOptions,
         );
         response.push(formatted);
 
-        structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
+        structuredContent.heapSnapshotDuplicateStrings = groups;
       }
       const objectInfo = this.#heapSnapshotOptions.objectInfo;
       if (objectInfo) {
