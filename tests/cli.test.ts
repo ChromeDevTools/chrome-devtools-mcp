@@ -23,6 +23,7 @@ import {
   buildCommand,
   getCommandArgSpec,
   registerCommandArgs,
+  resolveFileArg,
   shieldLiteralArgs,
 } from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
@@ -1792,6 +1793,49 @@ describe('cli literal args', () => {
     assert.deepStrictEqual(restore([argv[1], argv[2], 'x']), ['-a', '-b', 'x']);
     assert.strictEqual(restore(42), 42);
     assert.strictEqual(restore(undefined), undefined);
+  });
+});
+
+describe('cli file path args', () => {
+  const cwd = path.resolve(path.sep, 'client');
+
+  it('marks the args of verifyFilesSchema as file paths', () => {
+    assert.strictEqual(
+      commands['take_screenshot'].args.filePath.isFilePath,
+      true,
+    );
+    assert.strictEqual(commands['upload_file'].args.filePaths.isFilePath, true);
+    assert.strictEqual(commands['click'].args.uid.isFilePath, undefined);
+  });
+
+  it('resolves a relative path against the CLI working directory', () => {
+    assert.strictEqual(
+      resolveFileArg(path.join('shots', 'page.png'), cwd),
+      path.join(cwd, 'shots', 'page.png'),
+    );
+  });
+
+  it('resolves each relative path of an array', () => {
+    assert.deepStrictEqual(
+      resolveFileArg(['one.txt', path.join('dir', 'two.txt')], cwd),
+      [path.join(cwd, 'one.txt'), path.join(cwd, 'dir', 'two.txt')],
+    );
+  });
+
+  it('keeps absolute paths and URLs unchanged', () => {
+    const absolutePath = path.resolve(path.sep, 'tmp', 'result.json');
+    for (const value of [
+      absolutePath,
+      'file:///tmp/result.json',
+      'https://example.com/app.swbn',
+    ]) {
+      assert.strictEqual(resolveFileArg(value, cwd), value);
+    }
+  });
+
+  it('keeps empty and whitespace-only values unchanged', () => {
+    assert.strictEqual(resolveFileArg('', cwd), '');
+    assert.strictEqual(resolveFileArg('  ', cwd), '  ');
   });
 });
 
