@@ -10,6 +10,10 @@ import {describe, it, after, before} from 'node:test';
 import sinon from 'sinon';
 
 import {
+  isEdgeLike,
+  isNodeLike,
+} from '../../src/formatters/HeapSnapshotFormatter.js';
+import {
   HeapSnapshot,
   HeapSnapshotManager,
 } from '../../src/processors/HeapSnapshotManager.js';
@@ -243,6 +247,94 @@ describe('HeapSnapshotManager', () => {
 
     after(() => {
       manager.dispose();
+    });
+
+    it('applies the requested sortBy when querying objects', async () => {
+      const byId = await manager.queryObjects(filePath, {sortBy: 'id'});
+      const ids = byId.items.filter(isNodeLike).map(node => node.id);
+      assert.ok(ids.length > 2);
+      for (let i = 1; i < ids.length; i++) {
+        assert.ok(
+          ids[i - 1] < ids[i],
+          `${ids[i - 1]} should precede ${ids[i]}`,
+        );
+      }
+
+      const bySelfSize = await manager.queryObjects(filePath, {
+        sortBy: 'selfSize',
+      });
+      const selfSizes = bySelfSize.items
+        .filter(isNodeLike)
+        .map(node => node.selfSize);
+      for (let i = 1; i < selfSizes.length; i++) {
+        assert.ok(
+          selfSizes[i - 1] >= selfSizes[i],
+          `${selfSizes[i - 1]} should precede ${selfSizes[i]}`,
+        );
+      }
+      const byRetainedSize = await manager.queryObjects(filePath, {
+        sortBy: 'retainedSize',
+      });
+      assert.notDeepStrictEqual(bySelfSize.items, byRetainedSize.items);
+    });
+
+    it('uses retainedSize descending when sortBy is omitted', async () => {
+      const byDefault = await manager.queryObjects(filePath, {});
+      const byRetainedSize = await manager.queryObjects(filePath, {
+        sortBy: 'retainedSize',
+      });
+      assert.deepStrictEqual(byDefault, byRetainedSize);
+      const retainedSizes = byDefault.items
+        .filter(isNodeLike)
+        .map(node => node.retainedSize);
+      assert.ok(retainedSizes.length > 2);
+      for (let i = 1; i < retainedSizes.length; i++) {
+        assert.ok(retainedSizes[i - 1] >= retainedSizes[i]);
+      }
+    });
+
+    it('applies sortBy to edges', async () => {
+      const {aggregates} = await manager.getAggregates(filePath);
+      const arrayAggregate = aggregates.find(a => a.className === 'Array');
+      assert.ok(arrayAggregate);
+      const nodes = await manager.getNodesById(filePath, arrayAggregate.id);
+      const node = nodes.items[0];
+      assert.ok(isNodeLike(node));
+      const byRetainedSize = await manager.getEdges(filePath, node.id, {
+        sortBy: 'retainedSize',
+        excludePrimitives: true,
+      });
+      const bySelfSize = await manager.getEdges(filePath, node.id, {
+        sortBy: 'selfSize',
+        excludePrimitives: true,
+      });
+      assert.ok(bySelfSize.items.length > 1);
+      assert.notDeepStrictEqual(bySelfSize.items, byRetainedSize.items);
+      const selfSizes = bySelfSize.items
+        .filter(isEdgeLike)
+        .map(edge => edge.node.selfSize);
+      for (let i = 1; i < selfSizes.length; i++) {
+        assert.ok(
+          selfSizes[i - 1] >= selfSizes[i],
+          `${selfSizes[i - 1]} should precede ${selfSizes[i]}`,
+        );
+      }
+    });
+
+    it('sorts getNodesById results by descending retainedSize', async () => {
+      const {aggregates} = await manager.getAggregates(filePath);
+      const arrayAggregate = aggregates.find(a => a.className === 'Array');
+      assert.ok(arrayAggregate);
+
+      const range = await manager.getNodesById(filePath, arrayAggregate.id);
+      const nodes = range.items.filter(isNodeLike);
+      assert.ok(nodes.length > 1);
+      for (let i = 1; i < nodes.length; i++) {
+        assert.ok(
+          nodes[i - 1].retainedSize >= nodes[i].retainedSize,
+          `${nodes[i - 1].retainedSize} should precede ${nodes[i].retainedSize}`,
+        );
+      }
     });
 
     it('throws when getNodesById is called with a non-existent class ID', async () => {

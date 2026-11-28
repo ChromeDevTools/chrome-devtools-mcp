@@ -1510,9 +1510,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         const firstItem = nodes.items[0];
         if (firstItem) {
           if (isNodeLike(firstItem)) {
-            items = items
-              .filter(isNodeLike)
-              .sort((a, b) => b.retainedSize - a.retainedSize);
+            items = items.filter(isNodeLike);
           } else if (isEdgeLike(firstItem)) {
             items = items.filter(isEdgeLike);
           }

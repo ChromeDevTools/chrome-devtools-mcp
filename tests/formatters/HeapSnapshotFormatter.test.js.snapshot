@@ -415,23 +415,23 @@ Unattributed Size: 44.8 kB
 exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with class nodes > formats class nodes with default options 1`] = `
 nodeId,nodeName,type,distance,selfSize,retainedSize
 25307,Array,object,2,0.2 kB,2.1 kB
+46355,Array,object,2,0.2 kB,2.1 kB
 33187,Array,object,2,0.2 kB,1.7 kB
 36255,Array,object,2,0.2 kB,1.7 kB
-45899,Array,object,5,0.1 kB,0.1 kB
 45901,Array,object,5,0.1 kB,0.1 kB
-46149,Array,object,5,0.1 kB,0.1 kB
 46151,Array,object,5,0.1 kB,0.1 kB
-46355,Array,object,2,0.2 kB,2.1 kB
+45899,Array,object,5,0.1 kB,0.1 kB
+46149,Array,object,5,0.1 kB,0.1 kB
 `;
 
 exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with class nodes > formats class nodes with objectsRetainedByContexts filterName 1`] = `
 nodeId,nodeName,type,distance,selfSize,retainedSize
+45897,makeCallable,closure,5,0.0 kB,0.2 kB
+46147,makeCallable,closure,5,0.0 kB,0.2 kB
 45893,Apply,closure,5,0.0 kB,0.0 kB
 45895,Save,closure,5,0.0 kB,0.0 kB
-45897,makeCallable,closure,5,0.0 kB,0.2 kB
 46143,Apply,closure,5,0.0 kB,0.0 kB
 46145,Save,closure,5,0.0 kB,0.0 kB
-46147,makeCallable,closure,5,0.0 kB,0.2 kB
 `;
 
 exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with edges > formats outgoing edges for a valid nodeId 1`] = `
