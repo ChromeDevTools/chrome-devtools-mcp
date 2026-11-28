@@ -16,7 +16,8 @@ import tseslint from 'typescript-eslint';
 import localPlugin from './scripts/eslint_rules/local-plugin.js';
 
 const RESTRICTED_IMPORT_DEVTOOLS_MCP = {
-  regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
+  regex:
+    '(.*devtools-frontend/(?!mcp/mcp\\.js$).*|^(?:\\.\\./)+(?:front_end/.*|mcp/(?!mcp\\.js$).*))',
   message:
     'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
 };
@@ -24,6 +25,18 @@ const RESTRICTED_IMPORT_MCP_CLIENT = {
   group: ['@modelcontextprotocol/client', '@modelcontextprotocol/client/*'],
   message:
     'Do not import @modelcontextprotocol/client in src/; it is only for tests and scripts.',
+};
+const RESTRICTED_IMPORT_BROWSER_BUNDLE = {
+  regex: '(^|/)third_party/browser\\.js$',
+  allowTypeImports: true,
+  message:
+    'Do not import values from third_party/browser.js here; use loadBrowser() or a dynamic import() inside the handler.',
+};
+const RESTRICTED_IMPORT_MCP_CONTEXT = {
+  regex: '(^|/)McpContext\\.js$',
+  allowTypeImports: true,
+  message:
+    'Do not import values from ./McpContext.js in src/index.ts; load it dynamically in #ensureContext().',
 };
 
 export default defineConfig([
@@ -537,10 +550,47 @@ export default defineConfig([
     },
   },
   {
+    name: 'Modules that must not load the browser bundle',
+    files: [
+      'src/bin/**/*.ts',
+      'src/config/**/*.ts',
+      'src/daemon/**/*.ts',
+      'src/telemetry/**/*.ts',
+      'src/tools/**/*.ts',
+      'src/BrowserManager.ts',
+      'src/processors/HeapSnapshotManager.ts',
+      'src/ToolHandler.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [RESTRICTED_IMPORT_BROWSER_BUNDLE],
+        },
+      ],
+    },
+  },
+  {
+    name: 'Server entrypoint',
+    files: ['src/index.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            RESTRICTED_IMPORT_BROWSER_BUNDLE,
+            RESTRICTED_IMPORT_MCP_CONTEXT,
+          ],
+        },
+      ],
+    },
+  },
+  {
     name: 'Tools definitions',
     files: ['src/tools/**/*.ts'],
     rules: {
       '@local/enforce-zod-schema': 'error',
+      '@local/max-tool-name-length': 'error',
       '@local/require-parsed-arguments': 'error',
     },
   },

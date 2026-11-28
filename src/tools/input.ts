@@ -75,6 +75,29 @@ async function handleActionError(
   );
 }
 
+/**
+ * Runs raw mouse or keyboard input. Unlike locator actions, these CDP calls
+ * take no AbortSignal and do not return while a JavaScript dialog is open, so
+ * the action is raced against the signal that is aborted when a dialog opens.
+ * Returns `undefined` if the action opened a dialog.
+ */
+async function waitForEventsAfterRawInput(
+  page: ContextPage,
+  action: () => Promise<void>,
+): Promise<WaitForEventsResult | undefined> {
+  try {
+    return await page.waitForEventsAfterAction(signal =>
+      raceWithSignal(action(), signal),
+    );
+  } catch (error) {
+    if (!page.getDialog()) {
+      throw error;
+    }
+    logger?.('action interrupted by a dialog', error);
+    return undefined;
+  }
+}
+
 async function selectNativeSelectOption(
   handle: ElementHandle<Element>,
   signal: AbortSignal,
@@ -196,11 +219,19 @@ export const clickAt: PageToolFactory = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    const result = await page.waitForEventsAfterAction(async () => {
+    const result = await waitForEventsAfterRawInput(page, async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         count: request.params.dblClick ? 2 : 1,
       });
     });
+    if (!result) {
+      response.appendResponseLine(
+        request.params.dblClick
+          ? `The double click at the coordinates opened a dialog.`
+          : `The click at the coordinates opened a dialog.`,
+      );
+      return;
+    }
     response.appendResponseLine(
       request.params.dblClick
         ? `Successfully double clicked at the coordinates`
@@ -435,15 +466,18 @@ export const typeText: PageToolFactory = definePageTool(() => ({
   handler: async (request, response) => {
     const page = request.page;
     const submitKey = request.params.submitKey;
-    const result = await page.waitForEventsAfterAction(async () => {
+    const result = await waitForEventsAfterRawInput(page, async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (submitKey) {
         await page.pptrPage.keyboard.press(submitKey);
       }
     });
-    response.appendResponseLine(
-      `Typed text "${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`,
-    );
+    const typed = `"${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`;
+    if (!result) {
+      response.appendResponseLine(`Typing text ${typed} opened a dialog.`);
+      return;
+    }
+    response.appendResponseLine(`Typed text ${typed}`);
     response.attachWaitForResult(result);
   },
 }));
@@ -469,11 +503,17 @@ export const drag: PageToolFactory = definePageTool(() => ({
     );
     using toHandle = await request.page.getElementByUid(request.params.to_uid);
 
-    const result = await request.page.waitForEventsAfterAction(async () => {
+    const result = await waitForEventsAfterRawInput(request.page, async () => {
       await fromHandle.drag(toHandle);
       await new Promise(resolve => setTimeout(resolve, 50));
       await toHandle.drop(fromHandle);
     });
+    if (!result) {
+      response.appendResponseLine(
+        `The element was dragged and it opened a dialog.`,
+      );
+      return;
+    }
     response.appendResponseLine(`Successfully dragged an element`);
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
@@ -637,7 +677,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
     const page = request.page;
     const [key, ...modifiers] = request.params.key;
 
-    const result = await page.waitForEventsAfterAction(async () => {
+    const result = await waitForEventsAfterRawInput(page, async () => {
       const heldModifiers: KeyInput[] = [];
       try {
         for (const modifier of modifiers) {
@@ -655,9 +695,12 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
       }
     });
 
-    response.appendResponseLine(
-      `Successfully pressed key: ${[...modifiers, key].join('+')}`,
-    );
+    const keys = [...modifiers, key].join('+');
+    if (!result) {
+      response.appendResponseLine(`Pressing the key ${keys} opened a dialog.`);
+      return;
+    }
+    response.appendResponseLine(`Successfully pressed key: ${keys}`);
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();

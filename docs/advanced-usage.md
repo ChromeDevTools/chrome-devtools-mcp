@@ -186,6 +186,36 @@ If you hit VM-to-host port forwarding issues, see the “Remote debugging betwee
 
 For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
 
+## Testing Chrome Built-in AI
+
+By default, Built-in AI APIs such as `LanguageModel` and `Summarizer` report `'unavailable'` in Chrome launched by `chrome-devtools-mcp`:
+
+- Puppeteer launches Chrome with `--disable-features=OptimizationHints`.
+- Chrome for Testing and non-Stable channels default `chrome://settings/ai` ("On-device AI") to off on fresh profiles.
+- Chrome for Testing falls back to `kGpuBlocked` for on-device model performance classification.
+
+To opt in, pass these Chrome arguments with `--chrome-arg`:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--chrome-arg=--enable-features=OptimizationHints,OnDeviceAiDefaultEnabled",
+        "--chrome-arg=--optimization-guide-performance-class=5"
+      ]
+    }
+  }
+}
+```
+
+- `--enable-features=OptimizationHints,OnDeviceAiDefaultEnabled` enables on-device AI on fresh profiles. Features listed in `--enable-features` are removed from Puppeteer's default `--disable-features` list.
+- `--optimization-guide-performance-class=5` (`OnDeviceModelPerformanceClass::kHigh`) overrides the Chrome for Testing `kGpuBlocked` fallback. Only use it on hardware that can run on-device models.
+
+Enabling Built-in AI can trigger on-device model downloads of several GB on first use. `Translator` manages language packs through `component_updater` rather than `OptimizationGuide`, so it is not affected by these flags.
+
 ## Debugging Chrome on Android
 
 Please consult [these instructions](./debugging-android.md).

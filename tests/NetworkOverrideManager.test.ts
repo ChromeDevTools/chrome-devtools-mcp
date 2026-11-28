@@ -178,6 +178,35 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
+  it('matches preflight and prefetch mocks, which Chrome reports as other', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({resourceType: 'preflight', abort: true});
+    await manager.mock({resourceType: 'prefetch', abort: true});
+    const preflight = createMockHTTPRequest({
+      resourceType: 'other',
+      method: 'OPTIONS',
+      headers: {'access-control-request-method': 'PUT'},
+    });
+    const prefetch = createMockHTTPRequest({
+      resourceType: 'other',
+      headers: {'sec-purpose': 'prefetch'},
+    });
+    const other = createMockHTTPRequest({resourceType: 'other'});
+    pptrPage.emit('request', preflight);
+    pptrPage.emit('request', prefetch);
+    pptrPage.emit('request', other);
+    await settle();
+    sinon.assert.calledOnce(preflight.abort);
+    sinon.assert.calledOnce(prefetch.abort);
+    sinon.assert.notCalled(other.abort);
+    sinon.assert.calledOnce(other.continue);
+    await manager.dispose();
+  });
+
   it('counts only matching requests and returns independent diagnostic snapshots', async () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(

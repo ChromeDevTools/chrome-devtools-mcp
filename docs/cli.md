@@ -43,6 +43,7 @@ The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix
 - **Automatic Start**: The first time you call a tool (e.g., `list_pages`), the CLI automatically starts the MCP server and the browser in the background if they aren't already running.
 - **Persistence**: The same background instance is reused for subsequent commands, preserving the browser state (open pages, cookies, etc.).
 - **Manual Control**: You can explicitly manage the background process using `start`, `stop`, and `status`. The `start` command forwards all subsequent arguments to the underlying MCP server (e.g., `--headless`, `--userDataDir`) but not all args are supported. Run `chrome-devtools start --help` for supported args. Headless is enabled by default. Isolated is enabled by default unless `--userDataDir` is provided.
+- **Idle Timeout**: By default, the daemon runs until you call `stop`. Start it with `--idleTimeout` and a duration in seconds, minutes or hours (e.g., `chrome-devtools start --idleTimeout=30m`, or `90s`, `2h`) to close the browser it launched (along with all open pages) after that long without a tool call, or disconnect while leaving the browser open when using `--browserUrl`, `--wsEndpoint` or `--autoConnect`, and exit the daemon shortly afterwards (`status` does not count as a tool call). The next tool command starts a new daemon with only the default flags and the discovered config file: flags passed to `start` apply only to that daemon, so re-run `start` with your flags if you need them, or set `"idleTimeout": "30m"` in a discovered [configuration file](./configuration.md#configuration-file) to apply it to every daemon.
 
 ```sh
 # Check if the daemon is running
@@ -109,6 +110,16 @@ chrome-devtools evaluate_script "() => self.registration.scope" --serviceWorkerI
 chrome-devtools lighthouse_audit 1 --mode snapshot
 ```
 
+**Logpoints:**
+
+```sh
+# Set a logpoint on page 1
+chrome-devtools set_logpoints 1 "src/app.ts:42 'total', cart.total"
+
+# Remove all logpoints on page 1
+chrome-devtools set_logpoints 1
+```
+
 ## Output format
 
 By default, the CLI outputs a human-readable summary of the tool's result. For programmatic use, you can request raw JSON:
@@ -141,3 +152,17 @@ generation such as `wait_for` and `fill_form`.
 
 `chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
 because not all args make sense in a CLI interface.
+
+## Sessions
+
+By default, all commands share one daemon and browser. Pass `--sessionId=<id>`
+or set `CHROME_DEVTOOLS_SESSION_ID` to scope `start`, `status`, `stop`, and
+tool calls to an isolated daemon and browser. Session IDs use hex digits and
+dashes (such as a UUID); `--sessionId` overrides `CHROME_DEVTOOLS_SESSION_ID`.
+
+```sh
+SESSION_ID=$(uuidgen)
+chrome-devtools start --sessionId="$SESSION_ID"
+chrome-devtools list_pages --sessionId="$SESSION_ID"
+chrome-devtools stop --sessionId="$SESSION_ID"
+```

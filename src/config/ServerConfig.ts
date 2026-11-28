@@ -211,12 +211,6 @@ export class ServerConfig implements ReadonlyServerConfig {
       ) {
         resolvedArgs.isolated = true;
       }
-      if (
-        resolvedArgs.categoryExtensions === undefined &&
-        !connectsToExistingBrowser
-      ) {
-        resolvedArgs.categoryExtensions = true;
-      }
     }
 
     if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {

@@ -22,9 +22,11 @@ import {
 import {
   buildCommand,
   getCommandArgSpec,
+  registerCommandArgs,
   shieldLiteralArgs,
 } from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
+import {yargs} from '../src/third_party/cli.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
@@ -97,6 +99,11 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.isolated, true);
     assert.strictEqual(args.memoryDebugging, true);
     assert.strictEqual(args.categoryExtensions, true);
+    assert.strictEqual(args.categoryNetworkMocks, true);
+    assert.strictEqual(args.categoryPwa, undefined);
+    assert.strictEqual(args.categoryWebauthn, true);
+    assert.strictEqual(args.categoryExperimentalWebmcp, true);
+    assert.strictEqual(args.categoryExperimentalThirdParty, true);
     assert.strictEqual(args.experimentalStructuredContent, true);
     assert.strictEqual(args.viaCli, true);
   });
@@ -199,6 +206,15 @@ describe('cli args parsing', () => {
     ]) {
       assert.throws(
         () => coerce(value),
+        /Invalid viewport\. Expected format is `1280x720` with positive integer width and height\./,
+      );
+    }
+  });
+
+  it('rejects viewports with more than two parts', async () => {
+    for (const value of ['1280x720x2', '1280x720xfoo', '1280x720x']) {
+      assert.throws(
+        () => parseConfig(['--viewport', value]),
         /Invalid viewport\. Expected format is `1280x720` with positive integer width and height\./,
       );
     }
@@ -1042,8 +1058,24 @@ describe('cli args parsing', () => {
     );
     assert.strictEqual(
       cliOptions.categoryExtensions?.defaultDescription,
-      'true unless autoConnect, browserUrl or wsEndpoint is set',
+      'true',
     );
+    assert.strictEqual(
+      cliOptions.categoryNetworkMocks?.defaultDescription,
+      'true',
+    );
+    assert.strictEqual(cliOptions.categoryPwa?.defaultDescription, undefined);
+    assert.strictEqual(cliOptions.categoryWebauthn?.defaultDescription, 'true');
+    assert.strictEqual(
+      cliOptions.categoryExperimentalWebmcp?.defaultDescription,
+      'true',
+    );
+    assert.strictEqual(
+      cliOptions.categoryExperimentalThirdParty?.defaultDescription,
+      'true',
+    );
+    assert.strictEqual(mcpOptions.idleTimeout.hidden, undefined);
+    assert.strictEqual(cliOptions.idleTimeout?.hidden, undefined);
   });
 
   describe('mutual exclusivity', () => {
@@ -1327,12 +1359,27 @@ describe('cli args parsing', () => {
       ['--wsEndpoint', 'ws://localhost:9222'],
       ['--auto-connect'],
     ]) {
-      it(`allows viaCli with ${connectArgs[0]} without enabling extensions`, async () => {
+      it(`allows viaCli with ${connectArgs[0]} and enables all categories except PWA`, async () => {
         const args = parseConfig(['--viaCli', ...connectArgs]);
-        assert.strictEqual(args.categoryExtensions, undefined);
+        assert.strictEqual(args.categoryExtensions, true);
+        assert.strictEqual(args.categoryPwa, undefined);
+        assert.strictEqual(args.categoryNetworkMocks, true);
+        assert.strictEqual(args.categoryWebauthn, true);
+        assert.strictEqual(args.categoryExperimentalWebmcp, true);
+        assert.strictEqual(args.categoryExperimentalThirdParty, true);
         assert.strictEqual(args.isolated, false);
       });
     }
+
+    it('lets explicit category flags disable categories in viaCli', async () => {
+      const args = parseConfig([
+        '--viaCli',
+        '--no-category-network-mocks',
+        '--categoryWebauthn=false',
+      ]);
+      assert.strictEqual(args.categoryNetworkMocks, false);
+      assert.strictEqual(args.categoryWebauthn, false);
+    });
 
     it('allows explicit categoryExtensions with browserUrl in viaCli', async () => {
       const args = parseConfig([
@@ -1358,6 +1405,11 @@ describe('cli command strings', () => {
   const required = {description: '', required: true, positional: true};
   const dummyArgsVariadic = {
     arg1: {name: 'arg1', type: 'string', ...required},
+    arrArg: {name: 'arrArg', type: 'array', minItems: 1, ...required},
+  };
+
+  const dummyArgsVariadicAllowEmpty = {
+    arg1: {name: 'arg1', type: 'string', ...required},
     arrArg: {name: 'arrArg', type: 'array', ...required},
   };
 
@@ -1377,9 +1429,14 @@ describe('cli command strings', () => {
     },
   };
 
-  it('renders a required array arg as a variadic positional', () => {
+  it('renders a required array arg with minItems > 0 as a required variadic positional', () => {
     const {command} = buildCommand('dummy_cmd', dummyArgsVariadic);
     assert.strictEqual(command, 'dummy_cmd <arg1> <arrArg..>');
+  });
+
+  it('renders a required array arg without minItems as an optional variadic positional', () => {
+    const {command} = buildCommand('dummy_cmd', dummyArgsVariadicAllowEmpty);
+    assert.strictEqual(command, 'dummy_cmd <arg1> [arrArg..]');
   });
 
   it('renders required non-array args as plain positionals', () => {
@@ -1415,7 +1472,7 @@ describe('cli command strings', () => {
       );
 
       // yargs only allows a variadic positional as the last one.
-      const variadic = command.indexOf('..>');
+      const variadic = command.search(/\.\.[>\]]/);
       assert.ok(
         variadic === -1 || variadic === command.length - 3,
         `${name}: a variadic positional must be last`,
@@ -1424,9 +1481,11 @@ describe('cli command strings', () => {
       // A required array arg the daemon receives as a string fails validation.
       for (const [argName, arg] of Object.entries(args)) {
         if (arg.required && arg.type === 'array') {
+          const expected =
+            (arg.minItems ?? 0) > 0 ? `<${argName}..>` : `[${argName}..]`;
           assert.ok(
-            command.includes(`<${argName}..>`),
-            `${name}: required array arg ${argName} must be variadic`,
+            command.includes(expected),
+            `${name}: required array arg ${argName} must be variadic (${expected})`,
           );
         }
       }
@@ -1434,9 +1493,137 @@ describe('cli command strings', () => {
   });
 });
 
+describe('cli command parsing', () => {
+  const mockCommands: typeof commands = {
+    allow_empty_array: {
+      description: 'Command whose required array arg allows empty arrays',
+      category: 'Test',
+      args: {
+        id: {
+          name: 'id',
+          type: 'number',
+          description: '',
+          required: true,
+          positional: true,
+        },
+        items: {
+          name: 'items',
+          type: 'array',
+          description: '',
+          required: true,
+          positional: true,
+        },
+      },
+    },
+    require_non_empty_array: {
+      description:
+        'Command whose required array arg requires at least one item',
+      category: 'Test',
+      args: {
+        id: {
+          name: 'id',
+          type: 'number',
+          description: '',
+          required: true,
+          positional: true,
+        },
+        items: {
+          name: 'items',
+          type: 'array',
+          description: '',
+          required: true,
+          positional: true,
+          minItems: 1,
+        },
+      },
+    },
+  };
+
+  function parseToolCommand(rawArgs: string[]): Record<string, unknown> {
+    const {argv: cliArgs, restore} = shieldLiteralArgs(rawArgs, commandName => {
+      const commandDef = mockCommands[commandName];
+      return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
+    });
+
+    let parsedArgs: Record<string, unknown> | undefined;
+    const parser = yargs(cliArgs)
+      .locale('en')
+      .exitProcess(false)
+      .strict()
+      .fail((msg, err) => {
+        throw err ?? new Error(msg);
+      });
+
+    for (const [commandName, commandDef] of Object.entries(mockCommands)) {
+      const {command, usage} = buildCommand(commandName, commandDef.args);
+      parser.command(
+        command,
+        commandDef.description,
+        y => {
+          y.usage(usage);
+          y.option('output-format', {
+            choices: ['md', 'json'],
+            default: 'md',
+          });
+          registerCommandArgs(y, commandDef.args);
+        },
+        argv => {
+          const commandArgs: Record<string, unknown> = {};
+          for (const argName of Object.keys(commandDef.args)) {
+            if (argName in argv) {
+              commandArgs[argName] = restore(argv[argName]);
+            }
+          }
+          parsedArgs = commandArgs;
+        },
+      );
+    }
+
+    parser.parse();
+    assert.ok(parsedArgs, `Command did not match: ${rawArgs.join(' ')}`);
+    return parsedArgs;
+  }
+
+  it('parses an omitted variadic array arg without minItems as an empty array', () => {
+    assert.deepStrictEqual(parseToolCommand(['allow_empty_array', '2']), {
+      id: 2,
+      items: [],
+    });
+  });
+
+  it('parses an omitted variadic array arg as empty when followed by flags', () => {
+    assert.deepStrictEqual(
+      parseToolCommand(['allow_empty_array', '2', '--output-format', 'json']),
+      {
+        id: 2,
+        items: [],
+      },
+    );
+  });
+
+  it('parses multiple items for an optional variadic array arg', () => {
+    assert.deepStrictEqual(
+      parseToolCommand(['allow_empty_array', '2', 'first', 'second']),
+      {
+        id: 2,
+        items: ['first', 'second'],
+      },
+    );
+  });
+
+  it('rejects an omitted variadic array arg when minItems > 0', () => {
+    assert.throws(
+      () => parseToolCommand(['require_non_empty_array', '2']),
+      /Not enough non-option arguments/,
+    );
+  });
+});
+
 describe('cli literal args', () => {
   const getSpec = (name: string) =>
-    name in commands ? getCommandArgSpec(commands[name].args) : undefined;
+    Object.hasOwn(commands, name)
+      ? getCommandArgSpec(commands[name].args)
+      : undefined;
 
   function shield(argv: string[]) {
     const {argv: shielded, restore} = shieldLiteralArgs(argv, getSpec);
@@ -1599,9 +1786,76 @@ describe('cli literal args', () => {
     assert.deepStrictEqual(shield(input).shielded, input);
   });
 
+  it('does not treat a tool-named option value after a non-tool command as a tool command', () => {
+    const input = [
+      '--sessionId',
+      'abc',
+      'start',
+      '--workspace',
+      'click',
+      '--no-javascript-evaluation',
+    ];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield a lone hyphen for non-tool commands', () => {
+    const input = ['start', '--userDataDir', '-'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield tokens after -- for non-tool or missing commands', () => {
+    for (const input of [
+      ['start', '--', '--workspace', 'foo'],
+      ['--', 'start'],
+      ['--', 'click', '--no-javascript-evaluation'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
+  });
+
+  it('stops scanning when a leading lone hyphen precedes a tool name', () => {
+    const input = ['-', 'click', '--no-javascript-evaluation'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('does not shield when non-global or malformed flags precede a tool name', () => {
+    for (const input of [
+      ['--workspace', 'click', '--no-javascript-evaluation', 'start'],
+      ['--unknown', 'click', '--bar'],
+      ['--sessionId', '-abc', 'click', '1', '--weird'],
+      ['--sessionId', '-', 'click', '1', '--weird'],
+      ['--sessionId', '--', 'click', '1', '--weird'],
+      ['-sessionId', 'abc', 'click', '1', '--weird'],
+    ]) {
+      assert.deepStrictEqual(shield(input).shielded, input, input.join(' '));
+    }
+  });
+
+  it('handles negated global options and negative-number global values before a tool command', () => {
+    for (const input of [
+      ['--no-sessionId', 'click', '1', '--weird'],
+      ['--no-help', 'click', '1', '--weird'],
+      ['--sessionId', '-5', 'click', '1', '--weird'],
+    ]) {
+      const {restored, literalIndexes} = shield(input);
+      assert.deepStrictEqual(
+        literalIndexes,
+        [input.length - 1],
+        input.join(' '),
+      );
+      assert.deepStrictEqual(restored, input);
+    }
+    // `--no-help` does not consume `true`, so `true` is the command token (not a tool).
+    const negatedBoolWithValue = ['--no-help', 'true', 'click', '1', '--weird'];
+    assert.deepStrictEqual(
+      shield(negatedBoolWithValue).shielded,
+      negatedBoolWithValue,
+    );
+  });
+
   it('restores values nested in arrays and leaves other values alone', () => {
     const {argv, restore} = shieldLiteralArgs(
-      ['cmd', '--', '-a', '-b'],
+      ['fill', '--', '-a', '-b'],
       getSpec,
     );
     assert.deepStrictEqual(restore([argv[1], argv[2], 'x']), ['-a', '-b', 'x']);

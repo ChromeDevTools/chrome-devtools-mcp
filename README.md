@@ -132,6 +132,7 @@ The package includes [skills](./skills) that teach your agent how to use Chrome 
 A plugin installs the MCP server and all skills, including the CLI skill:
 
 - **Claude Code:** Run `/plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `/plugin install chrome-devtools-mcp@chrome-devtools-plugins`.
+- **Codex:** Run `codex plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `codex plugin add chrome-devtools-mcp@chrome-devtools-plugins`.
 - **Copilot / VS Code:** Run **Chat: Install Plugin From Source** and enter `ChromeDevTools/chrome-devtools-mcp`.
 - **Gemini CLI:** Run `gemini extensions install --auto-update https://github.com/ChromeDevTools/chrome-devtools-mcp`.
 
@@ -177,7 +178,7 @@ For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. 
 
 ## Advanced Usage
 
-For advanced features such as handling concurrent sessions, persistent user data directories, using a custom or non-standard browser path (`--executablePath`), connecting to a running Chrome instance instead of starting a new one, or debugging on Android, see our [Advanced Usage Guide][advanced-usage-guide].
+For advanced features such as handling concurrent sessions, persistent user data directories, using a custom or non-standard browser path (`--executablePath`), enabling Chrome Built-in AI APIs in automated sessions, connecting to a running Chrome instance instead of starting a new one, or debugging on Android, see our [Advanced Usage Guide][advanced-usage-guide].
 
 ## Integrating as a browser subagent
 

@@ -11,6 +11,7 @@ import {before, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -149,6 +150,8 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    const server = serverHooks();
+
     it('exposes serviceWorkerId only with categoryExtensions', () => {
       assert.ok(
         'serviceWorkerId' in
@@ -276,6 +279,145 @@ describe('console', () => {
         assert.strictEqual(
           structuredContent.consoleMessages[0].stackTrace,
           undefined,
+        );
+      });
+    });
+
+    it('includes preserved stack traces with wasm byte offsets', async () => {
+      server.addRoute('/logger.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function logIt() {
+  console.log('before navigation');
+}
+logIt();`);
+      });
+      // A wasm module whose exported run() calls the imported env.log().
+      const wasmModule =
+        'AGFzbQEAAAABBAFgAAACCwEDZW52A2xvZwAAAwIBAAcHAQNydW4AAQoGAQQA' +
+        'EAALABIEbmFtZQELAgADbG9nAQNydW4=';
+      server.addHtmlRoute(
+        '/first.html',
+        `<script src="${server.getRoute('/logger.js')}"></script>
+<script>
+const bytes = Uint8Array.from(atob('${wasmModule}'), c => c.charCodeAt(0));
+new WebAssembly.Instance(new WebAssembly.Module(bytes), {
+  env: {log: () => console.log('from wasm')},
+}).exports.run();
+</script>`,
+      );
+      server.addHtmlRoute('/second.html', '<title>second</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/first.html'));
+        await page.pptrPage.goto(server.getRoute('/second.html'));
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /at logIt \(.*logger\.js:2:11\)/);
+        assert.match(textContent, /at \$run \(wasm:\/\/wasm\/[\da-f]+:0x2d\)/);
+      });
+    });
+
+    it('includes preserved stack traces of uncaught errors', async () => {
+      server.addRoute('/thrower.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function throwFromOld() {
+  throw new Error('uncaught before navigation');
+}
+throwFromOld();`);
+      });
+      server.addHtmlRoute(
+        '/first.html',
+        `<script src="${server.getRoute('/thrower.js')}"></script>`,
+      );
+      server.addHtmlRoute('/second.html', '<title>second</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/first.html'));
+        await page.pptrPage.goto(server.getRoute('/second.html'));
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(
+          textContent.includes(
+            'Uncaught Error: uncaught before navigation (0 args)\n' +
+              `  at throwFromOld (${server.getRoute('/thrower.js')}:2:9)`,
+          ),
+          textContent,
+        );
+      });
+    });
+
+    it('keeps preserved frames raw after a cross-site navigation', async () => {
+      // Unlike a script from the network, an inline script gets the same id
+      // on every run.
+      server.addHtmlRoute(
+        '/old.html',
+        `<script>
+function logFromOld() {
+  console.log('before navigation');
+}
+logFromOld();
+</script>`,
+      );
+      // Script ids restart in the new renderer process, so the scripts of the
+      // new page reuse the ids of the old one.
+      server.addHtmlRoute('/new.html', '<script>"new";</script>'.repeat(8));
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        const model = page.devtoolsUniverse?.target.model(
+          DevTools.DebuggerModel,
+        );
+        assert.ok(model);
+        const oldUrl = server.getRoute('/old.html');
+        await page.pptrPage.goto(oldUrl);
+        const [oldScript] = model.scriptsForSourceURL(oldUrl);
+        assert.ok(oldScript);
+        // localhost and 127.0.0.1 are different sites.
+        const newUrl = server
+          .getRoute('/new.html')
+          .replace('127.0.0.1', 'localhost');
+        await page.pptrPage.goto(newUrl);
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.strictEqual(
+          model.scriptForId(oldScript.scriptId)?.sourceURL,
+          newUrl,
+          'A script of the new page should reuse the script id of old.html',
+        );
+        assert.match(
+          textContent,
+          /at logFromOld \(http:\/\/127\.0\.0\.1:\d+\/old\.html:3:11\)/,
         );
       });
     });
@@ -708,6 +850,44 @@ console.error('inline-line-4');
       });
     });
 
+    it('keeps the stack trace of a message after a navigation', async () => {
+      server.addRoute('/old.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function logFromOld() {
+  console.log('before navigation');
+}
+logFromOld();`);
+      });
+      server.addHtmlRoute(
+        '/old.html',
+        `<script src="${server.getRoute('/old.js')}"></script>`,
+      );
+      server.addHtmlRoute('/new.html', '<title>new</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/old.html'));
+        await page.pptrPage.goto(server.getRoute('/new.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(
+          rawText.includes(
+            '### Stack trace\n' +
+              `at logFromOld (${server.getRoute('/old.js')}:2:11)`,
+          ),
+          rawText,
+        );
+      });
+    });
+
     it('applies source maps to stack traces of console messages', async t => {
       server.addRoute('/main.min.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');
@@ -852,6 +1032,96 @@ console.error('inline-line-4');
 
         assert.ok(rawText.includes('Uncaught Error: outer'), rawText);
         assert.ok(rawText.includes('Caused by: Error: inner'), rawText);
+      });
+    });
+
+    it('resolves the stack and cause of an uncaught exception in a dedicated worker', async () => {
+      server.addRoute('/worker.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`setTimeout(() => {
+  throw new Error('worker-outer', {cause: new Error('worker-inner')});
+}, 50);`);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>new Worker('/worker.js');</script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        let error: UncaughtError | undefined;
+        await waitExecutionFor(async () => {
+          error = page
+            .getConsoleData()
+            .find(
+              (item): item is UncaughtError => item instanceof UncaughtError,
+            );
+          assert.ok(error);
+        }, 5000);
+        assert.ok(error);
+
+        await getConsoleMessage(args).handler(
+          {
+            params: {msgid: response.getConsoleMessageStableId(error)},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(rawText.includes('Uncaught Error: worker-outer'), rawText);
+        assert.ok(rawText.includes('worker.js:2'), rawText);
+        assert.ok(rawText.includes('Caused by: Error: worker-inner'), rawText);
+      });
+    });
+
+    it('resolves the stack of an unhandled rejection in a dedicated worker', async () => {
+      server.addRoute('/worker.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`setTimeout(() => {
+  Promise.reject(new Error('worker-rejected'));
+}, 50);`);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>new Worker('/worker.js');</script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        let error: UncaughtError | undefined;
+        await waitExecutionFor(async () => {
+          error = page
+            .getConsoleData()
+            .find(
+              (item): item is UncaughtError => item instanceof UncaughtError,
+            );
+          assert.ok(error);
+        }, 5000);
+        assert.ok(error);
+
+        await getConsoleMessage(args).handler(
+          {
+            params: {msgid: response.getConsoleMessageStableId(error)},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(
+          rawText.includes('Uncaught (in promise) Error: worker-rejected'),
+          rawText,
+        );
+        assert.ok(rawText.includes('worker.js:2'), rawText);
       });
     });
 

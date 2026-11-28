@@ -15,7 +15,7 @@ import type {
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
-import type {Logpoint, LogpointOptions} from '../LogpointManager.js';
+import type {Logpoint, LogpointOptions} from '../utils/logpoint.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import type {
@@ -91,9 +91,10 @@ export type FileVerificationOption =
  *   state or that is not reviewed for page-only access.
  * - `'page'`: the queue of the page named by `pageId`, a child of the
  *   context queue. Tools on different pages run at the same time; tools on
- *   one page and `'exclusive'` tools wait. Without page id routing the call
- *   runs on the context queue. Only for page-scoped tools whose handler
- *   touches the target page and no browser-global state.
+ *   one page and `'exclusive'` tools wait. Without page id routing, or
+ *   when no page has this id, the call runs on the context queue. Only for
+ *   page-scoped tools whose handler touches the target page and no
+ *   browser-global state.
  * - `'none'`: no queue. The tool runs at the same time as any other tool.
  *   For browserless tools, whose data guards itself (see
  *   `HeapSnapshotManager`), and for page tools that only read page state
@@ -292,6 +293,7 @@ export interface Response {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      serviceWorkerId?: string;
     },
   ): void;
   setIncludeConsoleData(
@@ -316,7 +318,11 @@ export interface Response {
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(
     reqId: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: {
+      requestFilePath?: string;
+      responseFilePath?: string;
+      serviceWorkerId?: string;
+    },
   ): void;
   attachConsoleMessage(
     msgid: number,

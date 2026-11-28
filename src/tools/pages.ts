@@ -366,7 +366,8 @@ export const navigatePage: PageToolFactory = definePageTool(
 
 export const resizePage: PageToolFactory = definePageTool(() => ({
   name: 'resize_page',
-  description: `Resizes the page's window so that the page has specified dimension`,
+  description:
+    'Requests the specified page dimensions. Chrome may enforce a minimum window size, so the resulting page dimensions can differ from the requested values.',
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,

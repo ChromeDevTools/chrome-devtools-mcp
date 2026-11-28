@@ -348,6 +348,25 @@ describe('TaskRunner', () => {
       waiting.finish();
       await Promise.all([running.done, waiting.done]);
     });
+
+    it('unblocks unrelated queues when a waiting pause is aborted', async () => {
+      const {runner, childA, childB} = createTree();
+      const a = start(childA);
+      await settle();
+      const controller = new AbortController();
+      const pause = runner.pause(controller.signal);
+      const b = start(childB);
+      await settle();
+      assert.strictEqual(b.started, false);
+      controller.abort();
+      await assert.rejects(pause, {name: 'AbortError'});
+      await settle();
+      assert.strictEqual(b.started, true);
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+      a.finish();
+      b.finish();
+      await Promise.all([a.done, b.done]);
+    });
   });
 
   describe('dispose', () => {

@@ -32,15 +32,59 @@ export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
   readonly session?: CDPSession;
+  /**
+   * True when the exception was thrown by another target than the page that
+   * reported it, such as a dedicated worker. The page's DevTools universe
+   * cannot resolve the scripts of that target.
+   */
+  readonly fromOtherTarget: boolean;
 
   constructor(
     details: Protocol.Runtime.ExceptionDetails,
     targetId: string,
     session?: CDPSession,
+    fromOtherTarget = false,
   ) {
     this.details = details;
     this.targetId = targetId;
     this.session = session;
+    this.fromOtherTarget = fromOtherTarget;
+  }
+
+  /**
+   * Builds an `UncaughtError` from a Puppeteer `exception` event, or returns
+   * `undefined` when the raw exception details are not available.
+   */
+  static fromException(
+    exception: RemoteException,
+    targetId: string,
+    session: CDPSession,
+  ): UncaughtError | undefined {
+    const details: Protocol.Runtime.ExceptionDetails | undefined =
+      // @ts-expect-error use internal Puppeteer API to get raw exception details.
+      exception._rawExceptionDetails();
+    if (!details) {
+      return undefined;
+    }
+    const handle = exception.handle();
+    // Keep the exception object alive so its stack and cause resolve later.
+    handle?.move();
+    // Exceptions of dedicated workers are forwarded to the page. Their objects
+    // and scripts belong to the worker session and target, not the page.
+    const handleSession: CDPSession =
+      // @ts-expect-error use internal Puppeteer API to get the handle session.
+      handle?.client ?? session;
+    if (handleSession === session) {
+      return new UncaughtError(details, targetId, session);
+    }
+    let handleTargetId = targetId;
+    try {
+      // @ts-expect-error use internal Puppeteer API to get target ID
+      handleTargetId = handleSession.target()._targetId;
+    } catch {
+      // `target()` throws for a session without a target; keep the given target.
+    }
+    return new UncaughtError(details, handleTargetId, handleSession, true);
   }
 }
 
@@ -254,17 +298,11 @@ class PageEventSubscriber {
   #seenKeys = new Set<string>();
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
-  #session: CDPSession;
-  #targetId: string;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
 
   constructor(page: Page) {
     this.#page = page;
-    // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    this.#session = this.#page._client() as CDPSession;
-    // @ts-expect-error use internal Puppeteer API to get target ID
-    this.#targetId = this.#session.target()._targetId;
   }
 
   #resetIssueAggregator(): void {
@@ -316,18 +354,18 @@ class PageEventSubscriber {
   };
 
   #onException = (exception: RemoteException): void => {
-    const details: Protocol.Runtime.ExceptionDetails | undefined =
-      // @ts-expect-error use internal Puppeteer API to get raw exception details.
-      exception._rawExceptionDetails();
-    if (!details) {
-      return;
-    }
-    // Keep the exception object alive so its stack and cause resolve later.
-    exception.handle()?.move();
-    this.#page.emit(
-      'uncaughtError',
-      new UncaughtError(details, this.#targetId, this.#session),
+    // Read at event time: prerender activation swaps the page session.
+    // @ts-expect-error use existing CDP client (internal Puppeteer API).
+    const pageSession: CDPSession = this.#page._client();
+    const error = UncaughtError.fromException(
+      exception,
+      // @ts-expect-error use internal Puppeteer API to get target ID
+      pageSession.target()._targetId,
+      pageSession,
     );
+    if (error) {
+      this.#page.emit('uncaughtError', error);
+    }
   };
 
   // On navigation, we reset issue aggregation.

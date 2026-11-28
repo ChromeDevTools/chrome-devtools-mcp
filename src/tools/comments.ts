@@ -15,7 +15,12 @@ export type CommentThreadPayload = CD4ACommentThread;
 export type RevealTargetPayload = CD4ARevealTarget;
 
 const DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE =
-  'DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.';
+  'DevTools comments are not supported by the connected browser. ' +
+  'They require Chrome 159 or later. ' +
+  'Do not call get_devtools_comments, resolve_devtools_comment, or ' +
+  'reveal_in_devtools again. Tell the user to update Chrome to version 159 ' +
+  'or later, or to restart the MCP server with a newer --channel ' +
+  '(for example, --channel=canary).';
 
 export const openDevtools: PageToolFactory = definePageTool(() => ({
   name: 'open_devtools',
@@ -71,6 +76,16 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
           `Defaults to ${DEFAULT_COMMENT_WAIT_MS}, maximum ${MAX_COMMENT_WAIT_MS}. ` +
           `Set to 0 to return immediately without waiting.`,
       ),
+    includeTransmitted: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Also return open comment threads that an earlier call already ' +
+          'returned. Threads returned again have "Previously delivered: ' +
+          'true". Resolved threads are never returned. When such threads ' +
+          'exist, the call returns immediately without waiting. Do not set ' +
+          'it while polling for new comments.',
+      ),
   },
   blockedByDialog: false,
   // The handler only reads page state and waits for comment events, so it
@@ -93,10 +108,12 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
       return;
     }
 
-    const timeout = request.params.timeout ?? DEFAULT_COMMENT_WAIT_MS;
+    const {timeout = DEFAULT_COMMENT_WAIT_MS, includeTransmitted} =
+      request.params;
+    const options = includeTransmitted ? {includeTransmitted} : {};
     const start = Date.now();
     const deadline = start + timeout;
-    let threads = await bridge.getComments(devtoolsPage);
+    let threads = await bridge.getComments(devtoolsPage, options);
     while (threads.length === 0) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
@@ -107,7 +124,7 @@ export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
         break;
       }
       // Another tool may have changed state during the wait, so fetch again.
-      threads = await bridge.getComments(devtoolsPage);
+      threads = await bridge.getComments(devtoolsPage, options);
     }
 
     if (threads.length === 0 && timeout > 0) {

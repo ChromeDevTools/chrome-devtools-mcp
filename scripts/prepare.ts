@@ -50,6 +50,10 @@ const SPARSE_CHECKOUT_PATTERNS = [
   '"/extension-api/"',
   '"/node_modules/"',
   '"/scripts/"',
+  '"/test/TestExpectations"',
+  '"/test/conductor/"',
+  '"/test/run.ts"',
+  '"/test/shared/"',
   '"/third_party/"',
   '"/v8/"',
   '"/**/BUILD.gn"',
@@ -57,6 +61,9 @@ const SPARSE_CHECKOUT_PATTERNS = [
 ].join(' ');
 
 function ensureSubmodule(): void {
+  if (existsSync(resolve(projectRoot, '..', 'front_end'))) {
+    return;
+  }
   const devtoolsFrontendDir = resolve(
     projectRoot,
     'third_party',
@@ -67,9 +74,9 @@ function ensureSubmodule(): void {
   // has mcp.ts but not this file predates the current patterns.
   const sparseMarker = resolve(
     devtoolsFrontendDir,
-    'v8',
-    'include',
-    'js_protocol.pdl',
+    'test',
+    'conductor',
+    'test_config.ts',
   );
 
   if (existsSync(mcpEntry) && existsSync(sparseMarker)) {

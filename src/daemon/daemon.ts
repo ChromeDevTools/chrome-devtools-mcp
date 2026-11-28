@@ -10,7 +10,6 @@ import '../utils/polyfill.js';
 
 import fs, {constants, openSync, writeSync, closeSync} from 'node:fs';
 import {createServer, type Server} from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -22,13 +21,21 @@ import {McpServer} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {PipeTransport} from '../third_party/index.js';
-import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {parseDurationMs} from '../utils/duration.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
+import {IdleTimer} from '../utils/IdleTimer.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+  saveLogsToFile,
+} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
 import {
   DAEMON_CLIENT_NAME,
+  assertSecureRuntimeDir,
   getPidFilePath,
   getSocketPath,
   IS_WINDOWS,
@@ -39,57 +46,28 @@ import {
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
 assertValidSessionId(sessionId);
 logger?.(`Daemon sessionId: ${sessionId}`);
-if (isDaemonRunning(sessionId)) {
-  logger?.('Another daemon process is running.');
-  process.exit(1);
-}
 const pidFilePath = getPidFilePath(sessionId);
 const pidDir = path.dirname(pidFilePath);
-const currentUserUid = os.userInfo().uid;
 
 try {
   fs.mkdirSync(pidDir, {recursive: true, mode: 0o700});
-  if (os.platform() !== 'win32') {
-    // POSIX specific checks
-    try {
-      const stats = fs.lstatSync(pidDir);
-
-      // 1. Reject symlinked runtime directories before checking ownership.
-      if (stats.isSymbolicLink()) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} must not be a symbolic link. Possible tampering.`,
-        );
-        process.exit(1);
-      }
-
-      // 2. Check Ownership: Ensure the directory is owned by the current user.
-      if (stats.uid !== currentUserUid) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
-        );
-        process.exit(1);
-      }
-
-      // 3. Check Permissions: Ensure the directory is not group or world-writable.
-      // Mode is a number, e.g., 0o700. We check if bits for group/world write are set.
-      const mode = stats.mode;
-      if (mode & constants.S_IWGRP || mode & constants.S_IWOTH) {
-        console.error(
-          `[MCP Daemon] Critical error: PID directory ${pidDir} has insecure permissions (Mode: ${mode.toString(8)}). It should not be writable by group or others.`,
-        );
-        process.exit(1);
-      }
-    } catch (statErr) {
-      console.error(
-        `[MCP Daemon] Critical error stating PID directory ${pidDir}:`,
-        statErr,
-      );
-      process.exit(1);
-    }
-  }
+  assertSecureRuntimeDir(pidDir);
 } catch (err) {
   console.error(
     `[MCP Daemon] Critical error creating/validating PID directory: ${pidDir}`,
+    err,
+  );
+  process.exit(1);
+}
+
+try {
+  if (isDaemonRunning(sessionId)) {
+    logger?.('Another daemon process is running.');
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(
+    `[MCP Daemon] Critical error validating PID file: ${pidFilePath}`,
     err,
   );
   process.exit(1);
@@ -135,7 +113,10 @@ const socketPath = getSocketPath(sessionId);
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
 
-let mcpServer: McpServer | null = null;
+// Matches BrowserManager's 5s close timeout so McpServer closes Chrome first.
+const DAEMON_IDLE_GRACE_MS = 5_000;
+
+let running: {mcpServer: McpServer; idleTimer?: IdleTimer} | null = null;
 let server: Server | null = null;
 
 async function setupMCPServer(): Promise<void> {
@@ -147,16 +128,31 @@ async function setupMCPServer(): Promise<void> {
   const browserManager = new BrowserManager(serverConfig, {
     logFile,
   });
-  mcpServer = await McpServer.from(serverConfig, {
+  const mcpServer = await McpServer.from(serverConfig, {
     browserManager,
     logFile,
   });
+  const idleTimeout = args.idleTimeout;
+  const idleTimer =
+    idleTimeout === undefined
+      ? undefined
+      : new IdleTimer({
+          timeoutMs:
+            parseDurationMs('idleTimeout', idleTimeout) + DAEMON_IDLE_GRACE_MS,
+          onIdle: () => {
+            logger?.(`No tool call for ${idleTimeout}, exiting.`);
+            void cleanup();
+          },
+        });
+  // Set before the remaining setup so cleanup() closes the server on failure.
+  running = {mcpServer, idleTimer};
   if (args.watchConfig) {
     mcpServer.watchConfig();
   }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();
   void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));
+  idleTimer?.schedule();
 }
 
 async function handleRequest(msg: DaemonMessage): Promise<{
@@ -168,12 +164,17 @@ async function handleRequest(msg: DaemonMessage): Promise<{
   try {
     if (msg.method === 'invoke_tool') {
       await started;
-      if (!mcpServer) {
+      const active = running;
+      if (!active) {
         throw new Error('MCP server not initialized');
       }
       const {tool, args} = msg;
 
-      const result = await mcpServer.callTool(tool, args);
+      const result = active.idleTimer
+        ? await active.idleTimer.track(() =>
+            active.mcpServer.callTool(tool, args),
+          )
+        : await active.mcpServer.callTool(tool, args);
 
       return {
         success: true,
@@ -199,7 +200,7 @@ async function handleRequest(msg: DaemonMessage): Promise<{
         socketPath,
         startDate: startDate.toISOString(),
         version: VERSION,
-        args: mcpServerArgs,
+        args: redactDaemonArgsForLogging(mcpServerArgs),
       };
       return {
         success: true,
@@ -277,10 +278,11 @@ async function cleanup(exitCode = 0): Promise<void> {
     return;
   }
   isCleaningUp = true;
+  running?.idleTimer?.dispose();
   console.log('Cleaning up daemon...');
 
   try {
-    await mcpServer?.close();
+    await running?.mcpServer.close();
   } catch (error) {
     logger?.('Error closing MCP server:', error);
   }

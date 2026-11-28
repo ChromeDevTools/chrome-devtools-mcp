@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import childProcess, {spawn} from 'node:child_process';
+import childProcess from 'node:child_process';
 import crypto from 'node:crypto';
 import fs, {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import net from 'node:net';
@@ -21,14 +21,17 @@ import {
   stopDaemon,
   verifyDaemonVersion,
 } from '../../src/daemon/client.js';
+import type {DaemonStatusResult} from '../../src/daemon/types.js';
 import {
   DAEMON_SCRIPT_PATH,
+  IS_WINDOWS,
   getDaemonPid,
   getPidFilePath,
+  getSocketPath,
   isDaemonRunning,
 } from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
-import {createTempDir} from '../utils.js';
+import {createTempDir, spawnReadyProcess} from '../utils.js';
 
 describe('stopDaemon signal failures', () => {
   it('rejects and keeps the PID file when SIGKILL throws EPERM', async () => {
@@ -71,8 +74,8 @@ function setupStopDaemonSignalFailure(runtimeDir: string) {
   const sessionId = crypto.randomUUID();
   const pid = 1234567895;
   const pidFilePath = getPidFilePath(sessionId);
-  mkdirSync(dirname(pidFilePath), {recursive: true});
-  writeFileSync(pidFilePath, String(pid));
+  mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+  writeFileSync(pidFilePath, String(pid), {mode: 0o600});
   const clock = sinon.useFakeTimers({toFake: ['Date', 'setTimeout']});
   sinon.stub(fs, 'existsSync').callThrough().withArgs('/proc').returns(false);
   sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
@@ -147,78 +150,59 @@ describe('daemon client', () => {
     });
 
     it('should stop and allow restarting a daemon when its socket is unreachable', async () => {
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
-        {
-          stdio: 'ignore',
-        },
+      using child = await spawnReadyProcess([DAEMON_SCRIPT_PATH]);
+
+      const pidFilePath = getPidFilePath(sessionId);
+      mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+      writeFileSync(pidFilePath, String(child.pid), {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
+      assert.ok(
+        isDaemonRunning(sessionId),
+        'Daemon should be detected as running via PID file',
       );
-      child.unref();
-      assert.ok(child.pid, 'Child process should have a PID');
 
-      try {
-        const pidFilePath = getPidFilePath(sessionId);
-        mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
-        writeFileSync(pidFilePath, String(child.pid), 'utf-8');
-        assert.ok(
-          isDaemonRunning(sessionId),
-          'Daemon should be detected as running via PID file',
-        );
+      await stopDaemon(sessionId);
+      assert.ok(
+        !isDaemonRunning(sessionId),
+        'Unreachable daemon should be stopped via signal fallback',
+      );
 
-        await stopDaemon(sessionId);
-        assert.ok(
-          !isDaemonRunning(sessionId),
-          'Unreachable daemon should be stopped via signal fallback',
-        );
-
-        await startDaemon([], sessionId);
-        assert.ok(
-          isDaemonRunning(sessionId),
-          'New daemon should start after stopping unreachable daemon',
-        );
-        assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
-      } finally {
-        child.kill();
-      }
+      await startDaemon([], sessionId);
+      assert.ok(
+        isDaemonRunning(sessionId),
+        'New daemon should start after stopping unreachable daemon',
+      );
+      assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
     });
 
     it('should not signal an unrelated process when its PID is in the PID file', async () => {
-      const child = spawn(
-        process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)'],
-        {
-          stdio: 'ignore',
-        },
+      using child = await spawnReadyProcess();
+
+      const pidFilePath = getPidFilePath(sessionId);
+      mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+      writeFileSync(pidFilePath, String(child.pid), {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
+
+      await stopDaemon(sessionId);
+      assert.doesNotThrow(
+        () => process.kill(child.pid, 0),
+        'stopDaemon must not kill the unrelated process',
       );
-      child.unref();
-      const childPid = child.pid;
-      assert.ok(childPid, 'Child process should have a PID');
 
-      try {
-        const pidFilePath = getPidFilePath(sessionId);
-        mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
-        writeFileSync(pidFilePath, String(childPid), 'utf-8');
-
-        await stopDaemon(sessionId);
-        assert.doesNotThrow(
-          () => process.kill(childPid, 0),
-          'stopDaemon must not kill the unrelated process',
-        );
-
-        await startDaemon([], sessionId);
-        assert.ok(
-          isDaemonRunning(sessionId),
-          'New daemon should start when PID file points to an unrelated process',
-        );
-        assert.notStrictEqual(getDaemonPid(sessionId), childPid);
-        assert.doesNotThrow(
-          () => process.kill(childPid, 0),
-          'startDaemon must not kill the unrelated process',
-        );
-      } finally {
-        child.kill();
-      }
+      await startDaemon([], sessionId);
+      assert.ok(
+        isDaemonRunning(sessionId),
+        'New daemon should start when PID file points to an unrelated process',
+      );
+      assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
+      assert.doesNotThrow(
+        () => process.kill(child.pid, 0),
+        'startDaemon must not kill the unrelated process',
+      );
     });
   });
 
@@ -250,6 +234,27 @@ describe('daemon client', () => {
         undefined,
         'Should not return warning when daemon is stopped',
       );
+    });
+  });
+
+  describe('status', () => {
+    it('redacts sensitive startup args in daemon status responses', async () => {
+      await startDaemon(
+        [
+          '--viaCli',
+          '--ws-endpoint=wss://user:pass@127.0.0.1:9222/ws?token=SECRET',
+          '--ws-headers={"Authorization":"Bearer HEADER_SECRET"}',
+        ],
+        sessionId,
+      );
+      const response = await sendCommand({method: 'status'}, sessionId);
+      assert.strictEqual(response.success, true);
+      const status: DaemonStatusResult = JSON.parse(response.result);
+      assert.deepStrictEqual(status.args, [
+        '--viaCli',
+        '--ws-endpoint=wss://127.0.0.1:9222/ws?REDACTED',
+        '--ws-headers=[REDACTED]',
+      ]);
     });
   });
 
@@ -393,28 +398,42 @@ describe('daemon client', () => {
 });
 
 describe('daemon response deadline', () => {
-  let socket: net.Socket;
-  let destroy: sinon.SinonStub<Parameters<net.Socket['destroy']>, net.Socket>;
-
-  beforeEach(() => {
+  function setupDeadlineTest(runtimeDir: string) {
+    sinon
+      .stub(process, 'env')
+      .value({...process.env, XDG_RUNTIME_DIR: runtimeDir});
     const pidFile = getPidFilePath('');
-    sinon.stub(fs, 'existsSync').callThrough().withArgs(pidFile).returns(true);
+    mkdirSync(dirname(pidFile), {recursive: true, mode: 0o700});
+    writeFileSync(pidFile, String(process.pid), {mode: 0o600});
+    if (!IS_WINDOWS) {
+      const socketPath = getSocketPath('');
+      const socketStats = sinon.createStubInstance(fs.Stats);
+      socketStats.isSymbolicLink.returns(false);
+      socketStats.isSocket.returns(true);
+      socketStats.uid = process.getuid ? process.getuid() : 0;
+      sinon
+        .stub(fs, 'lstatSync')
+        .callThrough()
+        .withArgs(socketPath)
+        .returns(socketStats);
+    }
     sinon
       .stub(fs, 'readFileSync')
       .callThrough()
-      .withArgs(pidFile, 'utf-8')
-      .returns(String(process.pid))
       .withArgs(`/proc/${process.pid}/cmdline`, 'utf-8')
       .returns(`node\0${DAEMON_SCRIPT_PATH}\0`);
     sinon.stub(childProcess, 'execFileSync').returns(DAEMON_SCRIPT_PATH);
-    socket = new net.Socket();
+    const socket = new net.Socket();
     sinon.stub(socket, 'write').returns(true);
     sinon.stub(socket, 'end').returns(socket);
-    destroy = sinon.stub(socket, 'destroy').returns(socket);
+    const destroy = sinon.stub(socket, 'destroy').returns(socket);
     sinon.stub(net, 'createConnection').returns(socket);
-  });
+    return {socket, destroy};
+  }
 
   it('receives a tool result after the default socket deadline', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {socket} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'navigate_page', args: {timeout: 120_000}},
@@ -428,6 +447,8 @@ describe('daemon response deadline', () => {
   });
 
   it('still times out when a long-running tool never responds', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 120_000}},
@@ -444,6 +465,8 @@ describe('daemon response deadline', () => {
   });
 
   it('status still times out at exactly 60 seconds', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand({method: 'status'}, ''),
@@ -457,6 +480,8 @@ describe('daemon response deadline', () => {
   });
 
   it('adds the response grace period to a short tool timeout', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand(
@@ -474,6 +499,8 @@ describe('daemon response deadline', () => {
 
   for (const timeout of [undefined, 0, -1, NaN, Infinity]) {
     it(`keeps a bounded default deadline for timeout ${timeout}`, async () => {
+      using dir = createTempDir('cdm-deadline-test-');
+      const {destroy} = setupDeadlineTest(dir.path);
       const clock = sinon.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],
       });
@@ -494,6 +521,8 @@ describe('daemon response deadline', () => {
   }
 
   it('does not overflow the timer for an extremely large tool timeout', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    const {destroy} = setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const result = sendCommand(
       {method: 'invoke_tool', tool: 'wait_for', args: {timeout: 2 ** 31}},
@@ -510,6 +539,8 @@ describe('daemon response deadline', () => {
   });
 
   it('preserves an explicit socket deadline', async () => {
+    using dir = createTempDir('cdm-deadline-test-');
+    setupDeadlineTest(dir.path);
     const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     const assertion = assert.rejects(
       sendCommand(

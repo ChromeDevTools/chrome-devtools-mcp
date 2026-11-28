@@ -5,7 +5,10 @@
  */
 
 import type {Page} from '../third_party/browser.js';
-import type {CD4ACommentThread} from '../types.js';
+import type {
+  CD4ACommentThread,
+  CD4AGetCommentThreadsOptions,
+} from '../types.js';
 import {logger} from '../utils/logger.js';
 
 export interface DevToolsCommentBridgeOptions {
@@ -108,11 +111,24 @@ export class DevToolsCommentBridge {
     return true;
   }
 
-  async getComments(devtoolsPage: Page): Promise<CD4ACommentThread[]> {
-    return await devtoolsPage.evaluate(() => {
-      window.universe?.cd4aBridge?.setAgentAttached(true);
-      return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
-    });
+  /**
+   * Returns the comment threads sent to the agent. With
+   * `includeTransmitted`, also returns open threads that an earlier call
+   * already returned.
+   */
+  async getComments(
+    devtoolsPage: Page,
+    options: CD4AGetCommentThreadsOptions,
+  ): Promise<CD4ACommentThread[]> {
+    return await devtoolsPage.evaluate(
+      (threadsOptions: CD4AGetCommentThreadsOptions) => {
+        window.universe?.cd4aBridge?.setAgentAttached(true);
+        return (
+          window.universe?.cd4aBridge?.getCommentThreads(threadsOptions) ?? []
+        );
+      },
+      options,
+    );
   }
 
   /**
