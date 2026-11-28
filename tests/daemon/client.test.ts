@@ -118,6 +118,63 @@ describe('daemon client', () => {
       );
     });
 
+    it('reports a daemon that exits during startup instead of timing out', async () => {
+      // The timeout path rejects with a "Timeout: ..." error, so matching the
+      // exit error shows the failure came from the child's exit code.
+      await assert.rejects(startDaemon(['--viewport=invalid'], sessionId), {
+        message: 'Daemon exited (exit code 1) before it was ready.',
+      });
+    });
+
+    it('waits for a concurrently started daemon when its own daemon exits during startup', async () => {
+      await startDaemon([], sessionId);
+      const runningPid = getDaemonPid(sessionId);
+      const pidFilePath = getPidFilePath(sessionId);
+      const hiddenPidFilePath = `${pidFilePath}.hidden`;
+
+      // Hide the running daemon's PID file so the second start spawns its own
+      // daemon, then put it back so that daemon exits because one is running.
+      fs.renameSync(pidFilePath, hiddenPidFilePath);
+      const once = sinon.spy(childProcess.ChildProcess.prototype, 'once');
+      let spawned: childProcess.ChildProcess | undefined;
+      let start: Promise<void>;
+      try {
+        start = startDaemon([], sessionId);
+        spawned = once
+          .getCalls()
+          .find(call => (call.args[0] as string) === 'exit')?.thisValue;
+      } finally {
+        once.restore();
+        fs.renameSync(hiddenPidFilePath, pidFilePath);
+      }
+      assert.ok(spawned, 'startDaemon should spawn a daemon');
+      let exited = false;
+      spawned.once('exit', () => {
+        exited = true;
+      });
+
+      // Fail status probes, as while the first daemon is still starting,
+      // until the spawned daemon has exited and one more probe has failed.
+      let released = false;
+      const createConnection = sinon
+        .stub(net, 'createConnection')
+        .callsFake((...args: Parameters<typeof net.createConnection>) => {
+          if (!released) {
+            released = exited;
+            throw new Error('connect ENOENT');
+          }
+          return createConnection.wrappedMethod.apply(net, args);
+        });
+      try {
+        await start;
+      } finally {
+        createConnection.restore();
+      }
+      assert.ok(released, 'status should have failed after the daemon exited');
+      assert.strictEqual(spawned.exitCode, 1);
+      assert.strictEqual(getDaemonPid(sessionId), runningPid);
+    });
+
     it('should handle starting daemon when already running', async () => {
       await startDaemon([], sessionId);
       assert.ok(isDaemonRunning(sessionId), 'Daemon should be running');
