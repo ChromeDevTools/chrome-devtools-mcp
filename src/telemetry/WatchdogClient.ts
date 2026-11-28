@@ -59,6 +59,9 @@ export class WatchdogClient {
     this.#childProcess.on('exit', (code, signal) => {
       logger?.(`Watchdog exited with code ${code} and signal ${signal}`);
     });
+    this.#childProcess.stdin?.on('error', err => {
+      logger?.('Watchdog stdin error:', err);
+    });
   }
 
   send(message: WatchdogMessage): void {

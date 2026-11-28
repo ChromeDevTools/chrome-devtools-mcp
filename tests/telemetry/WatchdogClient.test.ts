@@ -127,4 +127,43 @@ describe('WatchdogClient', () => {
       client.send({type: WatchdogMessageType.LOG_EVENT, payload: {}});
     }, 'Client should catch and ignore write errors');
   });
+
+  it('handles async stdin errors without crashing', async () => {
+    let writes = 0;
+    const stdin = new Writable({
+      write(_chunk, _encoding, callback) {
+        writes++;
+        setImmediate(() => {
+          const error: NodeJS.ErrnoException = new Error('write EPIPE');
+          error.code = 'EPIPE';
+          callback(error);
+        });
+      },
+    });
+    Object.defineProperty(mockChildProcess, 'stdin', {
+      value: stdin,
+      writable: true,
+    });
+
+    const client = new WatchdogClient(
+      {
+        parentPid: 100,
+        appVersion: '1.0.0',
+        osType: OsType.OS_TYPE_LINUX,
+        sessionId: 'session-1',
+        clearcutEndpoint: 'http://127.0.0.1:1234',
+      },
+      {spawn: spawnStub},
+    );
+
+    const closed = new Promise<void>(resolve => {
+      stdin.once('close', resolve);
+    });
+    client.send({type: WatchdogMessageType.LOG_EVENT, payload: {}});
+    await closed;
+
+    assert.strictEqual(stdin.destroyed, true);
+    client.send({type: WatchdogMessageType.LOG_EVENT, payload: {}});
+    assert.strictEqual(writes, 1);
+  });
 });
