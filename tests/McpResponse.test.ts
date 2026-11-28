@@ -2116,13 +2116,11 @@ describe('McpResponse heap snapshot formatting', () => {
       nodes,
     );
     const text = getTextContent(content[0]);
-    assert.ok(
-      text.indexOf('Id1') < text.indexOf('Id2'),
-      'Id1 should precede Id2',
-    );
-    assert.ok(
-      text.indexOf('Id2') < text.indexOf('Id3'),
-      'Id2 should precede Id3',
+    const positions = nodes.map(node => text.indexOf(node.name));
+    assert.ok(positions.every(position => position >= 0));
+    assert.deepStrictEqual(
+      positions,
+      [...positions].sort((a, b) => a - b),
     );
   });
 
