@@ -9,8 +9,12 @@ import fs from 'node:fs';
 import {afterEach, describe, it, mock} from 'node:test';
 import util from 'node:util';
 
+import sinon from 'sinon';
+
 import {
   escapeForLog,
+  flushLogs,
+  logger,
   redactConnectOptionsForLogging,
   redactDaemonArgsForLogging,
   redactUrlForLogging,
@@ -72,6 +76,27 @@ describe('puppeteerLogger', () => {
     assert.match(writeArg, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /);
     assert.ok(writeArg.includes('test-prefix'));
     assert.ok(writeArg.includes('hello world\n'));
+  });
+});
+
+describe('flushLogs', () => {
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  it('detaches the log stream after flush', async () => {
+    const mockStream = sinon.createStubInstance(fs.WriteStream);
+    mockStream.end.callsArg(0);
+    mock.method(fs, 'createWriteStream', () => mockStream);
+
+    const logFile = saveLogsToFile('dummy.log');
+    assert.ok(logger);
+    logger('before flush');
+    await flushLogs(logFile);
+    logger('after flush');
+
+    sinon.assert.calledOnce(mockStream.write);
+    sinon.assert.calledOnce(mockStream.end);
   });
 });
 
@@ -186,6 +211,54 @@ describe('sensitive connection logging', () => {
     }
     assert.strictEqual(options.headers.Authorization, 'Bearer HEADER_SECRET');
     assert.match(options.browserWSEndpoint, /URL_SECRET/);
+  });
+
+  it('redacts wsOptions.headers while preserving sibling wsOptions', () => {
+    const options = {
+      browserWSEndpoint: 'wss://user:password@example.test/ws?token=URL_SECRET',
+      wsOptions: {
+        keepAlive: true,
+        headers: {
+          Authorization: 'Bearer HEADER_SECRET',
+          'X-Api-Key': 'API_SECRET',
+        },
+      },
+    };
+    const sanitized = redactConnectOptionsForLogging(options);
+    assert.deepStrictEqual(sanitized.wsOptions, {
+      keepAlive: true,
+      headers: {
+        Authorization: '[REDACTED]',
+        'X-Api-Key': '[REDACTED]',
+      },
+    });
+    for (const secret of [
+      'password',
+      'URL_SECRET',
+      'HEADER_SECRET',
+      'API_SECRET',
+    ]) {
+      assert.ok(!JSON.stringify(sanitized).includes(secret));
+    }
+    assert.strictEqual(
+      options.wsOptions.headers.Authorization,
+      'Bearer HEADER_SECRET',
+    );
+  });
+
+  it('keeps wsOptions unchanged when wsOptions.headers is undefined', () => {
+    const options = {
+      browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
+      wsOptions: {
+        keepAlive: true,
+        headers: undefined,
+      },
+    };
+    const sanitized = redactConnectOptionsForLogging(options);
+    assert.deepStrictEqual(sanitized.wsOptions, {
+      keepAlive: true,
+      headers: undefined,
+    });
   });
 
   it('redacts daemon startup flags without modifying the arguments passed to spawn', () => {

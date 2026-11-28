@@ -14,6 +14,7 @@ import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
 import {puppeteer, type Browser} from '../src/third_party/browser.js';
+import {flushLogs, saveLogsToFile} from '../src/utils/logger.js';
 
 import {
   createMockPuppeteerBrowser,
@@ -21,7 +22,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks} from './server.js';
-import {getExecutablePath} from './utils.js';
+import {createTempDir, getExecutablePath} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -65,6 +66,9 @@ describe('browser', () => {
 
   describe('BrowserManager', () => {
     it('preserves WebSocket connection credentials for Puppeteer while redacting logs', async () => {
+      using dir = createTempDir('browser-log-redaction-');
+      const logPath = path.join(dir.path, 'connect.log');
+      const logFile = saveLogsToFile(logPath);
       const pptrBrowser = createMockPuppeteerBrowser();
       const connectStub = sinon
         .stub(puppeteer, 'connect')
@@ -79,17 +83,34 @@ describe('browser', () => {
         createMockServerConfig({wsEndpoint: endpoint, wsHeaders: headers}),
       );
 
-      await manager.ensureBrowser();
+      try {
+        await manager.ensureBrowser();
 
-      sinon.assert.calledOnceWithMatch(connectStub, {
-        browserWSEndpoint: endpoint,
-        wsOptions: {headers},
-      });
-      assert.deepStrictEqual(
-        connectStub.firstCall.args[0].wsOptions?.headers,
-        headers,
-      );
-      await manager.close();
+        sinon.assert.calledOnceWithMatch(connectStub, {
+          browserWSEndpoint: endpoint,
+          wsOptions: {headers},
+        });
+        assert.deepStrictEqual(
+          connectStub.firstCall.args[0].wsOptions?.headers,
+          headers,
+        );
+        await manager.close();
+      } finally {
+        await flushLogs(logFile);
+      }
+
+      const logContent = fs.readFileSync(logPath, 'utf8');
+      assert.ok(logContent.includes('Connecting Puppeteer to '));
+      assert.ok(logContent.includes('"Authorization":"[REDACTED]"'));
+      assert.ok(logContent.includes('"X-Test":"[REDACTED]"'));
+      for (const secret of [
+        'password',
+        'WS_SECRET_123',
+        'HEADER_SECRET_456',
+        'visible',
+      ]) {
+        assert.ok(!logContent.includes(secret));
+      }
     });
 
     it('launches a browser when no connect options are set and closes it on close()', async () => {

@@ -30,6 +30,9 @@ export function flushLogs(
   logFile: fs.WriteStream,
   timeoutMs = 2000,
 ): Promise<void> {
+  if (logFileStream === logFile) {
+    logFileStream = undefined;
+  }
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(reject, timeoutMs);
     logFile.end(() => {
@@ -86,6 +89,14 @@ export function redactUrlForLogging(value: string): string {
   }
 }
 
+function redactHeadersForLogging(
+  headers: Record<string, unknown>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.keys(headers).map(name => [name, '[REDACTED]']),
+  );
+}
+
 /**
  * Return a redacted copy of the Puppeteer connection options for logging.
  * Keep the actual headers and connection URLs intact for Puppeteer.
@@ -93,6 +104,9 @@ export function redactUrlForLogging(value: string): string {
 export function redactConnectOptionsForLogging<
   T extends {
     headers?: Record<string, string>;
+    wsOptions?: {
+      headers?: Record<string, unknown>;
+    };
     browserWSEndpoint?: string;
     browserURL?: string;
   },
@@ -100,10 +114,14 @@ export function redactConnectOptionsForLogging<
   return {
     ...options,
     ...(options.headers
+      ? {headers: redactHeadersForLogging(options.headers)}
+      : {}),
+    ...(options.wsOptions?.headers
       ? {
-          headers: Object.fromEntries(
-            Object.keys(options.headers).map(name => [name, '[REDACTED]']),
-          ),
+          wsOptions: {
+            ...options.wsOptions,
+            headers: redactHeadersForLogging(options.wsOptions.headers),
+          },
         }
       : {}),
     ...(options.browserWSEndpoint
