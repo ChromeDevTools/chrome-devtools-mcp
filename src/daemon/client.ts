@@ -116,11 +116,11 @@ async function waitForDaemonReady(
     } catch (error) {
       lastError = error;
     }
-    // Checked after a failed status: when two callers start the same session,
-    // the second daemon exits because the first one is running, and the
-    // caller should connect to that one.
+    // When two callers start the same session, the second daemon exits
+    // because the first one is running, and the caller should wait for that
+    // one to become ready.
     const startupError = getStartupError?.();
-    if (startupError) {
+    if (startupError && !isDaemonRunning(sessionId)) {
       throw startupError;
     }
 
