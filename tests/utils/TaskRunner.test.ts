@@ -349,6 +349,47 @@ describe('TaskRunner', () => {
       await Promise.all([running.done, waiting.done]);
     });
 
+    it('waits for running queues placed after a waiting task', async () => {
+      const {runner, childA, childB} = createTree();
+      const runningA = start(childA);
+      const waitingA = start(childA);
+      const runningB = start(childB);
+      await settle();
+      assert.strictEqual(runningA.started, true);
+      assert.strictEqual(waitingA.started, false);
+      assert.strictEqual(runningB.started, true);
+
+      let paused = false;
+      const pause = runner.pause().then(guard => {
+        paused = true;
+        return guard;
+      });
+      const lateB = start(childB);
+      runningA.finish();
+      await runningA.done;
+      await settle();
+
+      assert.strictEqual(paused, false);
+      assert.strictEqual(waitingA.started, false);
+      assert.strictEqual(lateB.started, false);
+
+      runningB.finish();
+      await runningB.done;
+      const guard = await pause;
+      await settle();
+      assert.strictEqual(paused, true);
+      assert.strictEqual(waitingA.started, false);
+      assert.strictEqual(lateB.started, false);
+
+      guard[Symbol.dispose]();
+      await settle();
+      assert.strictEqual(waitingA.started, true);
+      assert.strictEqual(lateB.started, true);
+      waitingA.finish();
+      lateB.finish();
+      await Promise.all([waitingA.done, lateB.done]);
+    });
+
     it('unblocks unrelated queues when a waiting pause is aborted', async () => {
       const {runner, childA, childB} = createTree();
       const a = start(childA);

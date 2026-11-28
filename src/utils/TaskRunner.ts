@@ -182,9 +182,11 @@ export class TaskRunner {
       if (entry.running) {
         continue;
       }
-      const blocked = this.#entries
-        .slice(0, index)
-        .some(earlier => earlier.queue.isRelatedTo(entry.queue));
+      const blocked = this.#entries.some(
+        (other, otherIndex) =>
+          (otherIndex < index || other.running) &&
+          other.queue.isRelatedTo(entry.queue),
+      );
       if (!blocked) {
         entry.running = true;
         entry.resolve();
